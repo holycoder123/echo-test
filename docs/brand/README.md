@@ -1,6 +1,6 @@
 # EchoTest 品牌资源
 
-依据选定的「e / 回声弧线 / 通过勾」方案重绘矢量母版。产品名称和 Logo 字标统一为 `EchoTest`，其中 `Echo` 加粗、`Test` 常规字重，中间不留空格。品牌语为「每一次测试，都有回响」。
+采用 A「回声闭环 / Echo Loop」方案：单道薄荷青回声弧线、墨蓝色开口圆环，以及独立的薄荷青通过勾。产品名称和 Logo 字标统一为 `EchoTest`，其中 `Echo` 加粗、`Test` 使用轻字重，中间不留空格。品牌语为「每一次测试，都有回响」。[选定的原始概念稿](approved-concept.png) 同目录保留，正式 SVG 以简洁几何路径重绘。
 
 ![品牌横幅](github-banner.svg)
 
@@ -14,7 +14,7 @@
 | 深色背景横版 | [logo-light.svg](logo-light.svg) | [logo-light.png](logo-light.png)，透明 |
 | 单色横版 | [logo-mono.svg](logo-mono.svg) | [logo-mono.png](logo-mono.png)，透明 |
 | 独立图形 | [标准](mark.svg) · [浅色](mark-light.svg) · [墨色](mark-mono.svg) · [白色](mark-white.svg) | 对应同名 PNG，576 × 576，透明 |
-| 应用图标 | [浅底](app-icon.svg) · [深底](app-icon-dark.svg) | [icons/](icons/) 下 16 / 20 / 24 / 32 / 40 / 48 / 64 / 128 / 256 / 512 / 1024 px |
+| 应用图标 | [标准深底](app-icon.svg) · [浅底](app-icon-light.svg) | [标准 PNG](app-icon.png) · [浅底 PNG](app-icon-light.png)；[icons/](icons/) 下 16 / 20 / 24 / 32 / 40 / 48 / 64 / 128 / 256 / 512 / 1024 px |
 | Windows 桌面 / 安装器 | — | [echo-test.ico](echo-test.ico)，包含 9 个尺寸的图像帧 |
 | 网页 favicon | [favicon.svg](favicon.svg) | [favicon.ico](favicon.ico) · [favicon.png](favicon.png) |
 | GitHub README 横幅 | [github-banner.svg](github-banner.svg) | [github-banner.png](github-banner.png)，2560 × 840 |
@@ -30,7 +30,7 @@
 | 薄荷青 | `#42D6B0` | 回声弧线、通过勾、品牌强调 |
 | 雾白 | `#F6F8F4` | 应用图标底色和浅色展示背景 |
 
-字标使用 Segoe UI Bold / Regular，中文使用 Microsoft YaHei，均已转为路径。SVG 不依赖系统字体或外部资源。保持比例、不旋转或拉伸，四周至少留出图形宽度 1/8 的空间。带文字组合建议宽度不低于 160 px，小尺寸使用独立图形或应用图标。深色背景使用 `logo-light` / `mark-light`，单色印刷使用 `logo-mono` / `mark-mono`。
+字标使用 Segoe UI Bold / Light，中文使用 Microsoft YaHei，均已转为路径。SVG 不依赖系统字体或外部资源。保持比例、不旋转或拉伸，四周至少留出图形宽度 1/8 的空间。带文字组合建议宽度不低于 160 px，小尺寸使用独立图形或应用图标。深色背景使用 `logo-light` / `mark-light`，单色印刷使用 `logo-mono` / `mark-mono`。桌面与安装图标默认采用墨蓝底、白色圆环和薄荷青弧线 / 通过勾；`app-icon-dark` 作为兼容别名保留。
 
 ## 应用接入
 

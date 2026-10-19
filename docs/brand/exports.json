@@ -66,8 +66,20 @@
     "height": 640
   },
   {
+    "source": "docs/brand/app-icon.svg",
+    "output": "docs/brand/app-icon.png",
+    "width": 1024,
+    "height": 1024
+  },
+  {
     "source": "docs/brand/app-icon-dark.svg",
     "output": "docs/brand/app-icon-dark.png",
+    "width": 1024,
+    "height": 1024
+  },
+  {
+    "source": "docs/brand/app-icon-light.svg",
+    "output": "docs/brand/app-icon-light.png",
     "width": 1024,
     "height": 1024
   },

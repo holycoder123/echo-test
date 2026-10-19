@@ -26,9 +26,9 @@ PAPER = '#F6F8F4'
 FONTS = Path(os.environ.get('WINDIR', 'C:/Windows')) / 'Fonts'
 
 
-def lettering(text, x, baseline, size, color=INK, bold=False, chinese=False):
+def lettering(text, x, baseline, size, color=INK, bold=False, chinese=False, light=False):
     """Outline every glyph so GitHub/Linux render the same wordmark as Windows."""
-    font = TTFont(FONTS / ('msyhbd.ttc' if bold else 'msyh.ttc'), fontNumber=0) if chinese else TTFont(FONTS / ('segoeuib.ttf' if bold else 'segoeui.ttf'))
+    font = TTFont(FONTS / ('msyhbd.ttc' if bold else 'msyh.ttc'), fontNumber=0) if chinese else TTFont(FONTS / ('segoeuib.ttf' if bold else 'segoeuil.ttf' if light else 'segoeui.ttf'))
     glyphs = font.getGlyphSet()
     cmap = font.getBestCmap()
     scale = size / font['head'].unitsPerEm
@@ -46,15 +46,15 @@ def lettering(text, x, baseline, size, color=INK, bold=False, chinese=False):
 
 def mark(color=INK, accent=MINT):
     return f'''<g fill="none" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M21 78C27 40 53 17 86 13M23 110C33 143 56 165 87 171" stroke="{accent}" stroke-width="10"/>
-      <path d="M142 61C127 41 105 34 82 42C55 51 40 79 47 106C54 134 83 149 110 141C124 137 134 129 142 118M47 91H104" stroke="{color}" stroke-width="18"/>
-      <path d="M103 89L114 100L134 79" stroke="{accent}" stroke-width="14"/>
+      <path d="M26 46A90 90 0 0 0 26 146" stroke="{accent}" stroke-width="16"/>
+      <path d="M151 46A67 67 0 1 0 151 146" stroke="{color}" stroke-width="26"/>
+      <path d="M110 92L134 115L178 70" stroke="{accent}" stroke-width="23"/>
     </g>'''
 
 
-def wordmark(x=193, baseline=135, size=118, color=INK):
+def wordmark(x=226, baseline=137, size=118, color=INK):
     echo, width = lettering('Echo', x, baseline, size, color, bold=True)
-    test, _ = lettering('Test', x + width, baseline, size, color)
+    test, _ = lettering('Test', x + width, baseline, size, color, light=True)
     return echo + test
 
 
@@ -77,20 +77,21 @@ def main():
     write('logo.svg', svg(760, 192, mark() + wordmark()))
     write('logo-light.svg', svg(760, 192, mark('#FFFFFF') + wordmark(color='#FFFFFF')))
     write('logo-mono.svg', svg(760, 192, mark(INK, INK) + wordmark()))
-    tagline, _ = lettering('每一次测试，都有回响', 198, 198, 28, chinese=True)
+    tagline, _ = lettering('每一次测试，都有回响', 230, 198, 28, chinese=True)
     write('logo-tagline.svg', svg(760, 230, mark() + wordmark() + tagline))
-    stacked = '<g transform="translate(114 9)">'+mark()+'</g>'
-    word_width = lettering('Echo',0,0,118,bold=True)[1] + lettering('Test',0,0,118)[1]
+    stacked = '<g transform="translate(104 9)">'+mark()+'</g>'
+    word_width = lettering('Echo',0,0,118,bold=True)[1] + lettering('Test',0,0,118,light=True)[1]
     stacked += f'<g transform="translate({(400-word_width*.65)/2:.3f} 184) scale(.65)">'+wordmark(x=0)+'</g>'
     write('logo-stacked.svg', svg(400, 300, stacked))
-    app_icon = f'<rect x="8" y="8" width="496" height="496" rx="112" fill="{PAPER}"/><g transform="translate(70 52) scale(2)">'+mark()+'</g>'
+    app_icon = f'<rect x="8" y="8" width="496" height="496" rx="112" fill="{INK}"/><g transform="translate(64 64) scale(2)">'+mark('#FFFFFF')+'</g>'
     write('app-icon.svg', svg(512, 512, app_icon))
-    write('app-icon-dark.svg', svg(512, 512, f'<rect x="8" y="8" width="496" height="496" rx="112" fill="{INK}"/><g transform="translate(70 52) scale(2)">'+mark('#FFFFFF')+'</g>'))
+    write('app-icon-dark.svg', svg(512, 512, app_icon))
+    write('app-icon-light.svg', svg(512, 512, f'<rect x="8" y="8" width="496" height="496" rx="112" fill="{PAPER}"/><g transform="translate(64 64) scale(2)">'+mark()+'</g>'))
     # GitHub displays local SVGs without embedded fonts; all text below is paths.
     banner = f'<rect width="1280" height="420" rx="28" fill="{PAPER}"/>'
     banner += '<g transform="translate(68 80) scale(1.02)">'+mark()+wordmark()+'</g>'
     label, _ = lettering('WINDOWS DESKTOP AUTOMATION', 80, 49, 15, '#52756C', bold=True)
-    line, _ = lettering('每一次测试，都有回响', 274, 285, 31, chinese=True)
+    line, _ = lettering('每一次测试，都有回响', 300, 285, 31, chinese=True)
     sub, _ = lettering('录制操作  /  识别控件  /  验证结果', 81, 363, 20, '#52756C', chinese=True)
     banner += label + line + sub
     for radius, opacity in [(95, '.5'), (137, '.32'), (179, '.18')]:
@@ -115,7 +116,9 @@ def main():
         export(name+'.svg', 'docs/brand/'+name+'.png', width*3, height*3)
     export('github-banner.svg', 'docs/brand/github-banner.png', 2560, 840)
     export('social-preview.svg', 'docs/brand/social-preview.png', 1280, 640)
+    export('app-icon.svg', 'docs/brand/app-icon.png', 1024, 1024)
     export('app-icon-dark.svg', 'docs/brand/app-icon-dark.png', 1024, 1024)
+    export('app-icon-light.svg', 'docs/brand/app-icon-light.png', 1024, 1024)
     for size in (16,20,24,32,40,48,64,128,256,512,1024):
         export('app-icon.svg', f'docs/brand/icons/echo-test-{size}.png', size, size)
     write('exports.json', json.dumps(jobs, indent=2)+'\n')
