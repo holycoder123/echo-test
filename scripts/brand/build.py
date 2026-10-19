@@ -1,4 +1,4 @@
-"""Build the approved echo test identity as portable SVG paths and PNG/ICO exports.
+"""Build the approved EchoTest identity as portable SVG paths and PNG/ICO exports.
 
 Build-only requirements: fonttools==4.60.1, Pillow. Run on Windows with Segoe UI
 and Microsoft YaHei installed. Application users do not need these tools.
@@ -53,12 +53,12 @@ def mark(color=INK, accent=MINT):
 
 
 def wordmark(x=193, baseline=135, size=118, color=INK):
-    echo, width = lettering('echo', x, baseline, size, color, bold=True)
-    test, _ = lettering('test', x + width + 14, baseline, size, color)
+    echo, width = lettering('Echo', x, baseline, size, color, bold=True)
+    test, _ = lettering('Test', x + width, baseline, size, color)
     return echo + test
 
 
-def svg(width, height, body, title='echo test'):
+def svg(width, height, body, title='EchoTest'):
     return f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" aria-label="{html.escape(title, quote=True)}"><title>{html.escape(title)}</title>{body}</svg>\n'
 
 
@@ -80,7 +80,7 @@ def main():
     tagline, _ = lettering('每一次测试，都有回响', 198, 198, 28, chinese=True)
     write('logo-tagline.svg', svg(760, 230, mark() + wordmark() + tagline))
     stacked = '<g transform="translate(114 9)">'+mark()+'</g>'
-    word_width = lettering('echo',0,0,118,bold=True)[1] + 14 + lettering('test',0,0,118)[1]
+    word_width = lettering('Echo',0,0,118,bold=True)[1] + lettering('Test',0,0,118)[1]
     stacked += f'<g transform="translate({(400-word_width*.65)/2:.3f} 184) scale(.65)">'+wordmark(x=0)+'</g>'
     write('logo-stacked.svg', svg(400, 300, stacked))
     app_icon = f'<rect x="8" y="8" width="496" height="496" rx="112" fill="{PAPER}"/><g transform="translate(70 52) scale(2)">'+mark()+'</g>'

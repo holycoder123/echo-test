@@ -18,7 +18,7 @@ const {authorize}=require('./window-access.cjs');
 
 const {ROOT, runtimeFile, artifactFile} = require('./paths.cjs');
 const RENDERER = path.join(__dirname, 'renderer');
-app.setName('echo test');
+app.setName('EchoTest');
 app.setPath('userData',path.join(app.getPath('appData'),'echo-test'));
 const gameSmoke=process.argv.includes('--game-smoke');
 if (process.env.ECHO_TEST_SMOKE_TEST === '1' || gameSmoke) app.setPath('userData', path.join(app.getPath('temp'), gameSmoke?'echo-test-game-smoke':'echo-test-smoke-'+process.pid));
@@ -96,7 +96,7 @@ async function openGameWindow(){
     const initialBounds=gameToolbarBounds();
     gameWindow=new BrowserWindow({...initialBounds,minWidth:300,minHeight:Math.min(600,initialBounds.height),show:false,
       resizable:true,maximizable:false,fullscreenable:false,skipTaskbar:false,alwaysOnTop:false,
-      backgroundColor:'#f8f8f9',title:'echo test · 窗口工具栏',icon:path.join(__dirname,'assets/studio.png'),
+      backgroundColor:'#f8f8f9',title:'EchoTest · 窗口工具栏',icon:path.join(__dirname,'assets/studio.png'),
       titleBarStyle:'hidden',titleBarOverlay:{color:'#f8f8f9',symbolColor:'#55585e',height:42},
       webPreferences:{preload:path.join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true,backgroundThrottling:false}});
     gameWindow.setMenuBarVisibility(false);secureWindow(gameWindow);
@@ -253,7 +253,7 @@ async function dispatchStudioCall(role, method, args = {}) {
   if(method==='audit_list')return {entries:audit.read(args),directory:audit.directory};
   if(method==='audit_folder'){const error=await shell.openPath(audit.directory);if(error)throw new Error(error);return {};}
   if(method==='audit_export'){
-    const result=await dialog.showSaveDialog(window,{title:'导出错误日志',defaultPath:path.join(app.getPath('documents'),'echo test 诊断日志.jsonl'),filters:[{name:'诊断日志',extensions:['jsonl']}]});
+    const result=await dialog.showSaveDialog(window,{title:'导出错误日志',defaultPath:path.join(app.getPath('documents'),'EchoTest 诊断日志.jsonl'),filters:[{name:'诊断日志',extensions:['jsonl']}]});
     if(result.canceled)return null;
     fs.writeFileSync(result.filePath,audit.read({limit:1000}).reverse().map(row=>JSON.stringify(row)).join('\n')+'\n','utf8');return {path:result.filePath};
   }
@@ -322,7 +322,7 @@ async function dispatchStudioCall(role, method, args = {}) {
       file = recent[args.index];
       if (!file) throw new Error('最近用例不存在');
     } else {
-      const result = await dialog.showOpenDialog(window, {title: '打开测试用例',defaultPath:CASES, properties: ['openFile'], filters: [{name: 'echo test 用例', extensions: ['json']}]});
+      const result = await dialog.showOpenDialog(window, {title: '打开测试用例',defaultPath:CASES, properties: ['openFile'], filters: [{name: 'EchoTest 用例', extensions: ['json']}]});
       if (result.canceled) return null;
       file = result.filePaths[0];
     }
@@ -336,7 +336,7 @@ async function dispatchStudioCall(role, method, args = {}) {
     if (busy) throw new Error('请先停止录制或执行');
     let file = currentPath;
     if (!file || args.as_new) {
-      const result = await dialog.showSaveDialog(window, {title: '保存测试用例', defaultPath: !args.as_new&&file?file:defaultCasePath(CASES,args.project?.name), filters: [{name: 'echo test 用例', extensions: ['echo.json']}]});
+      const result = await dialog.showSaveDialog(window, {title: '保存测试用例', defaultPath: !args.as_new&&file?file:defaultCasePath(CASES,args.project?.name), filters: [{name: 'EchoTest 用例', extensions: ['echo.json']}]});
       if (result.canceled) return null;
       file = result.filePath;
     }
@@ -461,7 +461,7 @@ app.whenReady().then(async () => {
   window = new BrowserWindow({
     width: 1440, height: 1000, minWidth: 1120, minHeight: 740, backgroundColor: '#ffffff', show: false,skipTaskbar:false,
     icon:path.join(__dirname,'assets/studio.png'),
-    title: 'echo test', titleBarStyle: 'hidden', titleBarOverlay: {color: '#f8f8f9', symbolColor: '#55585e', height: 42},
+    title: 'EchoTest', titleBarStyle: 'hidden', titleBarOverlay: {color: '#f8f8f9', symbolColor: '#55585e', height: 42},
     webPreferences: {preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true,backgroundThrottling:false}
   });
   secureWindow(window);
@@ -473,7 +473,7 @@ app.whenReady().then(async () => {
     window.once('closed',()=>{try{if(JSON.parse(fs.readFileSync(statePath,'utf8')).host_pid===process.pid)fs.unlinkSync(statePath);}catch{}});
   }
   tray=new Tray(path.join(__dirname,'assets/studio.png'));
-  tray.setToolTip('echo test · 点击恢复窗口');
+  tray.setToolTip('EchoTest · 点击恢复窗口');
   tray.on('click',showWorkbench);
   tray.setContextMenu(Menu.buildFromTemplate([
     {label:'显示工作台',click:showWorkbench},

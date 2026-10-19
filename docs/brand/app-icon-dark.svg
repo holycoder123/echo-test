@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="echo test"><title>echo test</title><rect x="8" y="8" width="496" height="496" rx="112" fill="#122D39"/><g transform="translate(70 52) scale(2)"><g fill="none" stroke-linecap="round" stroke-linejoin="round">
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="EchoTest"><title>EchoTest</title><rect x="8" y="8" width="496" height="496" rx="112" fill="#122D39"/><g transform="translate(70 52) scale(2)"><g fill="none" stroke-linecap="round" stroke-linejoin="round">
       <path d="M21 78C27 40 53 17 86 13M23 110C33 143 56 165 87 171" stroke="#42D6B0" stroke-width="10"/>
       <path d="M142 61C127 41 105 34 82 42C55 51 40 79 47 106C54 134 83 149 110 141C124 137 134 129 142 118M47 91H104" stroke="#FFFFFF" stroke-width="18"/>
       <path d="M103 89L114 100L134 79" stroke="#42D6B0" stroke-width="14"/>

@@ -208,7 +208,7 @@ class SelectorDialog(tk.Toplevel):
 class Studio(tk.Tk):
     def __init__(self, path=None):
         super().__init__()
-        self.title("echo test")
+        self.title("EchoTest")
         self.geometry("1360x880")
         self.minsize(1100, 750)
         self.configure(bg="#eff3f8")
@@ -252,7 +252,7 @@ class Studio(tk.Tk):
     def build(self):
         header = ttk.Frame(self, padding=(22, 16))
         header.pack(fill="x")
-        ttk.Label(header, text="echo test", style="Title.TLabel").pack(side="left")
+        ttk.Label(header, text="EchoTest", style="Title.TLabel").pack(side="left")
         self.badge = tk.StringVar(value="管理员权限" if is_admin() else "普通权限 · 管理员客户端需使用管理员启动")
         ttk.Label(header, textvariable=self.badge, style="Muted.TLabel").pack(side="right")
         toolbar = ttk.Frame(self, padding=(22, 0, 22, 10))
@@ -398,7 +398,7 @@ class Studio(tk.Tk):
 
     def changed(self):
         self.dirty = True
-        self.title("echo test · " + self.case_name.get() + " *")
+        self.title("EchoTest · " + self.case_name.get() + " *")
 
     def guard(self):
         if self.running:
@@ -636,12 +636,12 @@ class Studio(tk.Tk):
         self.case_name.set(self.project.name)
         self.refresh_project()
         self.dirty = False
-        self.title("echo test · 新用例")
+        self.title("EchoTest · 新用例")
 
     def open(self):
         if not self.guard() or not self.abandon():
             return
-        path = filedialog.askopenfilename(filetypes=[("echo test 用例", "*.json"), ("所有文件", "*.*")], parent=self)
+        path = filedialog.askopenfilename(filetypes=[("EchoTest 用例", "*.json"), ("所有文件", "*.*")], parent=self)
         if path:
             self.open_path(Path(path))
 
@@ -653,7 +653,7 @@ class Studio(tk.Tk):
             self.case_name.set(self.project.name)
             self.refresh_project()
             self.dirty = False
-            self.title("echo test · " + self.project.name)
+            self.title("EchoTest · " + self.project.name)
             self.status.set("已打开 " + str(self.case_path))
         except Exception as error:
             messagebox.showerror("打开失败", str(error), parent=self)
@@ -663,7 +663,7 @@ class Studio(tk.Tk):
             return
         path = self.case_path
         if path is None or as_new:
-            chosen = filedialog.asksaveasfilename(defaultextension=".echo.json", filetypes=[("echo test 用例", "*.echo.json")], parent=self)
+            chosen = filedialog.asksaveasfilename(defaultextension=".echo.json", filetypes=[("EchoTest 用例", "*.echo.json")], parent=self)
             if not chosen:
                 return
             path = Path(chosen)
@@ -674,7 +674,7 @@ class Studio(tk.Tk):
             self.base_dir = self.case_path.parent
             self.refresh_project()
             self.dirty = False
-            self.title("echo test · " + self.project.name)
+            self.title("EchoTest · " + self.project.name)
             self.status.set("用例已保存，模板已随用例复制到 assets")
         except Exception as error:
             messagebox.showerror("保存失败", str(error), parent=self)

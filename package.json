@@ -1,7 +1,7 @@
 {
   "name": "echo-test",
   "version": "1.0.0",
-  "description": "echo test desktop automation testing workbench",
+  "description": "EchoTest desktop automation testing workbench",
   "private": true,
   "main": "electron/main.cjs",
   "scripts": {
@@ -24,5 +24,5 @@
     "koffi": "3.3.2",
     "zod": "4.6.5"
   },
-  "productName": "echo test"
+  "productName": "EchoTest"
 }

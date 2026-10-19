@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/brand/github-banner.svg" width="100%" alt="echo test — 每一次测试，都有回响">
+  <img src="docs/brand/github-banner.svg" width="100%" alt="EchoTest — 每一次测试，都有回响">
 </p>
 
 <p align="center">
@@ -24,7 +24,7 @@
 
 ## 从一次操作，到可重复的测试
 
-echo test 将窗口连接、操作录制、步骤编辑、控件识别和执行报告放在同一个工作区。目标应用保持原生独立窗口，测试工具栏可捆绑在一旁，适合桌面应用的重复操作验证与回归测试。
+EchoTest 将窗口连接、操作录制、步骤编辑、控件识别和执行报告放在同一个工作区。目标应用保持原生独立窗口，测试工具栏可捆绑在一旁，适合桌面应用的重复操作验证与回归测试。
 
 | 连接与录制 | 识别与编排 | 执行与回响 |
 | --- | --- | --- |
@@ -34,7 +34,7 @@ echo test 将窗口连接、操作录制、步骤编辑、控件识别和执行�
 
 以下截图使用演示数据展示实际界面。
 
-<img src="docs/images/workbench.png" width="100%" alt="echo test 桌面工作台：用例步骤、目标窗口连接及参数编辑">
+<img src="docs/images/workbench.png" width="100%" alt="EchoTest 桌面工作台：用例步骤、目标窗口连接及参数编辑">
 
 <details>
 <summary><strong>查看共享控件库与窗口工具栏</strong></summary>
@@ -120,4 +120,4 @@ Electron 负责桌面界面，Python / OpenCV / Win32 负责识别、录制与�
 
 ---
 
-<p align="center"><strong>echo test</strong><br>每一次测试，都有回响。</p>
+<p align="center"><strong>EchoTest</strong><br>每一次测试，都有回响。</p>

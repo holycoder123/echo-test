@@ -9,7 +9,7 @@ import ntpath
 from PIL import ImageGrab
 
 if os.name != "nt":
-    raise RuntimeError("echo test仅支持 Windows")
+    raise RuntimeError("EchoTest仅支持 Windows")
 user32 = ct.WinDLL("user32", use_last_error=True)
 kernel32 = ct.WinDLL("kernel32", use_last_error=True)
 advapi32 = ct.WinDLL("advapi32", use_last_error=True)

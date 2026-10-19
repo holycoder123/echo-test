@@ -6,7 +6,7 @@ from echo_test import backend as native
 class GenericWindowTests(unittest.TestCase):
     def test_discovery_lists_unrelated_apps_and_excludes_hidden_empty_and_own_windows(self):
         windows = {1: ('计算器', 201), 2: ('文档 - 记事本', 202), 3: ('', 203),
-                   4: ('测试进程', 100), 5: ('echo test', 101), 6: ('隐藏应用', 206),
+                   4: ('测试进程', 100), 5: ('EchoTest', 101), 6: ('隐藏应用', 206),
                    7: ('无客户区', 207), 8: ('无进程', 0), 9: ('第二个文档', 202), 90: ('桌面', 209), 91: ('系统外壳', 210)}
         def enumerate_windows(callback, _):
             for handle in windows:

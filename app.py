@@ -8,7 +8,7 @@ class StartupPermissionError(RuntimeError):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="echo test 桌面自动化测试工作台")
+    parser = argparse.ArgumentParser(description="EchoTest 桌面自动化测试工作台")
     parser.add_argument("--case", type=Path, help="打开指定 JSON 用例")
     parser.add_argument("--run", action="store_true", help="命令行执行，需明确指定 --case 和 --window")
     parser.add_argument("--window", type=int, help="目标目标窗口句柄")
@@ -96,5 +96,5 @@ if __name__ == "__main__":
             import ctypes
             from echo_test.mcp_startup import McpStartupError
             detail = str(error) if isinstance(error, (McpStartupError, StartupPermissionError)) else str(error) + "\n请先运行 install_dependencies.cmd"
-            ctypes.windll.user32.MessageBoxW(None, detail, "echo test启动失败", 0x10)
+            ctypes.windll.user32.MessageBoxW(None, detail, "EchoTest启动失败", 0x10)
         raise SystemExit(1)

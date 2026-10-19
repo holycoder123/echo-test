@@ -6,11 +6,11 @@ RequestExecutionLevel user
 !include "x64.nsh"
 !include "WinVer.nsh"
 
-!define APP_NAME "echo test"
+!define APP_NAME "EchoTest"
 !define APP_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\EchoTest"
 Name "${APP_NAME} ${PRODUCT_VERSION}"
 OutFile "${OUTPUT_EXE}"
-InstallDir "$LOCALAPPDATA\Programs\echo test"
+InstallDir "$LOCALAPPDATA\Programs\EchoTest"
 InstallDirRegKey HKCU "${APP_KEY}" "InstallLocation"
 SetCompressor /SOLID lzma
 SetCompressorDictSize 32

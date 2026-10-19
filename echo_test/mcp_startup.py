@@ -90,8 +90,8 @@ def _main_window(root: Path, user32=None, kernel32=None):
         return None  # A closed window's handle was reused; it is not our instance.
     title = ct.create_unicode_buffer(512)
     user32.GetWindowTextW(handle, title, len(title))
-    if not (title.value == "echo test" or title.value.endswith(" · echo test")):
-        raise McpStartupError("无法确认运行中的工作台主窗口身份，请确认“echo test”主窗口已正常退出后重试。")
+    if not any(title.value == name or title.value.endswith(" · " + name) for name in ("EchoTest", "echo test")):
+        raise McpStartupError("无法确认运行中的工作台主窗口身份，请确认“EchoTest”主窗口已正常退出后重试。")
     process = kernel32.OpenProcess(0x1000, False, expected_pid)
     if process:
         try:
@@ -135,9 +135,9 @@ def check_mcp_startup(root: Path, *, user32=None, kernel32=None):
     if connection is not None:
         return connection
     raise McpStartupError(
-        "已有未启用 MCP 的“echo test”正在运行。\n"
-        "请先停止录制或执行，保存未保存用例，然后关闭“echo test”主窗口"
-        "（不是“echo test · 窗口工具栏”）。如出现未保存或忙碌提示，请处理后正常退出。\n"
+        "已有未启用 MCP 的“EchoTest”正在运行。\n"
+        "请先停止录制或执行，保存未保存用例，然后关闭“EchoTest”主窗口"
+        "（不是“EchoTest · 窗口工具栏”）。如出现未保存或忙碌提示，请处理后正常退出。\n"
         "退出后再双击 start_admin_mcp.cmd。新启动参数不能应用到旧实例；本次没有关闭任何窗口。"
     )
 
@@ -166,7 +166,7 @@ def wait_for_mcp(root: Path, *, timeout=10.0, interval=.1, user32=None,
     raise McpStartupError(
         f"MCP 工作台未能在 {timeout:g} 秒内完成启动。操作系统接收启动请求不代表 MCP 已启用。\n"
         f"未找到与当前主窗口匹配的有效连接信息：{root / '.runtime' / 'mcp-connection.json'}\n"
-        "请确认管理员启动提示已完成；保存用例并正常关闭“echo test”主窗口"
+        "请确认管理员启动提示已完成；保存用例并正常关闭“EchoTest”主窗口"
         "（不是工具栏），然后重新运行 start_admin_mcp.cmd。若主窗口已重新启动，"
         "请查看工作台中的“MCP 启动失败”提示或错误日志。本次没有关闭任何窗口。"
     )

@@ -193,7 +193,7 @@ class Runner:
             if step.get("recognition_screenshot"):
                 output += f'<a href="{escape(step["recognition_screenshot"])}">查看候选框</a>'
             rows.append(f'<tr><td>{step["index"] + 1}</td><td>{escape(step["name"])}</td><td>{escape(step["action"])}</td><td>{step["iteration"]}/{step["repeat"]}</td><td class="{step["status"]}">{escape(step["status"])}</td><td>{step.get("elapsed", 0)}s</td><td>{escape(step.get("error", ""))} {image} {script} {output}</td></tr>')
-        document = f'''<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>echo test 测试报告</title>
+        document = f'''<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>EchoTest 测试报告</title>
 <style>body{{font:15px 'Microsoft YaHei',sans-serif;background:#f3f6fa;padding:32px;color:#172438}}table{{width:100%;border-collapse:collapse;background:white}}td,th{{padding:12px;border-bottom:1px solid #ddd;text-align:left}}.passed{{color:#087d59}}.failed{{color:#bf283d}}.stopped{{color:#ab6900}}a{{color:#1465d4}}</style>
 <h1>{escape(self.result['case'])}</h1><p>状态：{escape(self.result['status'])} · 开始：{escape(self.result['started'])}</p>
 <p>{escape(self.result.get('error', ''))}</p><table><tr><th>步骤</th><th>名称</th><th>事件</th><th>轮次/重复</th><th>结果</th><th>耗时</th><th>详情</th></tr>{''.join(rows)}</table></html>'''

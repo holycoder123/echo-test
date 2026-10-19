@@ -25,9 +25,9 @@ class FocusTests(unittest.TestCase):
              patch.object(native.user32, "ShowWindow"), \
              patch.object(native.user32, "SetForegroundWindow", return_value=False), \
              patch.object(native.user32, "GetForegroundWindow", return_value=20), \
-             patch.object(native, "window_title", return_value="echo test"), \
+             patch.object(native, "window_title", return_value="EchoTest"), \
              patch.object(native.time, "monotonic", side_effect=[0,2]):
-            with self.assertRaisesRegex(RuntimeError, "无法激活.*echo test"):
+            with self.assertRaisesRegex(RuntimeError, "无法激活.*EchoTest"):
                 self.backend.activate()
 
     def test_elevation_error_precedes_focus_error(self):

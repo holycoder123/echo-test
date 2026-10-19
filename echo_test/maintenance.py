@@ -19,7 +19,7 @@ def close_workbench(root: Path, timeout=12):
     host=int(state.get('workbench',state['host']));pid=wt.DWORD()
     if not user32.IsWindow(host):return {'closed':True,'reason':'already_closed'}
     user32.GetWindowThreadProcessId(host,ct.byref(pid))
-    if pid.value!=state['host_pid'] or 'echo test' not in window_title(host):
+    if pid.value!=state['host_pid'] or not any(name in window_title(host) for name in ('EchoTest', 'echo test')):
         raise RuntimeError('工作台身份已变化，停止重启')
     process=kernel32.OpenProcess(0x1000,False,pid.value)
     if not process:raise RuntimeError('无法验证工作台进程，请以匹配的管理员权限运行')

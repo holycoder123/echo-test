@@ -1,6 +1,6 @@
-# echo test 品牌资源
+# EchoTest 品牌资源
 
-依据选定的「e / 回声弧线 / 通过勾」方案重绘矢量母版。横版字标保持 `echo` 加粗、`test` 常规字重，品牌语为「每一次测试，都有回响」。
+依据选定的「e / 回声弧线 / 通过勾」方案重绘矢量母版。产品名称和 Logo 字标统一为 `EchoTest`，其中 `Echo` 加粗、`Test` 常规字重，中间不留空格。品牌语为「每一次测试，都有回响」。
 
 ![品牌横幅](github-banner.svg)
 
@@ -36,7 +36,7 @@
 
 - `electron/assets/studio.svg` / `studio.png` / `studio.ico`：应用窗口、托盘、安装器与安装快捷方式。
 - `electron/renderer/brand/mark.svg`：工作台标题栏、侧栏与窗口工具栏，经现有应用协议加载。
-- `scripts/set-desktop-icon.ps1`：为当前项目创建「echo test」桌面入口，识别旧名称入口并备份后替换。
+- `scripts/set-desktop-icon.ps1`：为当前项目创建「EchoTest」桌面入口，识别旧名称入口并备份后替换。
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/set-desktop-icon.ps1

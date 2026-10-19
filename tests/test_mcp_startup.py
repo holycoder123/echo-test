@@ -33,7 +33,7 @@ class McpStartupTests(unittest.TestCase):
 
     @staticmethod
     def window_title(_handle, output, _length):
-        output.value = "echo test"
+        output.value = "EchoTest"
         return len(output.value)
 
     def process_path(self, _handle, _flags, output, _length):
@@ -96,6 +96,14 @@ class McpStartupTests(unittest.TestCase):
         self.assertEqual(self.check(), {"already_enabled": True, "pid": 88})
         self.assert_read_only()
 
+    def test_product_rename_recognizes_current_and_legacy_main_titles(self):
+        self.snapshot()
+        self.descriptor()
+        for title in ('EchoTest', '示例用例 · EchoTest', 'echo test', '示例用例 · echo test'):
+            with self.subTest(title=title):
+                self.user32.GetWindowTextW.side_effect = lambda _h, output, _n, value=title: setattr(output, 'value', value) or len(value)
+                self.assertEqual(self.check(), {'already_enabled': True, 'pid': 88})
+
     def test_closed_stale_window_does_not_block_a_new_start(self):
         self.snapshot()
         self.user32.IsWindow.return_value = False
@@ -109,9 +117,11 @@ class McpStartupTests(unittest.TestCase):
 
     def test_toolbar_cannot_pass_as_the_main_window(self):
         self.snapshot()
-        self.user32.GetWindowTextW.side_effect = lambda _h, output, _n: setattr(output, "value", "echo test · 窗口工具栏") or 7
-        with self.assertRaisesRegex(McpStartupError, "主窗口身份"):
-            self.check()
+        for title in ('EchoTest · 窗口工具栏', 'echo test · 窗口工具栏'):
+            with self.subTest(title=title):
+                self.user32.GetWindowTextW.side_effect = lambda _h, output, _n, value=title: setattr(output, 'value', value) or len(value)
+                with self.assertRaisesRegex(McpStartupError, "主窗口身份"):
+                    self.check()
 
     def test_process_from_another_project_is_not_reused(self):
         self.snapshot()

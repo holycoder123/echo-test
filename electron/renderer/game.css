@@ -34,5 +34,5 @@ footer{display:flex;flex-direction:column;gap:6px;padding:10px 16px 11px;flex-sh
 #notice{position:fixed;z-index:10;bottom:75px;left:12px;right:12px;padding:10px 12px;border-radius:8px;background:#a14455;color:white;box-shadow:0 5px 20px #0002;pointer-events:none;line-height:1.6;overflow-wrap:anywhere}
 @media(max-height:650px){.toolbar{padding:10px 12px}.actions{margin-top:10px}.game-case-controls{padding:9px 12px;gap:7px}.run-area{padding:9px}.workspace-actions{padding:5px 9px}footer{padding:8px 12px}}
 
-/* echo test identity */
+/* EchoTest identity */
 .mark{background:transparent;border-radius:0}.mark img{display:block;width:24px;height:24px}

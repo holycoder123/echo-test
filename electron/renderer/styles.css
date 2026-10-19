@@ -26,5 +26,5 @@
 
 .history-selection-bar{display:flex;align-items:center;gap:14px;margin:8px 0 14px;font-size:11px;color:var(--muted);flex-wrap:wrap}.history-selection-bar>label{display:flex;align-items:center;gap:8px;cursor:pointer}.history-selection-bar>.btn{margin-left:auto;height:29px}.history-check{width:14px;height:14px;accent-color:#6577b2;flex-shrink:0;cursor:pointer}.history-check:disabled{cursor:default}.report-table .history-check-cell{width:34px;padding-left:10px;padding-right:5px}.history-selected{background:#f2f5fc}.run-current>.history-selection-bar{padding:10px 20px;margin:0;border-bottom:1px solid var(--line)}.log-line>.history-check{margin-top:3px}.audit-layout>div>.history-selection-bar{margin-top:0}
 
-/* echo test identity */
+/* EchoTest identity */
 .titlebar .app-mark{background:transparent;border-radius:0}.app-mark img{display:block;width:24px;height:24px}.brand-icon{border:0;background:transparent;box-shadow:none}.brand-icon img{display:block;width:39px;height:39px}

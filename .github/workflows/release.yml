@@ -1,4 +1,4 @@
-name: Release echo test
+name: Release EchoTest
 run-name: Release ${{ inputs.tag }}
 on:
   workflow_dispatch:
@@ -70,7 +70,7 @@ jobs:
           & scripts/build-portable.ps1 -SkipArchive
           if ($LASTEXITCODE -ne 0) { throw 'Offline runtime preparation failed' }
           (Join-Path (Get-Location) 'runtime\node') | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          $metadata = @{product='echo test';version=$env:RELEASE_VERSION;tag=$env:RELEASE_TAG;source_commit=$env:RELEASE_SHA;source_url="https://github.com/$env:GITHUB_REPOSITORY/tree/$env:RELEASE_SHA";built_at_utc=[DateTime]::UtcNow.ToString('o');build_url="https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"}
+          $metadata = @{product='EchoTest';version=$env:RELEASE_VERSION;tag=$env:RELEASE_TAG;source_commit=$env:RELEASE_SHA;source_url="https://github.com/$env:GITHUB_REPOSITORY/tree/$env:RELEASE_SHA";built_at_utc=[DateTime]::UtcNow.ToString('o');build_url="https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"}
           [IO.File]::WriteAllText((Join-Path (Get-Location) 'runtime/release.json'),($metadata | ConvertTo-Json -Depth 5),(New-Object Text.UTF8Encoding $false))
       - name: Check source and run unit tests
         run: |
