@@ -18,6 +18,9 @@ async function verify(window){
     try{
       S.connection=null;S.handle=null;S.view='game';
       await handleAction('refresh',{dataset:{}});
+      const brandImages=[...document.querySelectorAll('.app-mark img,.brand-icon img')];
+      await Promise.all(brandImages.map(image=>image.decode()));
+      result.brandLoaded=brandImages.length===2&&brandImages.every(image=>image.naturalWidth>0);
       result.discoveryDoesNotConnect=S.handle===null&&S.connection===null&&attaches===0&&document.querySelector('#connection').value===''&&!document.querySelector('.topbar-right>.status-dot.green');
       result.disconnectedMessage=document.querySelector('.empty strong').textContent==='尚未连接目标应用';
       await handleAction('game-connect',{dataset:{}});

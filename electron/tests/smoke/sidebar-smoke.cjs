@@ -6,6 +6,8 @@ async function verify(bar) {
   const originalSize=bar.getSize(),saved=await bar.webContents.executeJavaScript('JSON.stringify(G)');
   const result={sizes:[],errors:[]};
   try {
+    result.brandLoaded=await bar.webContents.executeJavaScript(`(async()=>{const image=document.querySelector('.mark img');await image.decode();return image.naturalWidth>0;})()`);
+    assert.equal(result.brandLoaded,true,'toolbar brand image loads through the application protocol');
     await bar.webContents.executeJavaScript(`Object.assign(G,{
       connection:{width:1024,height:700,title:'示例桌面应用'},toolbarLinked:true,busy:'running',recordStarting:false,recordPending:false,
       run:{case:'新手任务 · 接受任务与交付奖励',status:'running',iterations:1,total:6,completed:3,passed:3,failed:0,stopped:0,

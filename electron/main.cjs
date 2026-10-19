@@ -596,6 +596,7 @@ app.whenReady().then(async () => {
           await require('./tests/smoke/control-library-responsive-smoke.cjs').verify(window);
           await require('./tests/smoke/modal-buttons-smoke.cjs').verify(window);
           await require('./tests/smoke/history-delete-smoke.cjs').verify(window);
+          if(process.env.ECHO_TEST_BRAND_PREVIEW==='1')await require('../scripts/brand/screenshots.cjs').capture(window,gameWindow);
       } finally {closing = true; await bridge.shutdown();gameWindow?.destroy(); window.destroy();}
     });
   }

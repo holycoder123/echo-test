@@ -98,7 +98,7 @@ function paramsSummary(step) {
 function render() {
   const titles={game:'目标窗口 ↗',cases:'测试用例',targets:'通用控件库',record:'录制',runs:'运行记录',diagnostics:'错误日志',help:'使用说明'};
   root.innerHTML=`<div class="shell"><aside class="sidebar">
-    <div class="brand"><div class="brand-icon">${icon('spark')}</div><div><strong>echo test</strong><span>桌面自动化测试工作台</span></div></div>
+    <div class="brand"><div class="brand-icon"><img src="brand/mark.svg" alt=""></div><div><strong>echo test</strong><span>桌面自动化测试工作台</span></div></div>
     ${Object.entries(titles).map(([view,title])=>`<button class="nav-button ${S.view===view?'active':''}" data-act="view-${view}">${icon(view==='runs'?'history':view)}<span>${title}</span>${view==='record'&&S.busy==='recording'?'<span class="count"><i class="status-dot red"></i></span>':''}</button>`).join('')}
     <div class="nav-label">工作区</div><button class="recent-case" data-act="new">＋ 新建用例</button><button class="recent-case" data-act="open">打开本地用例</button>
     ${S.recent.length?'<div class="nav-label">最近使用</div>'+S.recent.slice(0,5).map((path,index)=>`<button class="recent-case" data-act="recent" data-i="${index}" title="${esc(path)}">${esc(shortFile(path))}</button>`).join(''):''}

@@ -1,0 +1,140 @@
+[
+  {
+    "source": "docs/brand/mark.svg",
+    "output": "docs/brand/mark.png",
+    "width": 576,
+    "height": 576
+  },
+  {
+    "source": "docs/brand/mark-light.svg",
+    "output": "docs/brand/mark-light.png",
+    "width": 576,
+    "height": 576
+  },
+  {
+    "source": "docs/brand/mark-mono.svg",
+    "output": "docs/brand/mark-mono.png",
+    "width": 576,
+    "height": 576
+  },
+  {
+    "source": "docs/brand/mark-white.svg",
+    "output": "docs/brand/mark-white.png",
+    "width": 576,
+    "height": 576
+  },
+  {
+    "source": "docs/brand/logo.svg",
+    "output": "docs/brand/logo.png",
+    "width": 2280,
+    "height": 576
+  },
+  {
+    "source": "docs/brand/logo-light.svg",
+    "output": "docs/brand/logo-light.png",
+    "width": 2280,
+    "height": 576
+  },
+  {
+    "source": "docs/brand/logo-mono.svg",
+    "output": "docs/brand/logo-mono.png",
+    "width": 2280,
+    "height": 576
+  },
+  {
+    "source": "docs/brand/logo-tagline.svg",
+    "output": "docs/brand/logo-tagline.png",
+    "width": 2280,
+    "height": 690
+  },
+  {
+    "source": "docs/brand/logo-stacked.svg",
+    "output": "docs/brand/logo-stacked.png",
+    "width": 1200,
+    "height": 900
+  },
+  {
+    "source": "docs/brand/github-banner.svg",
+    "output": "docs/brand/github-banner.png",
+    "width": 2560,
+    "height": 840
+  },
+  {
+    "source": "docs/brand/social-preview.svg",
+    "output": "docs/brand/social-preview.png",
+    "width": 1280,
+    "height": 640
+  },
+  {
+    "source": "docs/brand/app-icon-dark.svg",
+    "output": "docs/brand/app-icon-dark.png",
+    "width": 1024,
+    "height": 1024
+  },
+  {
+    "source": "docs/brand/app-icon.svg",
+    "output": "docs/brand/icons/echo-test-16.png",
+    "width": 16,
+    "height": 16
+  },
+  {
+    "source": "docs/brand/app-icon.svg",
+    "output": "docs/brand/icons/echo-test-20.png",
+    "width": 20,
+    "height": 20
+  },
+  {
+    "source": "docs/brand/app-icon.svg",
+    "output": "docs/brand/icons/echo-test-24.png",
+    "width": 24,
+    "height": 24
+  },
+  {
+    "source": "docs/brand/app-icon.svg",
+    "output": "docs/brand/icons/echo-test-32.png",
+    "width": 32,
+    "height": 32
+  },
+  {
+    "source": "docs/brand/app-icon.svg",
+    "output": "docs/brand/icons/echo-test-40.png",
+    "width": 40,
+    "height": 40
+  },
+  {
+    "source": "docs/brand/app-icon.svg",
+    "output": "docs/brand/icons/echo-test-48.png",
+    "width": 48,
+    "height": 48
+  },
+  {
+    "source": "docs/brand/app-icon.svg",
+    "output": "docs/brand/icons/echo-test-64.png",
+    "width": 64,
+    "height": 64
+  },
+  {
+    "source": "docs/brand/app-icon.svg",
+    "output": "docs/brand/icons/echo-test-128.png",
+    "width": 128,
+    "height": 128
+  },
+  {
+    "source": "docs/brand/app-icon.svg",
+    "output": "docs/brand/icons/echo-test-256.png",
+    "width": 256,
+    "height": 256
+  },
+  {
+    "source": "docs/brand/app-icon.svg",
+    "output": "docs/brand/icons/echo-test-512.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "source": "docs/brand/app-icon.svg",
+    "output": "docs/brand/icons/echo-test-1024.png",
+    "width": 1024,
+    "height": 1024
+  }
+]
