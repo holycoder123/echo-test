@@ -1,4 +1,4 @@
-// Starts only this installation's workbench in a separate profile; sends no game input.
+// Starts only this installation's workbench in a separate profile; sends no application input.
 const fs=require('node:fs');
 const path=require('node:path');
 const assert=require('node:assert/strict');
@@ -31,15 +31,15 @@ async function mode(disabled){
         try{const data=JSON.parse(fs.readFileSync(descriptor,'utf8'));return data.pid===child.pid&&path.resolve(data.root)===root?data:null;}catch{return null;}
       },'Default MCP startup');
       assert.ok(connection.url.startsWith('http://127.0.0.1:'));
-      client=new Client({name:'nycs-default-mcp-smoke',version:'1.0.0'});
+      client=new Client({name:'echo-test-default-mcp-smoke',version:'1.0.0'});
       await client.connect(new StreamableHTTPClientTransport(new URL(connection.url),{requestInit:{headers:{Authorization:`Bearer ${connection.token}`}}}));
-      const status=await client.callTool({name:'nycs_status',arguments:{}});
+      const status=await client.callTool({name:'echo_test_status',arguments:{}});
       assert.equal(status.structuredContent.mcp.enabled,true);
       const tools=await client.listTools();assert.equal(tools.tools.length,14);
     }
   }finally{
     if(client)await client.close();
-    const result=spawnSync(python,['-X','utf8','-m','nycs_studio.maintenance'],{cwd:root,windowsHide:true,encoding:'utf8',timeout:15000});
+    const result=spawnSync(python,['-X','utf8','-m','echo_test.maintenance'],{cwd:root,windowsHide:true,encoding:'utf8',timeout:15000});
     if(result.error||result.status!==0)throw new Error('Fixture close request failed.');
     const close=JSON.parse(fs.readFileSync(path.join(root,'.runtime','workbench-close.json'),'utf8'));
     if(!close.closed)throw new Error('Fixture did not close normally; no process was terminated.');

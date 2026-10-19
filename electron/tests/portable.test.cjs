@@ -6,7 +6,7 @@ const path=require('node:path');
 const {connectionInfo}=require('../../scripts/mcp-connect-info.cjs');
 
 test('MCP instructions use the bundled Node path when the project is moved',t=>{
-  const root=fs.mkdtempSync(path.join(os.tmpdir(),'nycs portable '));
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'echo-test portable '));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   fs.mkdirSync(path.join(root,'runtime','node'),{recursive:true});
   const exe=path.join(root,'runtime','node','node.exe');

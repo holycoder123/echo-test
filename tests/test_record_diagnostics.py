@@ -1,10 +1,10 @@
 import unittest
 import ctypes as ct
 from unittest.mock import Mock, patch
-from nycs_studio.service import Service
-from nycs_studio.recorder import Recorder, MouseHook
-from nycs_studio.backend import GameWindow
-from nycs_studio import recorder as native
+from echo_test.service import Service
+from echo_test.recorder import Recorder, MouseHook
+from echo_test.backend import GameWindow
+from echo_test import recorder as native
 
 
 class RecordingDiagnosticsTests(unittest.TestCase):

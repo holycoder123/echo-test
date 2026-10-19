@@ -15,7 +15,7 @@ async function probe(window,diagnostics){
       if(Date.now()>deadline)throw new Error('诊断工作台初始化超时');
       await pause(100);
     }
-    await js("(async()=>{if(!S.connection||!S.handle)throw new Error('请先连接游戏');if(S.busy||S.recordPending)throw new Error('已有录制或未处理结果，诊断取消');await startRecord();})()");
+    await js("(async()=>{if(!S.connection||!S.handle)throw new Error('请先连接目标应用');if(S.busy||S.recordPending)throw new Error('已有录制或未处理结果，诊断取消');await startRecord();})()");
     const state=await js("api('game_state')");recordStart=state.recordStart;
     if(state.busy!=='recording'||!recordStart)throw new Error('录制未成功启动');
     armed=true;result.status='recording';save();

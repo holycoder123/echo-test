@@ -4,7 +4,7 @@ const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
 const {AuditLog}=require('../audit.cjs');
-function create(t,options={}){const directory=fs.mkdtempSync(path.join(os.tmpdir(),'nycs-audit-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));return new AuditLog(directory,options);}
+function create(t,options={}){const directory=fs.mkdtempSync(path.join(os.tmpdir(),'echo-test-audit-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));return new AuditLog(directory,options);}
 test('persists errors, traceback and context across sessions without input payloads',t=>{
  const log=create(t);const error=new Error('录制失败');error.backendTrace='Traceback: hook failed';
  const entry=log.error('record_start',error,{context:{handle:10,displayMode:'native'},password:'private',args:{text:'private'}});

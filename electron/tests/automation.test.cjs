@@ -7,10 +7,10 @@ const {McpAutomation,confinedFile}=require('../automation.cjs');
 const {projectSchema,selectorSchema}=require('../mcp-server.cjs');
 
 function fixture(t){
-  const root=fs.mkdtempSync(path.join(os.tmpdir(),'nycs-automation-'));
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'echo-test-automation-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   let state={connection:null,busy:'',dirty:false,recordPending:false};
-  let windows=[{handle:50,pid:100,title:'诺亚传说'}];
+  let windows=[{handle:50,pid:100,title:'目标应用'}];
   const calls=[];
   const router=new McpAutomation({root,state:()=>state,
     validateProject:value=>projectSchema.parse(value),validateSelector:value=>selectorSchema.parse(value),
@@ -32,63 +32,63 @@ const project={name:'测试新手任务',selectors:[{name:'NPC',x:.5,y:.5}],step
 
 test('MCP binds only a listed game and rejects PID reuse',async t=>{
   const f=fixture(t);
-  await assert.rejects(f.router.invoke('nycs_connect',{handle:50}),/先列出/);
-  await f.router.invoke('nycs_windows');await f.router.invoke('nycs_connect',{handle:50});
-  await f.router.invoke('nycs_capture');
-  f.setWindows([{handle:50,pid:101,title:'诺亚传说'}]);
-  await assert.rejects(f.router.invoke('nycs_capture'),/身份已变化/);
+  await assert.rejects(f.router.invoke('echo_test_connect',{handle:50}),/先列出/);
+  await f.router.invoke('echo_test_windows');await f.router.invoke('echo_test_connect',{handle:50});
+  await f.router.invoke('echo_test_capture');
+  f.setWindows([{handle:50,pid:101,title:'目标应用'}]);
+  await assert.rejects(f.router.invoke('echo_test_capture'),/身份已变化/);
   assert.equal(f.router.bound,null);
 });
 
 test('MCP run uses validated file and the shared execution scheduler',async t=>{
   const f=fixture(t);
-  await f.router.invoke('nycs_windows');await f.router.invoke('nycs_connect',{handle:50});
-  await f.router.invoke('nycs_save_case',{name:'新手任务',project});
-  await f.router.invoke('nycs_run_case',{name:'新手任务',iterations:1});
+  await f.router.invoke('echo_test_windows');await f.router.invoke('echo_test_connect',{handle:50});
+  await f.router.invoke('echo_test_save_case',{name:'新手任务',project});
+  await f.router.invoke('echo_test_run_case',{name:'新手任务',iterations:1});
   const run=f.calls.find(row=>row.method==='run');
   assert.equal(run.args.handle,50);assert.equal(run.args.source,'case');assert.equal(run.args.project.steps[0].target,'NPC');
   assert.equal(f.state.busy,'running');
-  await assert.rejects(f.router.invoke('nycs_run_case',{name:'新手任务'}),/先停止/);
-  await f.router.invoke('nycs_stop');assert.equal(f.calls.at(-1).method,'stop');
+  await assert.rejects(f.router.invoke('echo_test_run_case',{name:'新手任务'}),/先停止/);
+  await f.router.invoke('echo_test_stop');assert.equal(f.calls.at(-1).method,'stop');
 });
 
 test('MCP keeps editor changes and pending recordings',async t=>{
   const f=fixture(t);f.state.dirty=true;
-  await assert.rejects(f.router.invoke('nycs_save_case',{name:'新手任务',project}),/未保存/);
+  await assert.rejects(f.router.invoke('echo_test_save_case',{name:'新手任务',project}),/未保存/);
   f.state.dirty=false;f.state.recordPending=true;
-  await assert.rejects(f.router.invoke('nycs_save_case',{name:'新手任务',project}),/录制结果/);
+  await assert.rejects(f.router.invoke('echo_test_save_case',{name:'新手任务',project}),/录制结果/);
   assert.equal(f.calls.length,0);
 });
 
 test('MCP revalidates disk cases and confines names and assets',async t=>{
   const f=fixture(t);
-  for(const name of ['../escape','C:\\escape','CON','unsafe.json'])await assert.rejects(f.router.invoke('nycs_save_case',{name,project}));
-  await f.router.invoke('nycs_save_case',{name:'valid',project});
+  for(const name of ['../escape','C:\\escape','CON','unsafe.json'])await assert.rejects(f.router.invoke('echo_test_save_case',{name,project}));
+  await f.router.invoke('echo_test_save_case',{name:'valid',project});
   const malicious={...project,steps:[{action:'key',params:{keys:'WIN+R'}}]};
-  fs.writeFileSync(path.join(f.root,'test_cases','valid.nycs.json'),JSON.stringify(malicious));
-  await assert.rejects(f.router.invoke('nycs_load_case',{name:'valid'}));
-  await assert.rejects(f.router.invoke('nycs_save_case',{name:'image',project:{...project,selectors:[{name:'NPC',kind:'image',image:'../../secret.png'}]}}));
+  fs.writeFileSync(path.join(f.root,'test_cases','valid.echo.json'),JSON.stringify(malicious));
+  await assert.rejects(f.router.invoke('echo_test_load_case',{name:'valid'}));
+  await assert.rejects(f.router.invoke('echo_test_save_case',{name:'image',project:{...project,selectors:[{name:'NPC',kind:'image',image:'../../secret.png'}]}}));
 });
 
 test('MCP template save accepts a stem or PNG name and forwards one PNG suffix to backend',async t=>{
   const f=fixture(t);
-  await f.router.invoke('nycs_windows');await f.router.invoke('nycs_connect',{handle:50});
+  await f.router.invoke('echo_test_windows');await f.router.invoke('echo_test_connect',{handle:50});
   for(const name of ['接待员','接待员.png']) {
-    const result=await f.router.invoke('nycs_save_template',{name,capture_id:'observed_capture',rect:{x:10,y:20,w:40,h:30}});
+    const result=await f.router.invoke('echo_test_save_template',{name,capture_id:'observed_capture',rect:{x:10,y:20,w:40,h:30}});
     assert.equal(result.method,'automation_save_template');
     const saved=f.calls.at(-1);
     assert.equal(saved.method,'automation_save_template');
     assert.deepEqual(saved.args,{name:'接待员.png',capture_id:'observed_capture',rect:{x:10,y:20,w:40,h:30},handle:50,expected_pid:100});
   }
   assert.equal(fs.existsSync(path.join(f.root,'test_cases','assets')),true);
-  await assert.rejects(f.router.invoke('nycs_save_template',{name:'../outside.png',capture_id:'observed_capture',rect:{x:0,y:0,w:4,h:4}}),/名称只能/);
+  await assert.rejects(f.router.invoke('echo_test_save_template',{name:'../outside.png',capture_id:'observed_capture',rect:{x:0,y:0,w:4,h:4}}),/名称只能/);
 });
 
 test('MCP stop and status remain available during another operation',async t=>{
-  const f=fixture(t);f.router.active='nycs_capture';
-  await assert.rejects(f.router.invoke('nycs_save_case',{name:'valid',project}),/另一个/);
-  await f.router.invoke('nycs_stop');assert.equal(f.calls.at(-1).method,'stop');
-  assert.equal(f.router.status().mcp.operation,'nycs_capture');
+  const f=fixture(t);f.router.active='echo_test_capture';
+  await assert.rejects(f.router.invoke('echo_test_save_case',{name:'valid',project}),/另一个/);
+  await f.router.invoke('echo_test_stop');assert.equal(f.calls.at(-1).method,'stop');
+  assert.equal(f.router.status().mcp.operation,'echo_test_capture');
 });
 
 test('MCP event cursor retains ordering and limits history',t=>{
@@ -98,18 +98,18 @@ test('MCP event cursor retains ordering and limits history',t=>{
 
 test('MCP rejects symlink files and reports outside the project',async t=>{
   const f=fixture(t);const target=path.join(f.root,'test_cases');fs.mkdirSync(target);
-  const outside=fs.mkdtempSync(path.join(os.tmpdir(),'nycs-outside-'));t.after(()=>fs.rmSync(outside,{recursive:true,force:true}));
+  const outside=fs.mkdtempSync(path.join(os.tmpdir(),'echo-test-outside-'));t.after(()=>fs.rmSync(outside,{recursive:true,force:true}));
   fs.mkdirSync(path.join(f.root,'reports'));
   fs.symlinkSync(outside,path.join(f.root,'reports','escaped'),'junction');
   assert.throws(()=>confinedFile(f.root,'reports/escaped','result','.json',true),/超出/);
 });
 test('MCP stop while loading a case cancels the later start',async t=>{
-  const f=fixture(t);await f.router.invoke('nycs_save_case',{name:'valid',project});
-  await f.router.invoke('nycs_windows');await f.router.invoke('nycs_connect',{handle:50});
+  const f=fixture(t);await f.router.invoke('echo_test_save_case',{name:'valid',project});
+  await f.router.invoke('echo_test_windows');await f.router.invoke('echo_test_connect',{handle:50});
   let release,loaded;const reached=new Promise(resolve=>{loaded=resolve;});
   f.router.onProject=async()=>{loaded();await new Promise(resolve=>{release=resolve;});};
-  const run=f.router.invoke('nycs_run_case',{name:'valid'});
-  await reached;await f.router.invoke('nycs_stop');release();
+  const run=f.router.invoke('echo_test_run_case',{name:'valid'});
+  await reached;await f.router.invoke('echo_test_stop');release();
   await assert.rejects(run,/已取消/);
   assert.equal(f.calls.some(row=>row.method==='run'),false);assert.equal(f.router.active,'');
 });

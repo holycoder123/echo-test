@@ -8,12 +8,12 @@ test('recording replay retains its origin and report without an editor file path
   state.finish({status:'stopped'},'/reports/replay-123');
   assert.equal(state.snapshot().source,'recording');assert.equal(state.snapshot().path,null);
   assert.equal(state.snapshot().reportId,'replay-123');
-  state.start(project,1,'editor.nycs.json');
-  assert.equal(state.snapshot().source,'case');assert.equal(state.snapshot().path,'editor.nycs.json');
+  state.start(project,1,'editor.echo.json');
+  assert.equal(state.snapshot().source,'case');assert.equal(state.snapshot().path,'editor.echo.json');
 });
 
 test('counts repeated enabled executions, preserves planned repeats and ignores duplicate completion',()=>{
-  const state=new RunState();state.start(project,2,'case.nycs.json');
+  const state=new RunState();state.start(project,2,'case.echo.json');
   assert.equal(state.snapshot().total,6);assert.equal(state.snapshot().steps[1].status,'skipped');
   for(let iteration=1;iteration<=2;iteration++)for(const [index,repeat] of [[0,1],[0,2],[2,1]]){
     const record={index,repeat,iteration,name:project.steps[index].name};

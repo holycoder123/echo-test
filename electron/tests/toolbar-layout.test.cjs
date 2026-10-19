@@ -2,7 +2,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {toolbarBounds}=require('../toolbar-layout.cjs');
 
-test('sidebar prefers 380 pixels and aligns with the entire game window',()=>{
+test('sidebar prefers 380 pixels and aligns with the entire application window',()=>{
   const result=toolbarBounds({x:100,y:100,width:1040,height:730},{x:0,y:0,width:1920,height:1040});
   assert.deepEqual(result,{x:1148,y:100,width:380,height:730});
 });

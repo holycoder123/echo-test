@@ -25,7 +25,7 @@ class ElevationError extends Error{
   }
 }
 function ensureAdministrator({executable,argv=[],cwd,releaseLock=()=>{},platform=process.platform,env=process.env,native}={}){
-  if(platform!=='win32'||env.NYCS_SMOKE_TEST==='1'||argv.includes('--no-admin'))return 'continue';
+  if(platform!=='win32'||env.ECHO_TEST_SMOKE_TEST==='1'||argv.includes('--no-admin'))return 'continue';
   const api=native||loadNativeApi();
   if(api.isAdmin())return 'continue';
   // The elevated replacement must be able to acquire the same instance lock.

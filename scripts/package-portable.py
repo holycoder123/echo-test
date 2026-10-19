@@ -14,13 +14,13 @@ def excluded(directory, names):
 
 def main():
     # Every path is a fixed child of the workspace; user case/report directories are never removed.
-    stage = ROOT/'.runtime'/'portable-build'/'nycs-test-studio'
+    stage = ROOT/'.runtime'/'portable-build'/'echo-test'
     if stage.exists():
-        if stage.resolve() != ROOT.resolve()/'.runtime'/'portable-build'/'nycs-test-studio':
+        if stage.resolve() != ROOT.resolve()/'.runtime'/'portable-build'/'echo-test':
             raise RuntimeError('Refusing redirected staging directory')
         shutil.rmtree(stage)
     stage.mkdir(parents=True)
-    for name in ['electron', 'nycs_studio', 'scripts', 'docs', 'test_cases', 'projects', 'runtime', 'node_modules', 'tests']:
+    for name in ['electron', 'echo_test', 'scripts', 'docs', 'test_cases', 'projects', 'runtime', 'node_modules', 'tests']:
         shutil.copytree(ROOT/name, stage/name, ignore=excluded)
     if (ROOT/'control_library').exists():
         shutil.copytree(ROOT/'control_library', stage/'control_library', ignore=excluded)
@@ -31,7 +31,7 @@ def main():
     (stage/'PORTABLE-README.txt').write_text(note, encoding='utf-8')
     output = ROOT/'dist'
     output.mkdir(exist_ok=True)
-    archive = output/'nycs-test-studio-win-x64.zip'
+    archive = output/'echo-test-win-x64.zip'
     print('Compressing portable application...', flush=True)
     with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=6) as bundle:
         for source in sorted(stage.rglob('*')):
@@ -39,7 +39,7 @@ def main():
                 bundle.write(source, source.relative_to(stage.parent).as_posix())
     with archive.open('rb') as stream:
         digest = hashlib.file_digest(stream, 'sha256').hexdigest()
-    (output/'nycs-test-studio-win-x64.sha256').write_text(digest+'  '+archive.name+'\n', encoding='ascii')
+    (output/'echo-test-win-x64.sha256').write_text(digest+'  '+archive.name+'\n', encoding='ascii')
     print(json.dumps({'archive': str(archive), 'bytes': archive.stat().st_size, 'sha256': digest, 'stage': str(stage)}), flush=True)
 
 

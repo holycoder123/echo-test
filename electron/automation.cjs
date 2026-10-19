@@ -39,7 +39,7 @@ class McpAutomation {
   status() {
     return {...this.state(),mcp:{enabled:true,bound:this.bound,operation:this.active,eventSequence:this.sequence}};
   }
-  cancelStart(){if(['nycs_run_case','nycs_record_start'].includes(this.active))this.startCancelled=true;}
+  cancelStart(){if(['echo_test_run_case','echo_test_record_start'].includes(this.active))this.startCancelled=true;}
   checkStart(){if(this.startCancelled)throw new Error('已取消尚未开始的执行或录制');}
   idle(replace = false) {
     const current = this.state();
@@ -55,10 +55,10 @@ class McpAutomation {
   }
   async binding() {
     const current = this.state();
-    if (!this.bound || current.connection?.handle !== this.bound.handle) throw new Error('请先用 nycs_windows 和 nycs_connect 连接游戏');
+    if (!this.bound || current.connection?.handle !== this.bound.handle) throw new Error('请先用 echo_test_windows 和 echo_test_connect 连接目标应用');
     const data = await this.backend('windows');
     const actual = data.windows.find(win => win.handle === this.bound.handle);
-    if (!actual || actual.pid !== this.bound.pid) {this.bound = null; throw new Error('游戏窗口身份已变化，请重新连接');}
+    if (!actual || actual.pid !== this.bound.pid) {this.bound = null; throw new Error('目标窗口身份已变化，请重新连接');}
     return actual.handle;
   }
   checkAssets(project) {
@@ -74,7 +74,7 @@ class McpAutomation {
   }
   async load(name) {
     this.idle(true);
-    const file = confinedFile(this.root,'test_cases',name,'.nycs.json',true);
+    const file = confinedFile(this.root,'test_cases',name,'.echo.json',true);
     const project = this.validateProject(JSON.parse(fs.readFileSync(file,'utf8')));
     this.checkAssets(project);
     const data = await this.backend('load_project',{path:file});
@@ -82,16 +82,16 @@ class McpAutomation {
     return data;
   }
   async invoke(tool, args = {}) {
-    if (tool === 'nycs_status') return this.status();
-    if (tool === 'nycs_stop') {this.cancelStart();return this.dispatch('stop',{});}
-    if (tool === 'nycs_windows') return this.windows();
-    if (tool === 'nycs_events') {
+    if (tool === 'echo_test_status') return this.status();
+    if (tool === 'echo_test_stop') {this.cancelStart();return this.dispatch('stop',{});}
+    if (tool === 'echo_test_windows') return this.windows();
+    if (tool === 'echo_test_events') {
       const after = args.after ?? 0, limit = args.limit ?? 100;
       if (!Number.isSafeInteger(after) || after < 0 || !Number.isInteger(limit) || limit < 1 || limit > 200) throw new Error('无效的事件范围');
       const entries = this.events.filter(row => row.sequence > after).slice(0,limit);
       return {entries,next:entries.at(-1)?.sequence ?? after,latest:this.sequence,truncated:after > 0 && (this.events[0]?.sequence ?? 0) > after + 1};
     }
-    if (tool === 'nycs_report') {
+    if (tool === 'echo_test_report') {
       const file = confinedFile(this.root,`reports/${safeName(args.id)}`,'result','.json',true);
       return {id:args.id,result:JSON.parse(fs.readFileSync(file,'utf8')),path:file,html:path.join(path.dirname(file),'report.html')};
     }
@@ -101,26 +101,26 @@ class McpAutomation {
     this.editRevision = this.state().editRevision;
     try {
       await this.onOperation?.(tool);
-      if (tool === 'nycs_connect') {
+      if (tool === 'echo_test_connect') {
         this.idle();
-        if (!Number.isSafeInteger(args.handle) || !this.seen.has(args.handle)) throw new Error('请先列出窗口，再使用返回的游戏句柄');
+        if (!Number.isSafeInteger(args.handle) || !this.seen.has(args.handle)) throw new Error('请先列出窗口，再使用返回的目标应用句柄');
         const previous = this.seen.get(args.handle);
         const found = (await this.backend('windows')).windows.find(win => win.handle === args.handle && win.pid === previous.pid);
-        if (!found) throw new Error('游戏窗口已变化，请重新列出窗口');
+        if (!found) throw new Error('目标窗口已变化，请重新列出窗口');
         const result = await this.connect(args.handle);
         this.bound = {handle:found.handle,pid:found.pid,title:found.title};
         return result;
       }
-      if (tool === 'nycs_save_case') {
+      if (tool === 'echo_test_save_case') {
         this.idle(true);
-        const name = safeName(args.name,'.nycs.json');
-        confinedFile(this.root,'test_cases',name,'.nycs.json');
+        const name = safeName(args.name,'.echo.json');
+        confinedFile(this.root,'test_cases',name,'.echo.json');
         const project = this.validateProject(args.project); this.checkAssets(project);
         const data = await this.backend('automation_save_case',{name,project});
         await this.onProject(data,this.editRevision); return data;
       }
-      if (tool === 'nycs_load_case') return this.load(args.name);
-      if (tool === 'nycs_run_case') {
+      if (tool === 'echo_test_load_case') return this.load(args.name);
+      if (tool === 'echo_test_run_case') {
         this.idle(true);
         const iterations = args.iterations ?? 1;
         if (!Number.isInteger(iterations) || iterations < 1 || iterations > 10) throw new Error('MCP 循环次数必须为 1 ~ 10');
@@ -129,17 +129,17 @@ class McpAutomation {
         this.checkStart();
         return {...await this.dispatch('run',{handle,expected_pid:this.bound.pid,project:data.project,iterations,source:'case'}),path:data.path};
       }
-      if (tool === 'nycs_capture') {
+      if (tool === 'echo_test_capture') {
         const handle = await this.binding();
         return this.dispatch('automation_capture',{handle,expected_pid:this.bound.pid});
       }
-      if (tool === 'nycs_save_template') {
+      if (tool === 'echo_test_save_template') {
         this.idle(); const handle = await this.binding();
         const name = safeName(args.name,'.png');
         confinedFile(this.root,'test_cases/assets',name,'.png');
         return this.backend('automation_save_template',{...args,name,handle,expected_pid:this.bound.pid});
       }
-      if (tool === 'nycs_preview_target') {
+      if (tool === 'echo_test_preview_target') {
         this.idle(); const handle = await this.binding();
         const selector = this.validateSelector(args.selector);
         const selectors = (args.selectors||[]).filter(item=>item.name!==selector.name).map(item=>this.validateSelector(item));
@@ -147,12 +147,12 @@ class McpAutomation {
         this.checkAssets({selectors:[...selectors,selector]});
         return this.dispatch('automation_preview',{handle,expected_pid:this.bound.pid,selector,...(args.selectors?{selectors}:{})});
       }
-      if (tool === 'nycs_record_start') {
+      if (tool === 'echo_test_record_start') {
         this.idle(true); const handle = await this.binding();
         this.checkStart();
         return this.dispatch('record_start',{handle,expected_pid:this.bound.pid});
       }
-      if (tool === 'nycs_record_stop') return this.dispatch('record_stop',{});
+      if (tool === 'echo_test_record_stop') return this.dispatch('record_stop',{});
       throw new Error('不支持的 MCP 工具');
     } finally {this.active = '';await this.onOperation?.('');}
   }

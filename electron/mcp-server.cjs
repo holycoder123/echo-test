@@ -13,10 +13,10 @@ const finite = z.number().finite();
 const label = z.string().min(1).max(200).refine(value => value.trim().length > 0, 'Name must not be blank');
 const safeStem = z.string().min(1).max(64).regex(/^[\p{L}\p{N}_-]+$/u)
   .refine(value => !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(value), 'Unsafe filename');
-const safeBasename = z.string().min(1).max(74).regex(/^[\p{L}\p{N}_-]{1,64}(?:\.nycs\.json|\.png)?$/u)
-  .refine(value => safeStem.safeParse(value.replace(/(?:\.nycs\.json|\.png)$/, '')).success, 'Unsafe filename');
-const caseName = safeBasename.refine(value => !value.endsWith('.png'), 'Case name must use .nycs.json');
-const templateName = safeBasename.refine(value => !value.endsWith('.nycs.json'), 'Template name must use .png');
+const safeBasename = z.string().min(1).max(74).regex(/^[\p{L}\p{N}_-]{1,64}(?:\.echo\.json|\.png)?$/u)
+  .refine(value => safeStem.safeParse(value.replace(/(?:\.echo\.json|\.png)$/, '')).success, 'Unsafe filename');
+const caseName = safeBasename.refine(value => !value.endsWith('.png'), 'Case name must use .echo.json');
+const templateName = safeBasename.refine(value => !value.endsWith('.echo.json'), 'Template name must use .png');
 const templatePath = z.string().max(75).regex(/^assets\/[\p{L}\p{N}_-]{1,64}\.png$/u)
   .refine(value => safeStem.safeParse(value.slice(7,-4)).success, 'Template must be an assets PNG');
 const keyNames = new Set(['CTRL','CONTROL','ALT','SHIFT','ENTER','RETURN','ESC','ESCAPE','TAB','SPACE','BACKSPACE','DELETE',
@@ -70,7 +70,7 @@ const stepSchema = z.object({
 });
 const targetActions = new Set(['click','double_click','right_click','long_press','drag','scroll','wait_image','assert_image','assert_absent']);
 const imageActions = new Set(['wait_image','assert_image','assert_absent']);
-const projectSchema = z.object({name:label.default('诺亚传说测试用例'), schema_version:z.literal(1).default(1),
+const projectSchema = z.object({name:label.default('目标应用测试用例'), schema_version:z.literal(1).default(1),
   selectors:z.array(selectorSchema).max(5000).default([]), steps:z.array(stepSchema).max(10000).default([]),
 }).strict().superRefine((value, ctx) => {
   const selectors = new Map();
@@ -97,20 +97,20 @@ const projectSchema = z.object({name:label.default('诺亚传说测试用例'), 
 });
 const empty = z.object({}).strict();
 const tools = [
-  ['nycs_status', 'Read workbench state, game connection, administrator permission and current run.', empty, true],
-  ['nycs_windows', 'List game windows supported by this workbench.', empty, true],
-  ['nycs_connect', 'Connect a listed game window in native mode. The workbench rejects arbitrary windows.', z.object({handle:z.int().min(1).max(Number.MAX_SAFE_INTEGER)}).strict()],
-  ['nycs_capture', 'Capture the connected game. Returns PNG pixels and a capture id for creating templates.', empty, true],
-  ['nycs_save_case', 'Validate and save a case under the workbench test_cases directory.', z.object({name:caseName,project:projectSchema}).strict()],
-  ['nycs_load_case', 'Load a saved case by filename within test_cases.', z.object({name:caseName}).strict(), true],
-  ['nycs_run_case', 'Run a validated saved case against the connected game. Poll nycs_events and nycs_status for completion; F12 or nycs_stop stops execution.', z.object({name:caseName,iterations:z.int().min(1).max(10).default(1)}).strict()],
-  ['nycs_stop', 'Stop the running case or recording and release held inputs.', empty],
-  ['nycs_report', 'Read a completed execution report by its report id.', z.object({id:safeStem}).strict(), true],
-  ['nycs_events', 'Read execution events after a sequence number without blocking.', z.object({after:z.int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),limit:z.int().min(1).max(200).default(100)}).strict(), true],
-  ['nycs_save_template', 'Crop an observed capture into an assets PNG template. Coordinates use client-area pixels.', z.object({name:templateName,capture_id:z.string().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/),rect:z.object({x:z.int().min(0).max(100000),y:z.int().min(0).max(100000),w:z.int().min(4).max(100000),h:z.int().min(4).max(100000)}).strict()}).strict()],
-  ['nycs_preview_target', 'Preview recognition, including candidates on misses. Supply selectors for named anchors. Does not send input.', z.object({selector:selectorSchema,selectors:z.array(selectorSchema).max(5000).optional()}).strict(), true],
-  ['nycs_record_start', 'Start recording inputs in the connected game. F12 stops recording.', empty],
-  ['nycs_record_stop', 'Stop recording and return the pending recorded case for review.', empty],
+  ['echo_test_status', 'Read workbench state, window connection, administrator permission and current run.', empty, true],
+  ['echo_test_windows', 'List application windows supported by this workbench.', empty, true],
+  ['echo_test_connect', 'Connect a listed application window in native mode. The workbench rejects arbitrary windows.', z.object({handle:z.int().min(1).max(Number.MAX_SAFE_INTEGER)}).strict()],
+  ['echo_test_capture', 'Capture the connected application. Returns PNG pixels and a capture id for creating templates.', empty, true],
+  ['echo_test_save_case', 'Validate and save a case under the workbench test_cases directory.', z.object({name:caseName,project:projectSchema}).strict()],
+  ['echo_test_load_case', 'Load a saved case by filename within test_cases.', z.object({name:caseName}).strict(), true],
+  ['echo_test_run_case', 'Run a validated saved case against the connected application. Poll echo_test_events and echo_test_status for completion; F12 or echo_test_stop stops execution.', z.object({name:caseName,iterations:z.int().min(1).max(10).default(1)}).strict()],
+  ['echo_test_stop', 'Stop the running case or recording and release held inputs.', empty],
+  ['echo_test_report', 'Read a completed execution report by its report id.', z.object({id:safeStem}).strict(), true],
+  ['echo_test_events', 'Read execution events after a sequence number without blocking.', z.object({after:z.int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),limit:z.int().min(1).max(200).default(100)}).strict(), true],
+  ['echo_test_save_template', 'Crop an observed capture into an assets PNG template. Coordinates use client-area pixels.', z.object({name:templateName,capture_id:z.string().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/),rect:z.object({x:z.int().min(0).max(100000),y:z.int().min(0).max(100000),w:z.int().min(4).max(100000),h:z.int().min(4).max(100000)}).strict()}).strict()],
+  ['echo_test_preview_target', 'Preview recognition, including candidates on misses. Supply selectors for named anchors. Does not send input.', z.object({selector:selectorSchema,selectors:z.array(selectorSchema).max(5000).optional()}).strict(), true],
+  ['echo_test_record_start', 'Start recording inputs in the connected application. F12 stops recording.', empty],
+  ['echo_test_record_stop', 'Stop recording and return the pending recorded case for review.', empty],
 ];
 
 function jsonResult(value) {
@@ -168,8 +168,8 @@ async function startMcpServer({invoke,status,root,token=randomBytes(32).toString
   };
   const hideToken = value => String(value).split(token).join('[redacted]');
   const buildServer = () => {
-    const server = new McpServer({name:'nycs-test-studio',version:VERSION}, {
-      instructions:'Operate only the game selected in the workbench. Read nycs_windows, connect, and capture before building a case. Store cases and templates by safe names. Run saved cases and use status/events/report to verify real outcomes. Never infer task completion from a successful input step alone.',
+    const server = new McpServer({name:'echo-test',version:VERSION}, {
+      instructions:'Operate only the game selected in the workbench. Read echo_test_windows, connect, and capture before building a case. Store cases and templates by safe names. Run saved cases and use status/events/report to verify real outcomes. Never infer task completion from a successful input step alone.',
     });
     for (const [name, description, schema, readOnly=false] of tools) {
       server.registerTool(name,{description,inputSchema:schema,annotations:{readOnlyHint:readOnly,destructiveHint:!readOnly,idempotentHint:readOnly,openWorldHint:false}},async args => {
@@ -177,8 +177,8 @@ async function startMcpServer({invoke,status,root,token=randomBytes(32).toString
         auditEntry(name,'start');
         try {
           const parsed = schema.parse(args);
-          const output = name === 'nycs_status' && typeof status === 'function' ? await status() : await invoke(name,parsed);
-          const result = name === 'nycs_capture' || (name === 'nycs_preview_target' && output?.image) ? imageResult(output) : jsonResult(output);
+          const output = name === 'echo_test_status' && typeof status === 'function' ? await status() : await invoke(name,parsed);
+          const result = name === 'echo_test_capture' || (name === 'echo_test_preview_target' && output?.image) ? imageResult(output) : jsonResult(output);
           auditEntry(name,'complete',{elapsedMs:Date.now()-started});
           return result;
         } catch (error) {

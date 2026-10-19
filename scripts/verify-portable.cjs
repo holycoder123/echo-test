@@ -6,7 +6,7 @@ const python=path.join(root,'runtime','python','python.exe');
 const node=path.join(root,'runtime','node','node.exe');
 const system=process.env.SystemRoot||'C:\\Windows';
 const env={...process.env,PATH:`${system}\\System32;${system}`,PYTHONUTF8:'1',PYTHONNOUSERSITE:'1'};
-delete env.NYCS_PYTHON;delete env.PYTHONPATH;delete env.PYTHONHOME;
+delete env.ECHO_TEST_PYTHON;delete env.PYTHONPATH;delete env.PYTHONHOME;
 function run(exe,args){
   if(exe===python)args=['-X','utf8',...args];
   const result=spawnSync(exe,args,{cwd:root,env,windowsHide:true,encoding:'utf8',timeout:120000});
@@ -14,7 +14,7 @@ function run(exe,args){
   return result.stdout.trim();
 }
 for(const file of [python,node,path.join(root,'node_modules','electron','dist','electron.exe')])if(!fs.existsSync(file))throw new Error(`Missing portable runtime: ${file}`);
-const imports=run(python,['-c',`import sys,json,struct; import cv2,numpy,PIL,rapidocr,onnxruntime,tkinter; from nycs_studio import backend,service; assert struct.calcsize('P')==8; assert sys.flags.isolated; assert sys.flags.utf8_mode; print(json.dumps({'python':sys.version,'executable':sys.executable,'paths':sys.path}))`]);
+const imports=run(python,['-c',`import sys,json,struct; import cv2,numpy,PIL,rapidocr,onnxruntime,tkinter; from echo_test import backend,service; assert struct.calcsize('P')==8; assert sys.flags.isolated; assert sys.flags.utf8_mode; print(json.dumps({'python':sys.version,'executable':sys.executable,'paths':sys.path}))`]);
 const modules=run(node,['-e',`require('koffi');require('zod');require('@modelcontextprotocol/sdk/server/mcp.js'); console.log(process.version)`]);
 // Fail any external HTTP request during real OCR inference.
 const ocr=run(python,['-c',`import runpy,requests; from unittest.mock import patch; from pathlib import Path

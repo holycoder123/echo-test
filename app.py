@@ -8,11 +8,11 @@ class StartupPermissionError(RuntimeError):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="诺亚传说低代码测试工作台")
+    parser = argparse.ArgumentParser(description="echo test 桌面自动化测试工作台")
     parser.add_argument("--case", type=Path, help="打开指定 JSON 用例")
     parser.add_argument("--run", action="store_true", help="命令行执行，需明确指定 --case 和 --window")
-    parser.add_argument("--window", type=int, help="目标游戏窗口句柄")
-    parser.add_argument("--list-windows", action="store_true", help="列出当前诺亚传说窗口")
+    parser.add_argument("--window", type=int, help="目标目标窗口句柄")
+    parser.add_argument("--list-windows", action="store_true", help="列出当前可用应用窗口")
     parser.add_argument("--iterations", type=int, default=1)
     permission = parser.add_mutually_exclusive_group()
     permission.add_argument("--admin", dest="admin", action="store_true", help="请求管理员权限启动桌面工作台（默认）")
@@ -22,7 +22,7 @@ def main():
     mcp_mode.add_argument("--no-mcp", dest="mcp", action="store_false", help="本次启动关闭 MCP 接口")
     parser.set_defaults(mcp=True, admin=True)
     args = parser.parse_args()
-    from nycs_studio.backend import list_game_windows, WindowsBackend, is_admin
+    from echo_test.backend import list_game_windows, WindowsBackend, is_admin
     if args.list_windows:
         import json
         from dataclasses import asdict
@@ -31,13 +31,13 @@ def main():
     if args.run:
         if args.case is None or args.window is None:
             parser.error("命令行执行必须指定 --case 和 --window")
-        from nycs_studio.models import load_project
-        from nycs_studio.engine import Runner
+        from echo_test.models import load_project
+        from echo_test.engine import Runner
         windows = [w for w in list_game_windows() if w.handle == args.window]
         if len(windows) != 1:
-            parser.error("指定窗口不是当前诺亚传说窗口")
+            parser.error("指定窗口不在当前可用窗口列表中")
         case = args.case.resolve()
-        from nycs_studio.control_library import ControlLibrary
+        from echo_test.control_library import ControlLibrary
         library = ControlLibrary(Path(__file__).resolve().parent)
         project = library.import_project(load_project(case), case.parent, case)
         runner = Runner(WindowsBackend(windows[0]), library.resolve_project(project, case.parent), case.parent,
@@ -47,13 +47,13 @@ def main():
     import subprocess
     root = Path(__file__).resolve().parent
     if args.mcp:
-        from nycs_studio.mcp_startup import check_mcp_startup, wait_for_mcp
+        from echo_test.mcp_startup import check_mcp_startup, wait_for_mcp
         existing = check_mcp_startup(root)
         if existing["already_enabled"]:
             if args.admin:
-                from nycs_studio.backend import elevation
+                from echo_test.backend import elevation
                 if elevation(existing["pid"]) is not True:
-                    from nycs_studio.mcp_startup import McpStartupError
+                    from echo_test.mcp_startup import McpStartupError
                     raise McpStartupError("已有工作台启用了 MCP，但未确认具有管理员权限。请先保存用例并正常关闭主窗口，再使用管理员启动入口。")
             print("现有工作台 MCP 已启用，可以继续连接。", flush=True)
             return 0
@@ -94,7 +94,7 @@ if __name__ == "__main__":
         traceback.print_exc()
         if not sys.stdout or not sys.stdout.isatty():
             import ctypes
-            from nycs_studio.mcp_startup import McpStartupError
+            from echo_test.mcp_startup import McpStartupError
             detail = str(error) if isinstance(error, (McpStartupError, StartupPermissionError)) else str(error) + "\n请先运行 install_dependencies.cmd"
-            ctypes.windll.user32.MessageBoxW(None, detail, "诺亚测试工作台启动失败", 0x10)
+            ctypes.windll.user32.MessageBoxW(None, detail, "echo test启动失败", 0x10)
         raise SystemExit(1)

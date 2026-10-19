@@ -1,14 +1,19 @@
 import os
 from pathlib import Path
 import unittest
+import tempfile
 from PIL import Image
 
 
 @unittest.skipUnless(os.name == "nt", "Windows GUI / backend")
 class WindowsStudioTests(unittest.TestCase):
-    def test_gui_loads_demo_and_applies_low_code_form(self):
-        from nycs_studio.ui import Studio, ROOT
-        studio = Studio(ROOT / "projects" / "demo" / "open_shop.nycs.json")
+    def test_gui_loads_temporary_case_and_applies_low_code_form(self):
+        from echo_test.ui import Studio
+        from echo_test.models import Project, Selector, Step, save_project
+        temporary = tempfile.TemporaryDirectory(); self.addCleanup(temporary.cleanup)
+        directory = Path(temporary.name); filename = directory / 'form.echo.json'
+        save_project(Project('表单验证', [Selector('按钮')], [Step(target='按钮'), Step(target='按钮')]), filename, directory)
+        studio = Studio(filename)
         try:
             studio.withdraw()
             studio.update_idletasks()
@@ -29,7 +34,7 @@ class WindowsStudioTests(unittest.TestCase):
 
     def test_cancelled_capture_does_not_return_selection(self):
         import tkinter as tk
-        from nycs_studio.ui import CapturePicker
+        from echo_test.ui import CapturePicker
         root = tk.Tk()
         root.withdraw()
         try:
@@ -41,8 +46,8 @@ class WindowsStudioTests(unittest.TestCase):
             root.destroy()
 
     def backend_with_fake_input(self):
-        from nycs_studio.backend import WindowsBackend, GameWindow, Stopped
-        backend = WindowsBackend(GameWindow(1, "诺亚传说", 1))
+        from echo_test.backend import WindowsBackend, GameWindow, Stopped
+        backend = WindowsBackend(GameWindow(1, "目标应用", 1))
         events = []
         backend.move = lambda point: None
         backend.check_foreground = lambda: None
@@ -55,14 +60,14 @@ class WindowsStudioTests(unittest.TestCase):
         return backend, events
 
     def test_cancel_during_long_press_releases_mouse(self):
-        from nycs_studio.backend import Stopped
+        from echo_test.backend import Stopped
         backend, events = self.backend_with_fake_input()
         with self.assertRaises(Stopped):
             backend.click((10, 20), hold=1)
         self.assertEqual(events, [2, 4])
 
     def test_failure_during_drag_releases_mouse(self):
-        from nycs_studio.backend import Stopped
+        from echo_test.backend import Stopped
         backend, events = self.backend_with_fake_input()
         def fail_move(point):
             if point != (0, 0):
@@ -73,7 +78,7 @@ class WindowsStudioTests(unittest.TestCase):
         self.assertEqual(events, [2, 4])
 
     def test_partial_key_chord_releases_pressed_keys(self):
-        from nycs_studio.backend import Stopped
+        from echo_test.backend import Stopped
         backend, events = self.backend_with_fake_input()
         count = 0
         def pause(seconds):

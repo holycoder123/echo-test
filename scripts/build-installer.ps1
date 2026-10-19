@@ -5,7 +5,7 @@ $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 Set-Location -LiteralPath $projectRoot
 $cache = Join-Path $projectRoot '.runtime\installer-build'
 New-Item -ItemType Directory -Force -Path $cache | Out-Null
-if (!(Test-Path -LiteralPath (Join-Path $projectRoot 'dist\nycs-test-studio-win-x64.zip'))) {
+if (!(Test-Path -LiteralPath (Join-Path $projectRoot 'dist\echo-test-win-x64.zip'))) {
     & (Join-Path $PSScriptRoot 'build-portable.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Portable build failed' }
 }
@@ -29,8 +29,8 @@ if ($LASTEXITCODE -ne 0) { throw 'Refreshing portable payload failed' }
 & $python -X utf8 (Join-Path $PSScriptRoot 'prepare-installer.py')
 if ($LASTEXITCODE -ne 0) { throw 'Installer payload preparation failed' }
 $version = (Get-Content -LiteralPath (Join-Path $projectRoot 'package.json') -Raw | ConvertFrom-Json).version
-$output = Join-Path $projectRoot "dist\nycs-test-studio-$version-setup-x64.exe"
-$payload = Join-Path $cache 'payload\nycs-test-studio'
+$output = Join-Path $projectRoot "dist\echo-test-$version-setup-x64.exe"
+$payload = Join-Path $cache 'payload\echo-test'
 & $Compiler '/V3' '/INPUTCHARSET' 'UTF8' "/DPRODUCT_VERSION=$version" "/DPROJECT_ROOT=$projectRoot" "/DPAYLOAD_ROOT=$payload" "/DOUTPUT_EXE=$output" (Join-Path $PSScriptRoot 'installer.nsi')
 if ($LASTEXITCODE -ne 0) { throw "NSIS compilation failed: $LASTEXITCODE" }
 $hash = (Get-FileHash -LiteralPath $output -Algorithm SHA256).Hash.ToLowerInvariant()

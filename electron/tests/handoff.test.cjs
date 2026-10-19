@@ -61,7 +61,7 @@ test('successful MCP capture and preview keep the game foreground across observa
 
 test('failed MCP observation restores the workbench and manual capture still returns to it', async () => {
   const {handoff, events, window} = fixture();
-  await assert.rejects(handoff.call(async () => {throw new Error('游戏未在前台');}, true), /游戏未在前台/);
+  await assert.rejects(handoff.call(async () => {throw new Error('目标应用未在前台');}, true), /目标应用未在前台/);
   assert.equal(window.isMinimized(), false);
   assert.equal(handoff.pending, false);
   events.length = 0;

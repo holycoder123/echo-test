@@ -15,7 +15,7 @@ async function verify({root,main,toolbar,bridge,connect,open}){
   try{
     await waitFor(()=>js('!!window.__studioReady'),'工作台加载',20000);
     const handle=await js('S.handle');
-    if(!handle)throw new Error('请通过 --game 指定当前游戏窗口句柄');
+    if(!handle)throw new Error('请通过 --game 指定当前目标窗口句柄');
     await connect(handle);await open();
     result.before=await bridge.call('game_status',{handle});
     const bar=toolbar();
@@ -25,8 +25,8 @@ async function verify({root,main,toolbar,bridge,connect,open}){
     assert.equal(await bar.webContents.executeJavaScript('G.toolbarLinked'),true);
     const [x,y]=bar.getPosition();bar.setPosition(x+40,y+25);await pause(300);
     result.afterToolbarMove=await bridge.call('game_status',{handle});
-    assert.notDeepEqual(result.afterToolbarMove.rect,result.before.rect,'移动工具栏应带动游戏');
-    assert.deepEqual(nativeProperties(result.afterToolbarMove),nativeProperties(result.before),'联动应保留游戏尺寸和样式');
+    assert.notDeepEqual(result.afterToolbarMove.rect,result.before.rect,'移动工具栏应带动目标应用');
+    assert.deepEqual(nativeProperties(result.afterToolbarMove),nativeProperties(result.before),'联动应保留目标应用尺寸和样式');
 
     await bar.webContents.executeJavaScript("document.querySelector('#bundle').click()");
     await waitFor(()=>bar.webContents.executeJavaScript('!G.toolbarLinked'),'解绑');

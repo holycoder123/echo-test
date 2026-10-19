@@ -2,7 +2,7 @@ const {execFile} = require('node:child_process');
 
 function grantForeground(bridge, root) {
   return new Promise(resolve => {
-    execFile(bridge.command, ['-X', 'utf8', '-m', 'nycs_studio.foreground', String(bridge.child.pid)],
+    execFile(bridge.command, ['-X', 'utf8', '-m', 'echo_test.foreground', String(bridge.child.pid)],
       {cwd: root, windowsHide: true, timeout: 3000, env: {...process.env, PYTHONUTF8: '1'}},
       (error, output) => {
         if (error) return resolve({granted: false});
@@ -25,7 +25,7 @@ class GameHandoff {
     this.window.focus();
   }
   async call(operation, keepMinimized = false) {
-    if (this.pending) throw new Error('正在切换游戏窗口，请稍候');
+    if (this.pending) throw new Error('正在切换目标窗口，请稍候');
     this.pending = true;
     let started = false;
     try {

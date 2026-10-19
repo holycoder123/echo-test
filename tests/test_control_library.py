@@ -7,10 +7,10 @@ import threading
 import unittest
 from unittest.mock import Mock, patch
 from PIL import Image
-from nycs_studio.control_library import ControlLibrary
-from nycs_studio.models import Project, Selector, Step, load_project, save_project
-from nycs_studio.service import Service
-from nycs_studio import service as native
+from echo_test.control_library import ControlLibrary
+from echo_test.models import Project, Selector, Step, load_project, save_project
+from echo_test.service import Service
+from echo_test import service as native
 
 
 class SharedControlTests(unittest.TestCase):
@@ -27,7 +27,7 @@ class SharedControlTests(unittest.TestCase):
         return Project(name, [selector], [Step(target=selector.name)])
 
     def save_case(self, project, name='case'):
-        path = self.root/'test_cases'/f'{name}.nycs.json'
+        path = self.root/'test_cases'/f'{name}.echo.json'
         path.parent.mkdir(parents=True, exist_ok=True)
         return path, save_project(self.library.resolve_project(project, path.parent), path, path.parent)
 
@@ -49,7 +49,7 @@ class SharedControlTests(unittest.TestCase):
         third = Project('旧丙', [Selector('按钮', x=.9)], [Step(target='按钮')])
         paths=[]
         for index, project in enumerate((first, second, third)):
-            path=self.root/'projects'/str(index)/'old.nycs.json';path.parent.mkdir(parents=True)
+            path=self.root/'projects'/str(index)/'old.echo.json';path.parent.mkdir(parents=True)
             save_project(project,path,path.parent);paths.append(path)
         original_bytes=[path.read_bytes() for path in paths]
         self.library.migrate()
@@ -62,7 +62,7 @@ class SharedControlTests(unittest.TestCase):
         self.assertEqual(original_bytes,[path.read_bytes() for path in paths])
 
     def test_moving_workspace_preserves_legacy_references_to_edited_shared_controls(self):
-        path=self.root/'projects'/'legacy.nycs.json';path.parent.mkdir()
+        path=self.root/'projects'/'legacy.echo.json';path.parent.mkdir()
         save_project(Project('旧用例',[Selector('按钮',x=.2)],[Step(target='按钮')]),path,path.parent)
         self.library.migrate();control=self.library.list()['entries'][0]
         self.library.save({**control['selector'],'name':'新按钮','x':.9},identifier=control['id'])
@@ -74,7 +74,7 @@ class SharedControlTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             moved=Path(directory)/'workspace';shutil.copytree(self.root,moved)
             other=ControlLibrary(moved);other.migrate()
-            relocated=moved/'projects'/'legacy.nycs.json'
+            relocated=moved/'projects'/'legacy.echo.json'
             project=other.import_project(load_project(relocated),relocated.parent,relocated)
             self.assertEqual(other.list()['total'],1)
             self.assertEqual(project.selectors[0].library_id,control['id'])
@@ -148,7 +148,7 @@ class SharedControlTests(unittest.TestCase):
 
     def test_legacy_deletion_protection_follows_original_case_names(self):
         original=Project('旧用例',[Selector('原按钮')],[Step(target='原按钮')])
-        path=self.root/'test_cases'/'old.nycs.json';path.parent.mkdir()
+        path=self.root/'test_cases'/'old.echo.json';path.parent.mkdir()
         save_project(original,path,path.parent)
         self.library.migrate();control=self.library.list()['entries'][0]
         self.library.save({**control['selector'],'name':'新按钮'},identifier=control['id'])
@@ -189,10 +189,21 @@ class SharedControlServiceTests(unittest.TestCase):
         self.service.running=False;self.service.recorder=None;self.service.base_dir=self.root/'test_cases'
         self.service.stop_event=threading.Event();self.service.emit=Mock();self.service.window=Mock(return_value=Mock(pid=5))
 
+    def test_fresh_start_has_no_preset_case_controls_categories_or_templates(self):
+        with patch.object(native, 'list_game_windows', return_value=[]), patch.object(native, 'is_admin', return_value=False):
+            service = Service()
+            data = service.bootstrap()
+        self.assertIsNone(data['path'])
+        self.assertEqual(data['project']['steps'], [])
+        self.assertEqual(data['project']['selectors'], [])
+        self.assertEqual(data['controls']['entries'], [])
+        self.assertEqual(data['controls']['categories'], [])
+        self.assertFalse(list((self.root / 'test_cases').rglob('*.png')))
+
     def test_controls_survive_new_case_load_save_and_service_restart(self):
         control=self.service.call('control_save',{'selector':asdict(Selector('共享'))})['control']
         project=Project('甲',[Selector(**control['selector'])],[Step(target='共享')])
-        path=self.root/'test_cases'/'first.nycs.json'
+        path=self.root/'test_cases'/'first.echo.json'
         self.service.call('save_project',{'path':str(path),'project':project.to_dict()})
         self.service.call('new_project',{})
         self.assertEqual(self.service.call('control_list',{})['entries'][0]['id'],control['id'])

@@ -8,10 +8,10 @@ import time
 import unittest
 from unittest.mock import Mock, patch
 
-from nycs_studio.engine import Runner
-from nycs_studio.models import Project, Step, Selector, save_project, load_project
-from nycs_studio.scripting import read_script, validate_code
-from nycs_studio import scripting
+from echo_test.engine import Runner
+from echo_test.models import Project, Step, Selector, save_project, load_project
+from echo_test.scripting import read_script, validate_code
+from echo_test import scripting
 from test_studio import FakeBackend
 
 
@@ -166,7 +166,7 @@ time.sleep(100)
         original.write_text('print("导入成功")\n', encoding='utf-8-sig')
         imported = read_script(original)
         project = Project('导入', steps=[Step(imported['name'], 'python', params={'code': imported['code']}, delay=0)])
-        destination = self.root/'portable'/'case.nycs.json'
+        destination = self.root/'portable'/'case.echo.json'
         save_project(project, destination, self.root)
         original.unlink()
         loaded = load_project(destination)

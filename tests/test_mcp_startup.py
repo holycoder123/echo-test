@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from nycs_studio.mcp_startup import (
+from echo_test.mcp_startup import (
     MAX_STATE_BYTES, McpStartupError, check_mcp_startup, wait_for_mcp,
 )
 
@@ -33,7 +33,7 @@ class McpStartupTests(unittest.TestCase):
 
     @staticmethod
     def window_title(_handle, output, _length):
-        output.value = "诺亚测试工作台"
+        output.value = "echo test"
         return len(output.value)
 
     def process_path(self, _handle, _flags, output, _length):
@@ -109,7 +109,7 @@ class McpStartupTests(unittest.TestCase):
 
     def test_toolbar_cannot_pass_as_the_main_window(self):
         self.snapshot()
-        self.user32.GetWindowTextW.side_effect = lambda _h, output, _n: setattr(output, "value", "诺亚游戏工具栏") or 7
+        self.user32.GetWindowTextW.side_effect = lambda _h, output, _n: setattr(output, "value", "echo test · 窗口工具栏") or 7
         with self.assertRaisesRegex(McpStartupError, "主窗口身份"):
             self.check()
 
@@ -189,7 +189,7 @@ class McpStartupTests(unittest.TestCase):
     def test_launcher_preflight_runs_before_any_elevation_request(self):
         import app
         with patch("sys.argv", ["app.py", "--admin", "--mcp"]), \
-             patch("nycs_studio.mcp_startup.check_mcp_startup", side_effect=McpStartupError("旧主窗口")), \
+             patch("echo_test.mcp_startup.check_mcp_startup", side_effect=McpStartupError("旧主窗口")), \
              patch.object(ct.windll.shell32, "ShellExecuteW") as launch:
             with self.assertRaisesRegex(McpStartupError, "旧主窗口"):
                 app.main()
@@ -197,35 +197,35 @@ class McpStartupTests(unittest.TestCase):
 
     def test_already_elevated_launcher_enables_mcp_and_waits_for_readiness(self):
         import app
-        with patch('sys.argv',['app.py']), patch('nycs_studio.mcp_startup.check_mcp_startup',return_value={'already_enabled':False}) as preflight, \
-             patch('nycs_studio.mcp_startup.wait_for_mcp') as ready, patch('nycs_studio.backend.is_admin',return_value=True), patch('subprocess.Popen') as launch:
+        with patch('sys.argv',['app.py']), patch('echo_test.mcp_startup.check_mcp_startup',return_value={'already_enabled':False}) as preflight, \
+             patch('echo_test.mcp_startup.wait_for_mcp') as ready, patch('echo_test.backend.is_admin',return_value=True), patch('subprocess.Popen') as launch:
             self.assertEqual(app.main(),0)
             self.assertIn('--enable-mcp',launch.call_args.args[0])
             preflight.assert_called_once();ready.assert_called_once()
 
     def test_no_mcp_launch_does_not_wait_for_an_endpoint(self):
         import app
-        with patch('sys.argv',['app.py','--no-mcp']), patch('nycs_studio.mcp_startup.check_mcp_startup') as preflight, \
-             patch('nycs_studio.mcp_startup.wait_for_mcp') as ready, patch('nycs_studio.backend.is_admin',return_value=True), patch('subprocess.Popen') as launch:
+        with patch('sys.argv',['app.py','--no-mcp']), patch('echo_test.mcp_startup.check_mcp_startup') as preflight, \
+             patch('echo_test.mcp_startup.wait_for_mcp') as ready, patch('echo_test.backend.is_admin',return_value=True), patch('subprocess.Popen') as launch:
             self.assertEqual(app.main(),0)
             self.assertIn('--disable-mcp',launch.call_args.args[0])
             preflight.assert_not_called();ready.assert_not_called()
 
     def test_admin_start_cannot_reuse_a_non_elevated_mcp_instance(self):
         import app
-        with patch('sys.argv',['app.py','--admin']), patch('nycs_studio.mcp_startup.check_mcp_startup',return_value={'already_enabled':True,'pid':88}), \
-             patch('nycs_studio.backend.elevation',return_value=False), patch.object(ct.windll.shell32,'ShellExecuteW') as launch:
+        with patch('sys.argv',['app.py','--admin']), patch('echo_test.mcp_startup.check_mcp_startup',return_value={'already_enabled':True,'pid':88}), \
+             patch('echo_test.backend.elevation',return_value=False), patch.object(ct.windll.shell32,'ShellExecuteW') as launch:
             with self.assertRaisesRegex(McpStartupError,'管理员权限'):
                 app.main()
             launch.assert_not_called()
 
     def test_default_launcher_requests_elevation_and_keeps_case_and_mcp_parameters(self):
         import app
-        case=Path('test_cases')/'example test.nycs.json'
+        case=Path('test_cases')/'example test.echo.json'
         with patch('sys.argv',['app.py','--case',str(case)]), \
-             patch('nycs_studio.mcp_startup.check_mcp_startup',return_value={'already_enabled':False}), \
-             patch('nycs_studio.mcp_startup.wait_for_mcp') as ready, \
-             patch('nycs_studio.backend.is_admin',return_value=False), \
+             patch('echo_test.mcp_startup.check_mcp_startup',return_value={'already_enabled':False}), \
+             patch('echo_test.mcp_startup.wait_for_mcp') as ready, \
+             patch('echo_test.backend.is_admin',return_value=False), \
              patch.object(ct.windll.shell32,'ShellExecuteW',return_value=42) as launch, \
              patch('subprocess.Popen') as ordinary:
             self.assertEqual(app.main(),0)
@@ -237,26 +237,26 @@ class McpStartupTests(unittest.TestCase):
     def test_no_mcp_default_still_requests_administrator_permission(self):
         import app
         with patch('sys.argv',['app.py','--no-mcp']), \
-             patch('nycs_studio.backend.is_admin',return_value=False), \
+             patch('echo_test.backend.is_admin',return_value=False), \
              patch.object(ct.windll.shell32,'ShellExecuteW',return_value=42) as launch, \
-             patch('nycs_studio.mcp_startup.wait_for_mcp') as ready:
+             patch('echo_test.mcp_startup.wait_for_mcp') as ready:
             self.assertEqual(app.main(),0)
             self.assertIn('--disable-mcp',launch.call_args.args[3]);ready.assert_not_called()
 
     def test_cancelled_default_permission_request_never_launches_an_ordinary_workbench(self):
         import app
         with patch('sys.argv',['app.py','--no-mcp']), \
-             patch('nycs_studio.backend.is_admin',return_value=False), \
+             patch('echo_test.backend.is_admin',return_value=False), \
              patch.object(ct.windll.shell32,'ShellExecuteW',return_value=5), \
              patch('subprocess.Popen') as ordinary, \
-             patch('nycs_studio.mcp_startup.wait_for_mcp') as ready:
+             patch('echo_test.mcp_startup.wait_for_mcp') as ready:
             with self.assertRaisesRegex(app.StartupPermissionError,'未启动'):app.main()
             ordinary.assert_not_called();ready.assert_not_called()
 
     def test_explicit_no_admin_is_forwarded_to_electron_without_uac(self):
         import app
         with patch('sys.argv',['app.py','--no-admin','--no-mcp']), \
-             patch('nycs_studio.backend.is_admin',return_value=False), \
+             patch('echo_test.backend.is_admin',return_value=False), \
              patch.object(ct.windll.shell32,'ShellExecuteW') as elevated, \
              patch('subprocess.Popen') as launch:
             self.assertEqual(app.main(),0)
@@ -265,8 +265,8 @@ class McpStartupTests(unittest.TestCase):
     def test_default_start_cannot_reuse_a_non_elevated_mcp_instance(self):
         import app
         with patch('sys.argv',['app.py']), \
-             patch('nycs_studio.mcp_startup.check_mcp_startup',return_value={'already_enabled':True,'pid':88}), \
-             patch('nycs_studio.backend.elevation',return_value=False), \
+             patch('echo_test.mcp_startup.check_mcp_startup',return_value={'already_enabled':True,'pid':88}), \
+             patch('echo_test.backend.elevation',return_value=False), \
              patch.object(ct.windll.shell32,'ShellExecuteW') as launch:
             with self.assertRaisesRegex(McpStartupError,'管理员权限'):app.main()
             launch.assert_not_called()

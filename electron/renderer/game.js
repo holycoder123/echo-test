@@ -8,11 +8,11 @@ function notice(error,level='error'){if(level==='error')window.reportStudioError
 function renderState(){
   renderCases();RunPanel.update(document.querySelector('#game-run-results'),G.run,{expanded:true});
   const info=G.connection,server=document.querySelector('#server');
-  server.textContent=info?.title.match(/Server\s+(.*?)\s+诺亚/)?.[1]||info?.title||'未连接游戏';
+  server.textContent=info?.title||'未连接目标应用';
   server.title=info?.title||'';
   document.querySelector('#resolution').textContent=info?`${info.width} × ${info.height}`:'在工作台选择客户端';
   const bundle=document.querySelector('#bundle');bundle.disabled=!info||!!G.busy||G.recordStarting||bundleRequest;
-  bundle.textContent=G.toolbarLinked?'解绑':'捆绑游戏';bundle.setAttribute('aria-pressed',String(!!G.toolbarLinked));
+  bundle.textContent=G.toolbarLinked?'解绑':'捆绑目标应用';bundle.setAttribute('aria-pressed',String(!!G.toolbarLinked));
   document.querySelector('#pair-status').textContent=G.toolbarLinked?'窗口已捆绑':'独立模式';
   for(const id of ['coordinate','image','run'])document.querySelector('#'+id).disabled=!info||!!G.busy;
   document.querySelector('#record').disabled=!info||G.busy==='running'||G.recordStarting||recordRequest;
@@ -23,7 +23,7 @@ function renderState(){
   document.querySelector('#record').classList.toggle('active',G.busy==='recording');
   document.querySelector('#record-label').textContent=G.recordStarting?'正在启动…':G.busy==='recording'?'停止录制':G.busy==='running'?'执行期间暂停录制':G.recordPending?'查看录制结果':'开始录制';
   document.querySelector('#indicator').classList.toggle('active',G.busy==='recording');
-  document.querySelector('#status').textContent=G.recordStarting?'正在启动录制监听…':G.busy==='recording'?`正在录制 · ${G.recordCount} 个事件`:G.busy==='running'?'用例执行中':G.recordPending?'录制已结束，可在工作台转换为用例':info?'直接操作游戏，点击开始录制即可记录':'就绪';
+  document.querySelector('#status').textContent=G.recordStarting?'正在启动录制监听…':G.busy==='recording'?`正在录制 · ${G.recordCount} 个事件`:G.busy==='running'?'用例执行中':G.recordPending?'录制已结束，可在工作台转换为用例':info?'直接操作目标应用，点击开始录制即可记录':'就绪';
   updateClock();
 }
 function updateClock(){

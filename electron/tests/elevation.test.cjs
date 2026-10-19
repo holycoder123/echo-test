@@ -4,7 +4,7 @@ const {ensureAdministrator,quoteWindowsArgument,loadNativeApi,ElevationError}=re
 function fixture({admin=false,status=42,lastError=0}={}){
   const events=[],launches=[];
   const native={isAdmin:()=>{events.push('check');return admin;},launch:(...args)=>{events.push('launch');launches.push(args);return status;},lastError:()=>lastError};
-  const options={platform:'win32',env:{},native,executable:'C:\\工作台\\electron.exe',cwd:'C:\\工作台\\New project',argv:['C:\\工作台\\New project','--case','C:\\用例\\example test.nycs.json','--disable-mcp'],releaseLock:()=>events.push('release')};
+  const options={platform:'win32',env:{},native,executable:'C:\\工作台\\electron.exe',cwd:'C:\\工作台\\New project',argv:['C:\\工作台\\New project','--case','C:\\用例\\example test.echo.json','--disable-mcp'],releaseLock:()=>events.push('release')};
   return {options,events,launches};
 }
 test('default desktop startup requests UAC once and releases the lock before relaunch',()=>{
@@ -27,7 +27,7 @@ test('system elevation failure returns its status without a fallback launch',()=
 });
 test('explicit ordinary startup and isolated UI smoke never request UAC',()=>{
   const f=fixture();assert.equal(ensureAdministrator({...f.options,argv:['.','--no-admin']}),'continue');
-  assert.equal(ensureAdministrator({...f.options,env:{NYCS_SMOKE_TEST:'1'}}),'continue');
+  assert.equal(ensureAdministrator({...f.options,env:{ECHO_TEST_SMOKE_TEST:'1'}}),'continue');
   assert.equal(ensureAdministrator({...f.options,platform:'linux'}),'continue');assert.deepEqual(f.events,[]);
 });
 test('Windows arguments preserve spaces, quotes, empty values and trailing backslashes',()=>{

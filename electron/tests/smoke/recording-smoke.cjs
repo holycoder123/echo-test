@@ -1,4 +1,4 @@
-// Mocked recording IPC verifies the workbench flow without game input.
+// Mocked recording IPC verifies the workbench flow without application input.
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {artifactFile}=require('../../paths.cjs');
@@ -13,7 +13,7 @@ async function verify(main){
       window.__recordSmokeErrors=window.__studioErrors.slice();
       api=(method,args)=>method==='record_start'?new Promise(resolve=>window.__recordSmokeResolve=resolve):window.__recordSmokeOriginal(method,args);
       S.recordPending=null;S.busy='';S.view='game';S.handle=-1;
-      S.connection={handle:-1,width:1280,height:720,title:'录制回归游戏'};render();
+      S.connection={handle:-1,width:1280,height:720,title:'录制回归目标应用'};render();
       window.__recordSmokePromise=startRecord();
       return {recordView:S.view==='record',starting:S.recordStarting,
         disabled:document.querySelector('.record-card [data-act="stop"]').disabled,

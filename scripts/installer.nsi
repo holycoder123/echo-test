@@ -6,11 +6,11 @@ RequestExecutionLevel user
 !include "x64.nsh"
 !include "WinVer.nsh"
 
-!define APP_NAME "诺亚测试工作台"
-!define APP_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\NYCSTestStudio"
+!define APP_NAME "echo test"
+!define APP_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\EchoTest"
 Name "${APP_NAME} ${PRODUCT_VERSION}"
 OutFile "${OUTPUT_EXE}"
-InstallDir "$LOCALAPPDATA\Programs\NYCS Test Studio"
+InstallDir "$LOCALAPPDATA\Programs\echo test"
 InstallDirRegKey HKCU "${APP_KEY}" "InstallLocation"
 SetCompressor /SOLID lzma
 SetCompressorDictSize 32
@@ -87,7 +87,7 @@ Section "工作台及离线运行环境（必需）" Core
   SetOutPath "$INSTDIR"
   SetOverwrite on
   File /r /x "test_cases" /x "projects" /x "control_library" /x "__pycache__" /x "*.pyc" "${PAYLOAD_ROOT}\*"
-  ; Sample files are seeded only once; upgrades keep edited cases and templates.
+  ; Seed empty workspace metadata only once; upgrades keep user-created cases and controls.
   SetOverwrite off
   SetOutPath "$INSTDIR\test_cases"
   File /r /x "__pycache__" /x "*.pyc" "${PAYLOAD_ROOT}\test_cases\*"
@@ -99,8 +99,8 @@ Section "工作台及离线运行环境（必需）" Core
   File /r /x "__pycache__" /x "*.pyc" "${PAYLOAD_ROOT}\projects\*"
   SetOverwrite on
   SetOutPath "$INSTDIR"
-  WriteINIStr "$INSTDIR\nycs-install.ini" "Installer" "AppId" "NYCSTestStudio"
-  WriteINIStr "$INSTDIR\nycs-install.ini" "Installer" "TestInstall" "$TestInstall"
+  WriteINIStr "$INSTDIR\echo-test-install.ini" "Installer" "AppId" "EchoTest"
+  WriteINIStr "$INSTDIR\echo-test-install.ini" "Installer" "TestInstall" "$TestInstall"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   WriteRegStr HKCU "$RegistryKey" "DisplayName" "${APP_NAME}"
   WriteRegStr HKCU "$RegistryKey" "DisplayVersion" "${PRODUCT_VERSION}"
@@ -131,13 +131,13 @@ SectionEnd
 Function un.onInit
   SetShellVarContext current
   SetRegView 64
-  ReadINIStr $0 "$INSTDIR\nycs-install.ini" "Installer" "AppId"
-  ${If} $0 != "NYCSTestStudio"
+  ReadINIStr $0 "$INSTDIR\echo-test-install.ini" "Installer" "AppId"
+  ${If} $0 != "EchoTest"
     MessageBox MB_ICONSTOP "安装目录标识无效，已停止卸载。"
     Abort
   ${EndIf}
   StrCpy $RegistryKey "${APP_KEY}"
-  ReadINIStr $TestInstall "$INSTDIR\nycs-install.ini" "Installer" "TestInstall"
+  ReadINIStr $TestInstall "$INSTDIR\echo-test-install.ini" "Installer" "TestInstall"
   ${If} $TestInstall == "1"
     StrCpy $RegistryKey "${APP_KEY}-InstallerTest"
   ${EndIf}
@@ -153,7 +153,7 @@ FunctionEnd
 Section "Uninstall"
   ; Remove program code only. Keep control_library, test_cases, projects, reports and recordings.
   RMDir /r "$INSTDIR\electron"
-  RMDir /r "$INSTDIR\nycs_studio"
+  RMDir /r "$INSTDIR\echo_test"
   RMDir /r "$INSTDIR\node_modules"
   RMDir /r "$INSTDIR\runtime"
   RMDir /r "$INSTDIR\scripts"
@@ -174,7 +174,7 @@ Section "Uninstall"
   Delete "$INSTDIR\build_portable.cmd"
   Delete "$INSTDIR\verify_portable.cmd"
   Delete "$INSTDIR\mcp_info.cmd"
-  Delete "$INSTDIR\nycs-install.ini"
+  Delete "$INSTDIR\echo-test-install.ini"
   Delete "$INSTDIR\Uninstall.exe"
   DeleteRegKey HKCU "$RegistryKey"
   ${If} $TestInstall != "1"

@@ -112,8 +112,8 @@ function safeMessage(error, token) {
 async function startProxy({ root = ROOT, stdin = process.stdin,
   stdout = process.stdout, stderr = process.stderr } = {}) {
   const connection = readConnection(root);
-  const log = error => stderr.write(`[nycs-studio MCP] ${safeMessage(error, connection.token)}\n`);
-  const client = new Client({ name: 'nycs-studio-stdio-proxy', version: connection.version });
+  const log = error => stderr.write(`[echo-test MCP] ${safeMessage(error, connection.token)}\n`);
+  const client = new Client({ name: 'echo-test-stdio-proxy', version: connection.version });
   // Do not follow redirects with the workbench bearer token, including on SSE GET.
   const localFetch = (input, init) => {
     const url = input instanceof Request ? input.url : String(input);
@@ -142,7 +142,7 @@ async function startProxy({ root = ROOT, stdin = process.stdin,
     await client.connect(upstream, { timeout: 8000 });
     const capabilities = client.getServerCapabilities();
     if (!capabilities?.tools) throw new Error('Workbench MCP server does not expose tools.');
-    server = new Server({ name: 'nycs-studio', version: connection.version }, {
+    server = new Server({ name: 'echo-test', version: connection.version }, {
       capabilities: { tools: { listChanged: Boolean(capabilities.tools.listChanged) } },
       instructions: client.getInstructions(),
     });
@@ -164,7 +164,7 @@ async function startProxy({ root = ROOT, stdin = process.stdin,
       } catch (error) {
         log(error);
         return { isError: true, content: [{ type: 'text', text:
-          `Workbench MCP request failed: ${safeMessage(error, connection.token)}. Check the workbench connection and run state before retrying; game inputs are not replayed automatically.` }] };
+          `Workbench MCP request failed: ${safeMessage(error, connection.token)}. Check the workbench connection and run state before retrying; application inputs are not replayed automatically.` }] };
       }
     });
     if (capabilities.tools.listChanged) {
@@ -185,7 +185,7 @@ async function startProxy({ root = ROOT, stdin = process.stdin,
 
 if (require.main === module) {
   startProxy().catch(error => {
-    process.stderr.write(`[nycs-studio MCP] ${safeMessage(error)}\n`);
+    process.stderr.write(`[echo-test MCP] ${safeMessage(error)}\n`);
     process.exitCode = 1;
   });
 }

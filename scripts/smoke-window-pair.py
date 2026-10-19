@@ -13,9 +13,9 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from nycs_studio.backend import GameWindow, user32
-from nycs_studio.native_windows import get_long
-from nycs_studio.window_pair import NativeToolbarPair, adjacent
+from echo_test.backend import GameWindow, user32
+from echo_test.native_windows import get_long
+from echo_test.window_pair import NativeToolbarPair, adjacent
 
 
 def fixture(kind):
@@ -23,7 +23,7 @@ def fixture(kind):
                                        ct.c_int, ct.c_int, ct.c_int, ct.c_int,
                                        wt.HWND, wt.HMENU, wt.HINSTANCE, wt.LPVOID]
     user32.CreateWindowExW.restype = wt.HWND
-    handle = user32.CreateWindowExW(0, 'STATIC', 'NYCS pairing test: ' + kind,
+    handle = user32.CreateWindowExW(0, 'STATIC', 'ECHO_TEST pairing test: ' + kind,
                                    0x00CF0000, 100, 300, 600 if kind == 'game' else 380, 700,
                                    None, None, None, None)
     if not handle:
@@ -74,7 +74,7 @@ def verify():
         game, bar = create('game'), create('toolbar')
         gh, bh = game['handle'], bar['handle']
         original = properties(gh)
-        result['attached'] = pair.attach(GameWindow(gh, 'NYCS pairing test', game['pid']), bh, bar['pid'])
+        result['attached'] = pair.attach(GameWindow(gh, 'ECHO_TEST pairing test', game['pid']), bh, bar['pid'])
         assert result['attached']['edge'] == 'right'
         assert get_long(bh, -8) == gh
         assert properties(gh) == original
@@ -106,7 +106,7 @@ def verify():
         assert pair.rect(gh) == before
         assert properties(gh) == original
         result['unlink'] = True
-        pair.attach(GameWindow(gh, 'NYCS pairing test', game['pid']), bh, bar['pid'])
+        pair.attach(GameWindow(gh, 'ECHO_TEST pairing test', game['pid']), bh, bar['pid'])
         children[0].terminate(); children[0].wait(3)
         wait(lambda: any(event.get('game_closed') for event in events), 'game closure')
         result['game_close'] = True

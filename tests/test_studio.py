@@ -4,9 +4,9 @@ import tempfile
 import unittest
 import numpy as np
 from PIL import Image
-from nycs_studio.models import Project, Selector, Step, save_project, load_project
-from nycs_studio.vision import coordinate, Vision
-from nycs_studio.engine import Runner
+from echo_test.models import Project, Selector, Step, save_project, load_project
+from echo_test.vision import coordinate, Vision
+from echo_test.engine import Runner
 
 
 class FakeBackend:
@@ -92,7 +92,7 @@ class StudioTests(unittest.TestCase):
     def test_save_as_copies_assets_and_roundtrips(self):
         self.template()
         project = Project("用例", selectors=[Selector("图片", kind="image", image="target.png")], steps=[Step("验证", "assert_image", target="图片")])
-        destination = self.root / "portable" / "case.nycs.json"
+        destination = self.root / "portable" / "case.echo.json"
         saved = save_project(project, destination, self.root)
         self.assertTrue((destination.parent / saved.selectors[0].image).exists())
         self.assertEqual(load_project(destination).to_dict(), saved.to_dict())

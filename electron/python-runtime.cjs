@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 function resolvePython(env = process.env, exists = fs.existsSync, root = path.resolve(__dirname, '..')) {
-  if (env.NYCS_PYTHON) return env.NYCS_PYTHON;
+  if (env.ECHO_TEST_PYTHON) return env.ECHO_TEST_PYTHON;
   const bundled = path.join(root, 'runtime', 'python', 'python.exe');
   if (exists(bundled)) return bundled;
   const local = env.LOCALAPPDATA || '';

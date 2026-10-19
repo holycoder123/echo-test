@@ -19,7 +19,7 @@ try {
         if ($installProcess.ExitCode -notin @(0, 3010, 1638)) { throw "Visual C++ installation failed: $($installProcess.ExitCode)" }
     }
     if ($requestAdmin -or $Mcp) {
-        $pythonExe = $env:NYCS_PYTHON
+        $pythonExe = $env:ECHO_TEST_PYTHON
         if (!$pythonExe) {
             $pythonExe = Join-Path $projectRoot 'runtime\python\python.exe'
             if (!(Test-Path -LiteralPath $pythonExe)) {

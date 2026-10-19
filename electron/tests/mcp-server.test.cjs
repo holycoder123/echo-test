@@ -11,11 +11,11 @@ const {startMcpServer,projectSchema,selectorSchema,MAX_BODY_BYTES} = require('..
 const pixel = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jZuoAAAAASUVORK5CYII=';
 const simpleProject = () => ({name:'新手验证',selectors:[{name:'NPC',x:.3,y:.4}],steps:[{name:'接待员',action:'click',target:'NPC'}]});
 async function fixture(t, options={}) {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(),'nycs-mcp-test-'));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(),'echo-test-mcp-test-'));
   const calls = [], logs = [];
   const server = await startMcpServer({root,invoke:async (name,args) => {
     calls.push({name,args});
-    return name === 'nycs_capture' || name === 'nycs_preview_target'
+    return name === 'echo_test_capture' || name === 'echo_test_preview_target'
       ? {image:`data:image/png;base64,${pixel}`,id:'observed_capture',width:1,height:1}
       : {tool:name,args};
   },status:async()=>({admin:true,busy:'',connection:{handle:123}}),audit:(...args)=>logs.push(args),...options});
@@ -24,7 +24,7 @@ async function fixture(t, options={}) {
   return {root,server,descriptor,calls,logs};
 }
 async function clientFor(t, fixture) {
-  const client = new Client({name:'nycs-workbench-integration-test',version:'1.0.0'});
+  const client = new Client({name:'echo-test-workbench-integration-test',version:'1.0.0'});
   const transport = new StreamableHTTPClientTransport(new URL(fixture.server.url),{requestInit:{headers:{Authorization:`Bearer ${fixture.descriptor.token}`}}});
   await client.connect(transport);
   t.after(()=>client.close());
@@ -47,33 +47,33 @@ test('real SDK client initializes, lists the allowlist and dispatches validated 
   const client = await clientFor(t,f);
   const listing = await client.listTools();
   assert.equal(listing.tools.length,14);
-  assert.ok(listing.tools.some(tool=>tool.name === 'nycs_run_case'));
-  assert.ok(listing.tools.every(tool=>tool.name.startsWith('nycs_')));
-  const status = await client.callTool({name:'nycs_status',arguments:{}});
+  assert.ok(listing.tools.some(tool=>tool.name === 'echo_test_run_case'));
+  assert.ok(listing.tools.every(tool=>tool.name.startsWith('echo_test_')));
+  const status = await client.callTool({name:'echo_test_status',arguments:{}});
   assert.equal(status.structuredContent.admin,true);
   assert.deepEqual(f.calls,[]);
-  const saved = await client.callTool({name:'nycs_save_case',arguments:{name:'新手验证.nycs.json',project:simpleProject()}});
-  assert.equal(saved.structuredContent.tool,'nycs_save_case');
+  const saved = await client.callTool({name:'echo_test_save_case',arguments:{name:'新手验证.echo.json',project:simpleProject()}});
+  assert.equal(saved.structuredContent.tool,'echo_test_save_case');
   assert.equal(f.calls[0].args.project.schema_version,1);
   assert.equal(f.calls[0].args.project.selectors[0].normalized,true);
   assert.equal(f.calls[0].args.project.steps[0].timeout,5);
-  const run = await client.callTool({name:'nycs_run_case',arguments:{name:'新手验证'}});
+  const run = await client.callTool({name:'echo_test_run_case',arguments:{name:'新手验证'}});
   assert.equal(run.structuredContent.args.iterations,1);
-  const stopped = await client.callTool({name:'nycs_stop',arguments:{}});
-  assert.equal(stopped.structuredContent.tool,'nycs_stop');
+  const stopped = await client.callTool({name:'echo_test_stop',arguments:{}});
+  assert.equal(stopped.structuredContent.tool,'echo_test_stop');
   assert.ok(!JSON.stringify(f.logs).includes(f.descriptor.token));
   assert.ok(!JSON.stringify(f.logs).includes('新手验证'));
 });
 
 test('capture and selector previews expose MCP image pixels with separate structured metadata',async t=>{
   const f = await fixture(t),client = await clientFor(t,f);
-  for (const [name,args] of [['nycs_capture',{}],['nycs_preview_target',{selector:{name:'NPC',x:.2,y:.3}}]]) {
+  for (const [name,args] of [['echo_test_capture',{}],['echo_test_preview_target',{selector:{name:'NPC',x:.2,y:.3}}]]) {
     const result = await client.callTool({name,arguments:args});
     assert.equal(result.content[0].type,'image');assert.equal(result.content[0].mimeType,'image/png');
     assert.equal(result.content[0].data,pixel);assert.equal(result.structuredContent.id,'observed_capture');
     assert.equal(result.structuredContent.image,undefined);
   }
-  const template = await client.callTool({name:'nycs_save_template',arguments:{name:'接待员',capture_id:'observed_capture',rect:{x:1,y:2,w:24,h:18}}});
+  const template = await client.callTool({name:'echo_test_save_template',arguments:{name:'接待员',capture_id:'observed_capture',rect:{x:1,y:2,w:24,h:18}}});
   assert.equal(template.structuredContent.args.capture_id,'observed_capture');
 });
 
@@ -94,7 +94,7 @@ test('authentication, origin and Host validation reject browser access and DNS r
 test('Python steps retain source through MCP and reject missing or oversized code',async t=>{
   const f=await fixture(t);const client=await clientFor(t,f);
   const code='print("脚本检查", game.size())\nvariables["count"] = 1\n';
-  const result=await client.callTool({name:'nycs_save_case',arguments:{name:'python-case',project:{name:'脚本用例',steps:[{name:'Python 检查',action:'python',timeout:30,params:{code}}]}}});
+  const result=await client.callTool({name:'echo_test_save_case',arguments:{name:'python-case',project:{name:'脚本用例',steps:[{name:'Python 检查',action:'python',timeout:30,params:{code}}]}}});
   assert.equal(result.isError,undefined);
   assert.equal(f.calls.at(-1).args.project.steps[0].params.code,code);
   assert.equal(projectSchema.safeParse({steps:[{action:'python',params:{code:'   '}}]}).success,false);
@@ -105,15 +105,15 @@ test('Python steps retain source through MCP and reject missing or oversized cod
 test('raw tool input is strict and invalid names, arguments and methods never reach backend',async t=>{
   const f = await fixture(t);
   const badCalls = [
-    ['nycs_connect',{handle:0}], ['nycs_connect',{handle:123,method:'shutdown'}],
-    ['nycs_run_case',{name:'../outside',iterations:1}], ['nycs_run_case',{name:'CON.json'}],
-    ['nycs_run_case',{name:'valid',iterations:11}], ['nycs_load_case',{name:'C:\\private.json'}],
-    ['nycs_report',{id:'..'}], ['nycs_events',{after:-1}], ['nycs_capture',{handle:123}],
-    ['nycs_save_template',{name:'template',rect:{x:0,y:0,w:20,h:20}}],
-    ['nycs_save_template',{name:'template',capture_id:'seen',rect:{x:0,y:0,w:3,h:20}}],
-    ['nycs_preview_target',{selector:{name:'target',kind:'image',image:'../private.png'}}],
-    ['nycs_save_case',{name:'safe',project:{...simpleProject(),command:'powershell'}}],
-    ['nycs_save_case',{name:'safe',project:{name:'unsafe',steps:[{action:'shell',params:{command:'whoami'}}]}}],
+    ['echo_test_connect',{handle:0}], ['echo_test_connect',{handle:123,method:'shutdown'}],
+    ['echo_test_run_case',{name:'../outside',iterations:1}], ['echo_test_run_case',{name:'CON.json'}],
+    ['echo_test_run_case',{name:'valid',iterations:11}], ['echo_test_load_case',{name:'C:\\private.json'}],
+    ['echo_test_report',{id:'..'}], ['echo_test_events',{after:-1}], ['echo_test_capture',{handle:123}],
+    ['echo_test_save_template',{name:'template',rect:{x:0,y:0,w:20,h:20}}],
+    ['echo_test_save_template',{name:'template',capture_id:'seen',rect:{x:0,y:0,w:3,h:20}}],
+    ['echo_test_preview_target',{selector:{name:'target',kind:'image',image:'../private.png'}}],
+    ['echo_test_save_case',{name:'safe',project:{...simpleProject(),command:'powershell'}}],
+    ['echo_test_save_case',{name:'safe',project:{name:'unsafe',steps:[{action:'shell',params:{command:'whoami'}}]}}],
   ];
   for (const [name,args] of badCalls) {
     const response = await raw(f,{body:{jsonrpc:'2.0',id:1,method:'tools/call',params:{name,arguments:args}}});
@@ -155,7 +155,7 @@ test('tool failures are MCP error results and audit logs never include inputs or
   const f = await fixture(t,{invoke:async()=>{throw new Error(`${marker} ${token}`);}});
   token = f.descriptor.token;
   const client = await clientFor(t,f);
-  const result = await client.callTool({name:'nycs_load_case',arguments:{name:marker}});
+  const result = await client.callTool({name:'echo_test_load_case',arguments:{name:marker}});
   assert.equal(result.isError,true);assert.ok(result.content[0].text.includes('[redacted]'));
   assert.ok(!JSON.stringify(f.logs).includes(marker));assert.ok(!JSON.stringify(f.logs).includes(token));
 });
@@ -180,7 +180,7 @@ test('shutdown closes a pending tool transport and returns promptly',async t=>{
   const started = new Promise(resolve=>entered=resolve),blocked = new Promise(resolve=>release=resolve);
   const f = await fixture(t,{invoke:async()=>{entered();await blocked;return {complete:true};}});
   const client = await clientFor(t,f);
-  const call = client.callTool({name:'nycs_windows',arguments:{}}).catch(error=>({failed:error.message}));
+  const call = client.callTool({name:'echo_test_windows',arguments:{}}).catch(error=>({failed:error.message}));
   await started;
   await f.server.close();
   release();

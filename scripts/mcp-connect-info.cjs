@@ -15,10 +15,10 @@ function connectionInfo(root = path.resolve(__dirname, '..')) {
   const powershell = value => `'${value.replaceAll("'", "''")}'`;
   return [
     'Run this PowerShell command once to register the workbench in your Codex profile:',
-    `codex mcp add nycs-studio -- ${powershell(node)} ${powershell(proxy)}`,
+    `codex mcp add echo-test -- ${powershell(node)} ${powershell(proxy)}`,
     '',
     'Or add this equivalent entry in Codex Settings > MCP servers / config.toml:',
-    '[mcp_servers.nycs-studio]',
+    '[mcp_servers.echo-test]',
     `command = ${toml(node)}`,
     `args = [${toml(proxy)}]`,
     `cwd = ${toml(root)}`,

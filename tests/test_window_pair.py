@@ -1,8 +1,8 @@
 import unittest
 from unittest.mock import Mock, patch
-from nycs_studio import window_pair as native
-from nycs_studio.backend import GameWindow
-from nycs_studio.service import Service
+from echo_test import window_pair as native
+from echo_test.backend import GameWindow
+from echo_test.service import Service
 
 
 class PlacementTests(unittest.TestCase):
@@ -173,7 +173,7 @@ class PairTests(unittest.TestCase):
     def test_attach_pairs_toolbar_without_changing_game_owner(self):
         self.mock_attach_environment()
         self.pair.detach(); self.owner.reset_mock()
-        result = self.pair.attach(GameWindow(10, '诺亚传说', 11), 20, 22)
+        result = self.pair.attach(GameWindow(10, '目标应用', 11), 20, 22)
         self.assertTrue(result['linked']); self.assertTrue(result['fits'])
         self.owner.assert_called_once_with(20, -8, 10)
         self.assertEqual(self.owners[10], 30)
@@ -184,7 +184,7 @@ class PairTests(unittest.TestCase):
         self.positions[20] = (0, 0, 1040, 230)
         self.move.side_effect = None; self.move.return_value = False
         with self.assertRaisesRegex(RuntimeError, '无法放置'):
-            self.pair.attach(GameWindow(10, '诺亚传说', 11), 20, 22)
+            self.pair.attach(GameWindow(10, '目标应用', 11), 20, 22)
         self.assertEqual(self.owners[20], 0)
         self.assertEqual(self.owners[10], 30)
         self.assertIsNone(self.pair.state)
@@ -192,13 +192,13 @@ class PairTests(unittest.TestCase):
     def test_attach_rejects_reused_window_identity_before_mutation(self):
         self.pair.detach(); self.owner.reset_mock()
         with self.assertRaisesRegex(ValueError, '身份已变化'):
-            self.pair.attach(GameWindow(10, '诺亚传说', 44), 20, 22)
+            self.pair.attach(GameWindow(10, '目标应用', 44), 20, 22)
         self.owner.assert_not_called(); self.move.assert_not_called()
 
     def test_service_rejects_stale_game_pid(self):
         service = Service.__new__(Service)
         service.running = False; service.recorder = None
-        service.window = Mock(return_value=GameWindow(10, '诺亚传说', 11))
+        service.window = Mock(return_value=GameWindow(10, '目标应用', 11))
         service.toolbar_pair = Mock()
         args = {'handle': 10, 'game_pid': 99, 'toolbar': 20, 'toolbar_pid': 22}
         with self.assertRaisesRegex(ValueError, '身份已变化'):
@@ -212,7 +212,7 @@ class PairTests(unittest.TestCase):
         self.pair.detach(); self.owner.reset_mock()
         with patch.object(native, 'get_long', return_value=0x40000000):
             with self.assertRaisesRegex(ValueError, '独立窗口'):
-                self.pair.attach(GameWindow(10, '诺亚传说', 11), 20, 22)
+                self.pair.attach(GameWindow(10, '目标应用', 11), 20, 22)
         self.owner.assert_not_called(); self.move.assert_not_called()
 
 

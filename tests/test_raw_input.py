@@ -1,7 +1,7 @@
 import ctypes as ct
 import unittest
 from unittest.mock import Mock,patch
-from nycs_studio import raw_input as raw
+from echo_test import raw_input as raw
 
 class RawInputTests(unittest.TestCase):
     def test_windows_packet_layout_and_mouse_wheel_decode(self):

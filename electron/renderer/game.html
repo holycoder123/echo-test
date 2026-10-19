@@ -4,17 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; frame-src 'none'">
-  <title>诺亚游戏工具栏</title>
+  <title>echo test · 窗口工具栏</title>
   <link rel="stylesheet" href="run-panel.css">
   <link rel="stylesheet" href="game.css">
 </head>
 <body>
-  <header class="titlebar"><span class="mark">N</span><span>游戏工具栏</span><button id="help" title="使用说明 · F1" aria-label="打开使用说明">?</button></header>
+  <header class="titlebar"><span class="mark">E</span><span>窗口工具栏</span><button id="help" title="使用说明 · F1" aria-label="打开使用说明">?</button></header>
   <div class="panel-content">
-    <section class="toolbar" aria-label="游戏连接与录制">
+    <section class="toolbar" aria-label="目标应用连接与录制">
       <div class="connection-row">
-        <div class="connection"><strong id="server">未连接游戏</strong><div class="connection-meta"><span id="resolution">在工作台选择客户端</span><span class="subtitle" id="pair-status">独立模式</span></div></div>
-        <button id="bundle" class="quiet" disabled aria-pressed="false">捆绑游戏</button>
+        <div class="connection"><strong id="server">未连接目标应用</strong><div class="connection-meta"><span id="resolution">在工作台选择客户端</span><span class="subtitle" id="pair-status">独立模式</span></div></div>
+        <button id="bundle" class="quiet" disabled aria-pressed="false">捆绑目标应用</button>
       </div>
       <div class="actions">
         <button id="record" class="record" disabled><span class="record-dot"></span><span id="record-label">开始录制</span><kbd>F12 停止</kbd></button>

@@ -10,10 +10,10 @@ from unittest.mock import Mock, patch
 
 from PIL import Image
 
-from nycs_studio.backend import GameWindow
-from nycs_studio.service import Service
-from nycs_studio.models import Project, Selector, Step, load_project
-from nycs_studio import service as native
+from echo_test.backend import GameWindow
+from echo_test.service import Service
+from echo_test.models import Project, Selector, Step, load_project
+from echo_test import service as native
 
 
 class McpServiceTests(unittest.TestCase):
@@ -34,7 +34,7 @@ class McpServiceTests(unittest.TestCase):
         self.service.automation_capture_handle = None
         self.service.automation_capture_pid = None
         self.service.automation_capture_at = None
-        self.game = GameWindow(1234, "诺亚传说测试", 99)
+        self.game = GameWindow(1234, "目标应用测试", 99)
         self.service.window = Mock(return_value=self.game)
         self.frame = Image.new("RGB", (1024, 700), "blue")
         self.frame.paste("red", (10, 20, 30, 40))
@@ -81,7 +81,7 @@ class McpServiceTests(unittest.TestCase):
 
     def test_busy_capture_reports_focus_failure_without_activating(self):
         self.service.running = True
-        self.backend.capture.side_effect = RuntimeError("游戏窗口失去焦点")
+        self.backend.capture.side_effect = RuntimeError("目标窗口失去焦点")
         with self.assertRaisesRegex(RuntimeError, "失去焦点"):
             self.observe()
         self.backend.activate.assert_not_called()
@@ -94,7 +94,7 @@ class McpServiceTests(unittest.TestCase):
         self.backend_factory.assert_not_called()
 
     def test_closed_window_is_rejected_before_any_capture(self):
-        self.service.window.side_effect = ValueError("游戏窗口已关闭")
+        self.service.window.side_effect = ValueError("目标窗口已关闭")
         with self.assertRaisesRegex(ValueError, "已关闭"):
             self.observe()
         self.backend_factory.assert_not_called()
@@ -145,17 +145,17 @@ class McpServiceTests(unittest.TestCase):
     def test_capture_cannot_be_used_for_another_handle(self):
         observation = self.observe()
         self.service.window.reset_mock()
-        with self.assertRaisesRegex(ValueError, "不属于当前游戏窗口"):
+        with self.assertRaisesRegex(ValueError, "不属于当前目标窗口"):
             self.save(observation, handle=4321)
         self.service.window.assert_not_called()
 
     def test_template_rejects_closed_changed_or_resized_window(self):
         observation = self.observe()
-        self.service.window.side_effect = ValueError("游戏窗口已关闭")
+        self.service.window.side_effect = ValueError("目标窗口已关闭")
         with self.assertRaisesRegex(ValueError, "已关闭"):
             self.save(observation)
         self.service.window.side_effect = None
-        self.service.window.return_value = GameWindow(1234, "诺亚传说测试", 100)
+        self.service.window.return_value = GameWindow(1234, "目标应用测试", 100)
         with self.assertRaisesRegex(ValueError, "进程已改变"):
             self.save(observation)
         self.service.window.return_value = self.game
@@ -224,7 +224,7 @@ class McpServiceTests(unittest.TestCase):
         project = Project("新手任务", [Selector("任务图", kind="image", image=template["image"])],
                           [Step("任务验证", "assert_image", "任务图")]).to_dict()
         result = self.service.call("automation_save_case", {"name": "新手全部任务", "project": project})
-        destination = self.root / "test_cases" / "新手全部任务.nycs.json"
+        destination = self.root / "test_cases" / "新手全部任务.echo.json"
         self.assertEqual(result["path"], str(destination))
         self.assertEqual(result["base_dir"], str(destination.parent))
         self.assertEqual(self.service.case_path, destination)
@@ -237,7 +237,7 @@ class McpServiceTests(unittest.TestCase):
 
     def test_save_case_allows_updating_same_safe_case_name(self):
         project = Project("第一次", steps=[Step("等待", "sleep", params={"duration": .1})]).to_dict()
-        first = self.service.automation_save_case("newbie.nycs.json", project)
+        first = self.service.automation_save_case("newbie.echo.json", project)
         project["name"] = "第二次"
         second = self.service.automation_save_case("newbie", project)
         self.assertEqual(first["path"], second["path"])
@@ -272,7 +272,7 @@ class McpServiceTests(unittest.TestCase):
         with patch.object(Path, "resolve", autospec=True, side_effect=resolve):
             with self.assertRaisesRegex(ValueError, "重定向路径"):
                 self.service.automation_save_case("case", project)
-        self.assertFalse((self.root / "test_cases" / "case.nycs.json").exists())
+        self.assertFalse((self.root / "test_cases" / "case.echo.json").exists())
 
     def test_save_case_rejects_asset_copy_destination_redirect(self):
         observation = self.observe()
@@ -291,7 +291,7 @@ class McpServiceTests(unittest.TestCase):
     def test_save_case_rejects_case_or_temporary_file_redirect(self):
         project = Project("测试").to_dict()
         original_resolve = Path.resolve
-        for redirected in ["case.nycs.json", "case.nycs.json.tmp"]:
+        for redirected in ["case.echo.json", "case.echo.json.tmp"]:
             with self.subTest(redirected=redirected):
                 def resolve(path, *args, **kwargs):
                     if path == self.root / "test_cases" / redirected:
@@ -386,14 +386,14 @@ class McpServiceTests(unittest.TestCase):
         import numpy as np
         import json
         result = SimpleNamespace(boxes=np.array([[[10,20],[90,20],[90,40],[10,40]]]),txts=["完成任务"],scores=[.98])
-        with patch("nycs_studio.vision.ocr_engine", return_value=lambda frame:result):
+        with patch("echo_test.vision.ocr_engine", return_value=lambda frame:result):
             preview = self.service.automation_preview(1234, {"name":"文字","kind":"image","recognition":"ocr","text":"完成任务"})
         self.assertEqual(preview["point"], [50,30])
         self.assertTrue(preview["matched"])
         json.dumps(preview)
 
     def test_capture_and_preview_reject_reused_window_handle_before_activation(self):
-        self.service.window.return_value = GameWindow(1234, "诺亚传说新进程", 100)
+        self.service.window.return_value = GameWindow(1234, "目标应用新进程", 100)
         for method, args in [
             ("automation_capture", {"handle": 1234, "expected_pid": 99}),
             ("automation_preview", {"handle": 1234, "expected_pid": 99, "selector": {"name": "中心"}}),
@@ -422,7 +422,7 @@ class McpServiceTests(unittest.TestCase):
         self.service.stop_event = threading.Event()
         self.service.stop_event.set()
         self.service.pending_recording = {"preserved": True}
-        self.service.window.return_value = GameWindow(1234, "诺亚传说新进程", 100)
+        self.service.window.return_value = GameWindow(1234, "目标应用新进程", 100)
         project = Project("不能开始", steps=[Step("等待", "sleep", params={"duration": .1})]).to_dict()
         with patch.object(native, "Runner") as runner, patch.object(native, "Recorder") as recorder:
             for method, args in [
@@ -441,7 +441,7 @@ class McpServiceTests(unittest.TestCase):
 
     def test_expected_pid_is_a_positive_integer_or_omitted(self):
         for expected_pid in [False, True, 0, -1, "99", 99.0, 2**32]:
-            with self.subTest(expected_pid=expected_pid), self.assertRaisesRegex(ValueError, "无效的游戏进程身份"):
+            with self.subTest(expected_pid=expected_pid), self.assertRaisesRegex(ValueError, "无效的目标应用进程身份"):
                 self.service.automation_capture(1234, expected_pid)
         self.backend_factory.assert_not_called()
         observation = self.service.automation_capture(1234, 99)

@@ -1,11 +1,11 @@
-// Reproduce discovery after startup using a fake target; no game input.
+// Reproduce discovery after startup using a fake target; no application input.
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {artifactFile}=require('../../paths.cjs');
 async function verify(window){
   const result=await window.webContents.executeJavaScript(`(async()=>{
     const original=api,saved={windows:S.windows,handle:S.handle,connection:S.connection,view:S.view};
-    const target={handle:99123,pid:88,width:1024,height:700,title:'连接回归游戏'};
+    const target={handle:99123,pid:88,width:1024,height:700,title:'连接回归目标应用'};
     let discovered=[target],attaches=0,detaches=0,rejectAttach=false;
     api=async(method,args)=>{
       if(method==='windows')return {windows:discovered,admin:S.admin};
@@ -19,7 +19,7 @@ async function verify(window){
       S.connection=null;S.handle=null;S.view='game';
       await handleAction('refresh',{dataset:{}});
       result.discoveryDoesNotConnect=S.handle===null&&S.connection===null&&attaches===0&&document.querySelector('#connection').value===''&&!document.querySelector('.topbar-right>.status-dot.green');
-      result.disconnectedMessage=document.querySelector('.empty strong').textContent==='尚未连接游戏';
+      result.disconnectedMessage=document.querySelector('.empty strong').textContent==='尚未连接目标应用';
       await handleAction('game-connect',{dataset:{}});
       result.singleWindowConnect=attaches===1&&S.connection.handle===target.handle&&document.querySelector('#connection').value===String(target.handle);
       await handleAction('game-connect',{dataset:{}});

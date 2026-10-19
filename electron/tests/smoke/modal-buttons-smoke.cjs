@@ -12,11 +12,11 @@ async function verify(window){
       await click('.modal-footer [data-act="close-modal"]');result.cancelCloses=!modal.open&&S.modal===null;
       result.cancelLeavesData=JSON.stringify(S.controls)===bank&&JSON.stringify(S.project)===project&&S.dirty===dirtyBefore;
       await editTarget();await click('.modal-header [data-act="close-modal"] svg');result.crossCloses=!modal.open&&S.modal===null;
-      await editTarget();S.mcpOperation='观察游戏';await click('.modal-footer [data-act="close-modal"]');result.closeDuringMcp=!modal.open&&S.modal===null;S.mcpOperation='';
+      await editTarget();S.mcpOperation='观察目标应用';await click('.modal-footer [data-act="close-modal"]');result.closeDuringMcp=!modal.open&&S.modal===null;S.mcpOperation='';
       let answer=confirm('取消测试');await click('[data-act="confirm-no"]');result.confirmCancel=await resolved(answer)===false&&!modal.open;
       answer=confirm('关闭测试');await click('.modal-header [data-act="close-modal"]');result.confirmCross=await resolved(answer)===false&&!modal.open;
       answer=confirm('继续测试');await click('[data-act="confirm-yes"]');result.confirmContinue=await resolved(answer)===true&&!modal.open;
-      answer=confirm('运行期间取消测试');S.mcpOperation='观察游戏';await click('[data-act="confirm-no"]');result.confirmCancelDuringMcp=await resolved(answer)===false&&!modal.open;S.mcpOperation='';
+      answer=confirm('运行期间取消测试');S.mcpOperation='观察目标应用';await click('[data-act="confirm-no"]');result.confirmCancelDuringMcp=await resolved(answer)===false&&!modal.open;S.mcpOperation='';
       await editTarget();modal.dispatchEvent(new Event('cancel',{cancelable:true}));result.escapeCloses=!modal.open&&S.modal===null;
       result.errors=window.__studioErrors;return result;
     }finally{closeModal();Object.assign(S,saved);render();}

@@ -1,4 +1,4 @@
-"""Verify the real local OCR engine against saved game templates; no game input."""
+"""Verify the real local OCR engine against saved game templates; no application input."""
 import json
 from pathlib import Path
 import sys
@@ -7,8 +7,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from PIL import Image
-from nycs_studio.models import Selector
-from nycs_studio.vision import Vision
+from echo_test.models import Selector
+from echo_test.vision import Vision
 
 
 def main():

@@ -3,12 +3,12 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 Set-Location -LiteralPath $projectRoot
 $version = (Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json).version
-$installer = Join-Path $projectRoot "dist\nycs-test-studio-$version-setup-x64.exe"
+$installer = Join-Path $projectRoot "dist\echo-test-$version-setup-x64.exe"
 $target = [IO.Path]::GetFullPath((Join-Path $projectRoot ('.runtime\installer-build\'+$TestName)))
 $expectedPrefix = $projectRoot.TrimEnd('\') + '\.runtime\installer-build\'
 if (!$target.StartsWith($expectedPrefix, [StringComparison]::OrdinalIgnoreCase)) { throw 'Unsafe installer test path' }
 if (Test-Path -LiteralPath $target) { throw 'Installer test directory already exists; preserve it and choose a fresh test path.' }
-$testKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\NYCSTestStudio-InstallerTest'
+$testKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\EchoTest-InstallerTest'
 if (Test-Path -LiteralPath $testKey) { throw 'Installer test registry key already exists; refusing to overwrite it.' }
 $report = @{passed=$false; target=$target; version=$version}
 function Install-Fixture {
@@ -26,10 +26,10 @@ try {
     $entry = Get-ItemProperty -LiteralPath $testKey
     if ($entry.InstallLocation -ne $target) { throw 'Uninstall registration does not match the test directory' }
     $report.install=$true
-    $case = Get-ChildItem -LiteralPath (Join-Path $target 'test_cases') -Filter '*.nycs.json' | Select-Object -First 1
-    $content = Get-Content -LiteralPath $case.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
-    $content.name = 'Installer upgrade preservation probe'
-    [IO.File]::WriteAllText($case.FullName,($content | ConvertTo-Json -Depth 100),(New-Object Text.UTF8Encoding $false))
+    $casePath = Join-Path $target 'test_cases\installer-preservation.echo.json'
+    $content = @{name='Installer upgrade preservation probe';schema_version=1;steps=@();selectors=@()}
+    [IO.File]::WriteAllText($casePath,($content | ConvertTo-Json -Depth 100),(New-Object Text.UTF8Encoding $false))
+    $case = Get-Item -LiteralPath $casePath
     $originalHash=(Get-FileHash -LiteralPath $case.FullName -Algorithm SHA256).Hash
     $asset=Join-Path $target 'test_cases\assets\installer-preservation.txt'
     [IO.File]::WriteAllText($asset,'Preserve this user asset')
@@ -41,10 +41,10 @@ try {
     if ((Get-FileHash -LiteralPath $case.FullName -Algorithm SHA256).Hash -ne $originalHash) { throw 'Upgrade overwrote the edited case' }
     $report.upgradePreservesCases=$true
     $originalPath=$env:PATH
-    $originalPython=$env:NYCS_PYTHON
+    $originalPython=$env:ECHO_TEST_PYTHON
     try {
         $env:PATH="$env:SystemRoot\System32;$env:SystemRoot"
-        Remove-Item Env:NYCS_PYTHON -ErrorAction SilentlyContinue
+        Remove-Item Env:ECHO_TEST_PYTHON -ErrorAction SilentlyContinue
         Set-Location -LiteralPath $target
         $node=Join-Path $target 'runtime\node\node.exe'
         Run-Checked $node @('scripts/verify-portable.cjs')
@@ -54,7 +54,7 @@ try {
     } finally {
         Set-Location -LiteralPath $projectRoot
         $env:PATH=$originalPath
-        if ($null -ne $originalPython) { $env:NYCS_PYTHON=$originalPython }
+        if ($null -ne $originalPython) { $env:ECHO_TEST_PYTHON=$originalPython }
     }
     $report.offlineOcrAndUi=$true
     $uninstaller=Join-Path $target 'Uninstall.exe'

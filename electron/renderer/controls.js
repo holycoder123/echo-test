@@ -84,7 +84,7 @@ async function openControlPicker(key){
   const selected=eligible.find(entry=>entry.selector.name===step[key]);
   const m={kind:'control-picker',project,step,key,imageOnly,category:'all',search:'',selectedId:selected?.id||'',clear:false};
   showModal(m);modal.querySelector('#control-picker-search').focus();
-  // Load saved templates without requiring a connected game. Keep search focus and scroll intact.
+  // Load saved templates without requiring a connected application. Keep search focus and scroll intact.
   const images=[...new Set(eligible.flatMap(entry=>controlImages(entry.selector)))];
   let next=0;
   const worker=async()=>{while(next<images.length&&S.modal===m){await thumbnail(images[next++]);}};
@@ -217,7 +217,7 @@ async function sharedControlAction(action,node){
     }return true;
   }
   if(action==='preview-target'){
-    if(!S.handle)throw new Error('请先连接游戏窗口');
+    if(!S.handle)throw new Error('请先连接目标窗口');
     const target=S.controls.entries[index]?.selector;if(!target)throw new Error('控件已不存在，请刷新');
     const shot=await api('preview',{handle:S.handle,selector:target,selectors:controlSelectors()});showModal({kind:'preview',shot});return true;
   }

@@ -1,9 +1,9 @@
 from pathlib import Path
 import tempfile
 import unittest
-from nycs_studio.models import Project, Step, Selector, load_project, save_project
-from nycs_studio.recording import convert_events
-from nycs_studio.engine import Runner
+from echo_test.models import Project, Step, Selector, load_project, save_project
+from echo_test.recording import convert_events
+from echo_test.engine import Runner
 from test_studio import FakeBackend
 
 
@@ -58,7 +58,7 @@ class RecordingTests(unittest.TestCase):
     def test_recorded_project_roundtrips_as_existing_json_format(self):
         project = convert_events([mouse("down", 0), mouse("up", .1)])
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory)/"recorded.nycs.json"
+            path = Path(directory)/"recorded.echo.json"
             save_project(project, path, Path(directory))
             self.assertEqual(load_project(path).to_dict(), project.to_dict())
 

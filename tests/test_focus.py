@@ -1,11 +1,11 @@
 import unittest
 from unittest.mock import patch
-from nycs_studio import backend as native
+from echo_test import backend as native
 
 
 class FocusTests(unittest.TestCase):
     def setUp(self):
-        self.backend = native.WindowsBackend(native.GameWindow(10, "诺亚传说", 1))
+        self.backend = native.WindowsBackend(native.GameWindow(10, "目标应用", 1))
 
     def test_activation_waits_for_delayed_foreground_change(self):
         with patch.object(native, "elevation", return_value=False), \
@@ -25,9 +25,9 @@ class FocusTests(unittest.TestCase):
              patch.object(native.user32, "ShowWindow"), \
              patch.object(native.user32, "SetForegroundWindow", return_value=False), \
              patch.object(native.user32, "GetForegroundWindow", return_value=20), \
-             patch.object(native, "window_title", return_value="诺亚测试工作台"), \
+             patch.object(native, "window_title", return_value="echo test"), \
              patch.object(native.time, "monotonic", side_effect=[0,2]):
-            with self.assertRaisesRegex(RuntimeError, "无法激活.*诺亚测试工作台"):
+            with self.assertRaisesRegex(RuntimeError, "无法激活.*echo test"):
                 self.backend.activate()
 
     def test_elevation_error_precedes_focus_error(self):

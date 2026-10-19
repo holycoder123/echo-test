@@ -3,8 +3,8 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
-from nycs_studio import legacy_window_recovery as native
-from nycs_studio import service
+from echo_test import legacy_window_recovery as native
+from echo_test import service
 
 
 class LegacyWindowRecoveryTests(unittest.TestCase):
@@ -17,7 +17,7 @@ class LegacyWindowRecoveryTests(unittest.TestCase):
                       'rect':[100, 200, 1040, 730], 'mode':'docked', 'enabled':True}
         self.pids = {10:11}
         self.enterContext(patch.object(native, 'window_pid', side_effect=self.pids.get))
-        self.enterContext(patch.object(native, 'window_title', return_value='诺亚传说'))
+        self.enterContext(patch.object(native, 'window_title', return_value='目标应用'))
         self.style = self.enterContext(patch.object(native, 'checked_long'))
         self.enterContext(patch.object(native, 'get_long', return_value=0x80000000))
         self.parent = self.enterContext(patch.object(native.user32, 'SetParent', return_value=20))
@@ -63,11 +63,12 @@ class LegacyWindowRecoveryTests(unittest.TestCase):
                 self.assertFalse(native.recover_legacy_window(self.path))
                 self.assertFalse(self.path.exists()); self.assert_untouched()
 
-    def test_changed_game_title_discards_snapshot_without_mutation(self):
+    def test_changed_window_title_with_same_pid_still_restores_snapshot(self):
         self.save()
-        with patch.object(native, 'window_title', return_value='其他程序'):
-            self.assertFalse(native.recover_legacy_window(self.path))
-        self.assert_untouched()
+        with patch.object(native, 'window_title', return_value='已修改文档 - 记事本'):
+            self.assertTrue(native.recover_legacy_window(self.path))
+        self.assertFalse(self.path.exists())
+        self.move.assert_called_once()
 
     def test_reused_host_is_not_treated_as_running_original_workbench(self):
         self.save(); self.pids[20] = 99
@@ -121,7 +122,7 @@ class NativeServiceStartupTests(unittest.TestCase):
                              [root/'.runtime'/'embed-recovery.json', root/'.embed-recovery.json'])
 
     def test_custom_recovery_path_does_not_touch_project_snapshots(self):
-        with patch.dict(service.os.environ, {'NYCS_EMBED_RECOVERY':'custom-recovery.json'}), \
+        with patch.dict(service.os.environ, {'ECHO_TEST_EMBED_RECOVERY':'custom-recovery.json'}), \
              patch.object(service, 'NativeToolbarPair'), \
              patch.object(service, 'recover_legacy_window') as recover:
             service.Service()

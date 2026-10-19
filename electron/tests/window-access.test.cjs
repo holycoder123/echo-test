@@ -1,9 +1,9 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const {authorize}=require('../window-access.cjs');
-function surface(page){const frame={url:`nycs://studio/${page}`};return {isDestroyed:()=>false,webContents:{mainFrame:frame}};}
+function surface(page){const frame={url:`echo-test://studio/${page}`};return {isDestroyed:()=>false,webContents:{mainFrame:frame}};}
 function event(win){return {sender:win.webContents,senderFrame:win.webContents.mainFrame};}
-test('game connections are limited to the workbench and removed embedding methods are rejected',()=>{
+test('window connections are limited to the workbench and removed embedding methods are rejected',()=>{
   const main=surface('index.html'),game=surface('game.html');
   assert.equal(authorize(event(main),main,game,'game_connect',{}),'main');
   assert.throws(()=>authorize(event(game),main,game,'game_connect',{}));
@@ -12,7 +12,7 @@ test('game connections are limited to the workbench and removed embedding method
     assert.throws(()=>authorize(event(game),main,game,method,{}));
   }
 });
-test('game window can record and stop, but cannot replace or save the project',()=>{
+test('application window can record and stop, but cannot replace or save the project',()=>{
   const main=surface('index.html'),game=surface('game.html');
   for(const method of ['case_list','record_start','stop','workbench_show','game_action','game_bundle'])assert.equal(authorize(event(game),main,game,method,{}),'game');
   for(const method of ['save_project','new_project','run','capture','record_reviewed','toolbar_pair_attach','toolbar_pair_detach','script_import'])assert.throws(()=>authorize(event(game),main,game,method,{}));
@@ -21,7 +21,7 @@ test('game window can record and stop, but cannot replace or save the project',(
 });
 test('subframes, foreign pages and destroyed windows cannot call studio',()=>{
   const main=surface('index.html'),game=surface('game.html');
-  assert.throws(()=>authorize({...event(game),senderFrame:{url:'nycs://studio/game.html'}},main,game,'stop',{}));
+  assert.throws(()=>authorize({...event(game),senderFrame:{url:'echo-test://studio/game.html'}},main,game,'stop',{}));
   game.webContents.mainFrame.url='https://example.com/game.html';
   assert.throws(()=>authorize(event(game),main,game,'stop',{}));
   main.isDestroyed=()=>true;

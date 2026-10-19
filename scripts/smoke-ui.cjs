@@ -8,7 +8,7 @@ const electron = require('electron');
 const started = Date.now();
 const result = spawnSync(electron, [ROOT, '--disable-mcp'], {
   cwd: ROOT,
-  env: {...process.env, NYCS_SMOKE_TEST: '1'},
+  env: {...process.env, ECHO_TEST_SMOKE_TEST: '1'},
   stdio: 'inherit',
 });
 if (result.error) {

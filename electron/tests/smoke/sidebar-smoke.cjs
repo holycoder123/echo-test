@@ -7,7 +7,7 @@ async function verify(bar) {
   const result={sizes:[],errors:[]};
   try {
     await bar.webContents.executeJavaScript(`Object.assign(G,{
-      connection:{width:1024,height:700,title:'Server 4.137服一线 诺亚传说'},toolbarLinked:true,busy:'running',recordStarting:false,recordPending:false,
+      connection:{width:1024,height:700,title:'示例桌面应用'},toolbarLinked:true,busy:'running',recordStarting:false,recordPending:false,
       run:{case:'新手任务 · 接受任务与交付奖励',status:'running',iterations:1,total:6,completed:3,passed:3,failed:0,stopped:0,
         current:{index:3,name:'打开任务详情，确认目标、奖励与完成条件',iteration:1,repeat:1,status:'running',started:Date.now()},
         steps:['打开任务列表','核对当前可接任务','前往任务 NPC 并接受任务','打开任务详情，确认目标、奖励与完成条件','完成任务后检查经验与奖励发放','返回任务列表，确认已完成的任务不再显示'].map((name,index)=>({index,name,repeatTotal:1,status:index<3?'passed':index===3?'running':'pending'}))}

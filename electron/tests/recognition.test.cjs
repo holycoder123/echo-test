@@ -25,7 +25,7 @@ test('relative ROI needs a valid visual anchor and rejects cycles',()=>{
 });
 
 test('desktop and installer prefer a supported 64-bit interpreter and honor overrides',()=>{
-  assert.equal(resolvePython({NYCS_PYTHON:'custom-python'},()=>false),'custom-python');
+  assert.equal(resolvePython({ECHO_TEST_PYTHON:'custom-python'},()=>false),'custom-python');
   const selected=resolvePython({LOCALAPPDATA:'C:/Local'},name=>name.includes('Python311'));
   assert.ok(selected.includes('Python311'));
   assert.equal(resolvePython({LOCALAPPDATA:'C:/Local'},name=>name.includes('Python313-32')),'python');
@@ -36,7 +36,7 @@ test('project-local Python takes precedence over system installations and reloca
   const root=path.resolve('portable-copy');
   const bundled=path.join(root,'runtime','python','python.exe');
   assert.equal(resolvePython({LOCALAPPDATA:'C:/Local'},file=>file===bundled||file.includes('Python311'),root),bundled);
-  assert.equal(resolvePython({NYCS_PYTHON:'custom-python'},()=>true,root),'custom-python');
+  assert.equal(resolvePython({ECHO_TEST_PYTHON:'custom-python'},()=>true,root),'custom-python');
 });
 
 test('shared control IDs survive project validation and malformed references are rejected',()=>{

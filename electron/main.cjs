@@ -18,9 +18,11 @@ const {authorize}=require('./window-access.cjs');
 
 const {ROOT, runtimeFile, artifactFile} = require('./paths.cjs');
 const RENDERER = path.join(__dirname, 'renderer');
+app.setName('echo test');
+app.setPath('userData',path.join(app.getPath('appData'),'echo-test'));
 const gameSmoke=process.argv.includes('--game-smoke');
-if (process.env.NYCS_SMOKE_TEST === '1' || gameSmoke) app.setPath('userData', path.join(app.getPath('temp'), gameSmoke?'nycs-test-studio-game-smoke':'nycs-test-studio-smoke'));
-if(mcpStartupSmoke)app.setPath('userData',path.join(app.getPath('temp'),'nycs-test-studio-mcp-startup-smoke'));
+if (process.env.ECHO_TEST_SMOKE_TEST === '1' || gameSmoke) app.setPath('userData', path.join(app.getPath('temp'), gameSmoke?'echo-test-game-smoke':'echo-test-smoke-'+process.pid));
+if(mcpStartupSmoke)app.setPath('userData',path.join(app.getPath('temp'),'echo-test-mcp-startup-smoke'));
 const primaryInstance = app.requestSingleInstanceLock();
 if (!primaryInstance) app.quit();
 if (primaryInstance) {
@@ -35,7 +37,7 @@ if (primaryInstance) {
     app.exit(1);
   }
 }
-protocol.registerSchemesAsPrivileged([{scheme: 'nycs', privileges: {standard: true, secure: true, supportFetchAPI: true}}]);
+protocol.registerSchemesAsPrivileged([{scheme: 'echo-test', privileges: {standard: true, secure: true, supportFetchAPI: true}}]);
 let window, bridge, handoff, currentPath, busy = '', dirty = false, closing = false;
 let recent = [];
 const knownCases=new Set();
@@ -79,7 +81,7 @@ async function linkToolbar(){
   if(!toolbarLinked)gameWindow.setBounds(gameToolbarBounds());
   const result=await bridge.call('toolbar_pair_attach',{handle:selectedGame.handle,game_pid:selectedGame.pid,toolbar:nativeHandle(gameWindow),toolbar_pid:process.pid});
   toolbarLinked=Boolean(result.linked);gameWindow.setSkipTaskbar(toolbarLinked);
-  if(!result.fits)send({kind:'notice',level:'warning',message:'当前屏幕无法同时容纳游戏和工具栏，可拖动窗口组到更大的屏幕或点击解绑。'});
+  if(!result.fits)send({kind:'notice',level:'warning',message:'当前屏幕无法同时容纳目标应用和工具栏，可拖动窗口组到更大的屏幕或点击解绑。'});
 }
 function gameToolbarBounds(){
   const bounds=selectedGame?.window_bounds||selectedGame?.bounds;
@@ -94,7 +96,7 @@ async function openGameWindow(){
     const initialBounds=gameToolbarBounds();
     gameWindow=new BrowserWindow({...initialBounds,minWidth:300,minHeight:Math.min(600,initialBounds.height),show:false,
       resizable:true,maximizable:false,fullscreenable:false,skipTaskbar:false,alwaysOnTop:false,
-      backgroundColor:'#f8f8f9',title:'诺亚游戏工具栏',icon:path.join(__dirname,'assets/studio.png'),
+      backgroundColor:'#f8f8f9',title:'echo test · 窗口工具栏',icon:path.join(__dirname,'assets/studio.png'),
       titleBarStyle:'hidden',titleBarOverlay:{color:'#f8f8f9',symbolColor:'#55585e',height:42},
       webPreferences:{preload:path.join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true,backgroundThrottling:false}});
     gameWindow.setMenuBarVisibility(false);secureWindow(gameWindow);
@@ -108,7 +110,7 @@ async function openGameWindow(){
       (async()=>{if(busy==='recording')await bridge.call('stop');await unlinkToolbar();current.destroy();})()
         .catch(error=>{gameClosing=false;send({kind:'notice',message:error.message});});
     });
-    gameLoaded=current.loadURL('nycs://studio/game.html');
+    gameLoaded=current.loadURL('echo-test://studio/game.html');
   }
   await gameLoaded;
   if(selectedGame&&toolbarLinkWanted&&!toolbarLinked){
@@ -122,7 +124,7 @@ async function openGameWindow(){
 
 async function connectSelectedGame(handle){
   if(busy)throw new Error('请先停止录制或执行');
-  if(connectingGame)throw new Error('正在连接游戏，请稍候');
+  if(connectingGame)throw new Error('正在连接目标应用，请稍候');
   connectingGame=true;
   try{
     await detachGame();
@@ -162,7 +164,7 @@ function remember(file) {
 }
 function registerStop() {
   globalShortcut.unregister('F12');
-  if ((busy||['nycs_run_case','nycs_record_start'].includes(automation?.active)) && !globalShortcut.register('F12', () => stopCurrent().catch(error => send({kind: 'notice', message: error.message})))) {
+  if ((busy||['echo_test_run_case','echo_test_record_start'].includes(automation?.active)) && !globalShortcut.register('F12', () => stopCurrent().catch(error => send({kind: 'notice', message: error.message})))) {
     auditWrite('warning','stop.shortcut','unavailable',{message:'F12 快捷键被占用，请使用停止按钮'});
     send({kind: 'notice',level:'warning', message: 'F12 快捷键被占用，请使用停止按钮'});
   }
@@ -208,10 +210,10 @@ function receive(event) {
 }
 function createBridge() {
   const python = require('./python-runtime.cjs').resolvePython();
-  bridge = new PythonBridge(python, ['-X', 'utf8', '-u', '-m', 'nycs_studio.service'], {
-    cwd: ROOT, env: {...process.env, PYTHONUTF8: '1', PYTHONUNBUFFERED: '1',
-      ...((process.env.NYCS_SMOKE_TEST === '1' || gameSmoke || mcpStartupSmoke) ? {NYCS_CONTROL_LIBRARY_ROOT:path.join(app.getPath('userData'),'control-data')} : {}),
-      NYCS_EMBED_RECOVERY:gameSmoke?path.join(app.getPath('userData'),'.embed-recovery.json'):runtimeFile('embed-recovery.json')}
+  bridge = new PythonBridge(python, ['-X', 'utf8', '-u', '-m', 'echo_test.service'], {
+    cwd: ROOT, env: {...process.env, PYTHONUTF8: '1', PYTHONUNBUFFERED: '1', ECHO_TEST_HOST_PID:String(process.pid),
+      ...((process.env.ECHO_TEST_SMOKE_TEST === '1' || gameSmoke || mcpStartupSmoke) ? {ECHO_TEST_CONTROL_LIBRARY_ROOT:path.join(app.getPath('userData'),'control-data')} : {}),
+      ECHO_TEST_EMBED_RECOVERY:gameSmoke?path.join(app.getPath('userData'),'.embed-recovery.json'):runtimeFile('embed-recovery.json')}
   });
   bridge.on('event', receive);
   bridge.audit=(stage,method,details,error)=>{
@@ -244,7 +246,7 @@ async function dispatchStudioCall(role, method, args = {}) {
   if(method==='audit_list')return {entries:audit.read(args),directory:audit.directory};
   if(method==='audit_folder'){const error=await shell.openPath(audit.directory);if(error)throw new Error(error);return {};}
   if(method==='audit_export'){
-    const result=await dialog.showSaveDialog(window,{title:'导出错误日志',defaultPath:path.join(app.getPath('documents'),'诺亚诊断日志.jsonl'),filters:[{name:'诊断日志',extensions:['jsonl']}]});
+    const result=await dialog.showSaveDialog(window,{title:'导出错误日志',defaultPath:path.join(app.getPath('documents'),'echo test 诊断日志.jsonl'),filters:[{name:'诊断日志',extensions:['jsonl']}]});
     if(result.canceled)return null;
     fs.writeFileSync(result.filePath,audit.read({limit:1000}).reverse().map(row=>JSON.stringify(row)).join('\n')+'\n','utf8');return {path:result.filePath};
   }
@@ -254,7 +256,7 @@ async function dispatchStudioCall(role, method, args = {}) {
   if(method==='game_bundle'){
     if(typeof args.linked!=='boolean')throw new Error('无效的工具栏捆绑状态');
     if(busy)throw new Error('请先停止录制或执行再调整捆绑');
-    if(!selectedGame)throw new Error('请先连接游戏窗口');
+    if(!selectedGame)throw new Error('请先连接目标窗口');
     if(args.linked)await linkToolbar();else await unlinkToolbar();
     toolbarLinkWanted=args.linked;sendGameState();return gameState();
   }
@@ -262,10 +264,10 @@ async function dispatchStudioCall(role, method, args = {}) {
   if(method==='workbench_show'){showWorkbench();return {};}
   if(method==='record_reviewed'){recordPending=false;sendGameState();return {};}
   if(method==='game_action'){
-    if(!['game-pick-coordinate','game-pick-image','run','view-record','view-diagnostics','view-help'].includes(args.action))throw new Error('不支持的游戏窗口操作');
+    if(!['game-pick-coordinate','game-pick-image','run','view-record','view-diagnostics','view-help'].includes(args.action))throw new Error('不支持的目标窗口操作');
     const readOnly=['view-diagnostics','view-help'].includes(args.action);
     if(busy&&!readOnly)throw new Error('请先停止录制或执行');
-    if(!selectedGame&&!readOnly)throw new Error('请先连接游戏');
+    if(!selectedGame&&!readOnly)throw new Error('请先连接目标应用');
     if(['view-record','view-diagnostics','view-help'].includes(args.action))showWorkbench();
     if(args.action==='run'){
       if(args.casePath!=null&&typeof args.casePath!=='string')throw new Error('无效的用例路径');
@@ -274,11 +276,11 @@ async function dispatchStudioCall(role, method, args = {}) {
     send({kind:'game_action',action:args.action,casePath:args.casePath||'',iterations:args.iterations});return {};
   }
   if(role==='game'&&['record_start','game_focus'].includes(method)){
-    if(!selectedGame||Number(args.handle)!==selectedGame.handle)throw new Error('请先连接所选游戏');
+    if(!selectedGame||Number(args.handle)!==selectedGame.handle)throw new Error('请先连接所选目标应用');
   }
   if (method === 'dirty') { dirty = Boolean(args.value);if(dirty)editRevision++;if(typeof args.caseName==='string')currentCaseName=args.caseName;sendGameState(); return {}; }
   if (method === 'game_focus') {
-    if(!selectedGame||selectedGame.handle!==Number(args.handle))throw new Error('请先连接所选游戏');
+    if(!selectedGame||selectedGame.handle!==Number(args.handle))throw new Error('请先连接所选目标应用');
     await openGameWindow();await grantForeground(bridge,ROOT);
     return bridge.call('game_focus',args);
   }
@@ -293,7 +295,7 @@ async function dispatchStudioCall(role, method, args = {}) {
     const data = await bridge.call('bootstrap',{preferred_handle:preferredHandle});
     currentPath = data.path;
     currentCaseName=data.project.name;sendGameState();
-    return {...data, recent,library:await caseList(), autoConnect:process.env.NYCS_SMOKE_TEST !== '1'&&!mcpStartupSmoke, preferredHandle:gameIndex>=0?Number(process.argv[gameIndex+1]):null};
+    return {...data, recent,library:await caseList(), autoConnect:gameIndex>=0&&process.env.ECHO_TEST_SMOKE_TEST !== '1'&&!mcpStartupSmoke, preferredHandle:gameIndex>=0?Number(process.argv[gameIndex+1]):null};
   }
   if(method==='windows'){
     const data=await bridge.call(method);
@@ -313,7 +315,7 @@ async function dispatchStudioCall(role, method, args = {}) {
       file = recent[args.index];
       if (!file) throw new Error('最近用例不存在');
     } else {
-      const result = await dialog.showOpenDialog(window, {title: '打开测试用例',defaultPath:CASES, properties: ['openFile'], filters: [{name: '诺亚测试用例', extensions: ['json']}]});
+      const result = await dialog.showOpenDialog(window, {title: '打开测试用例',defaultPath:CASES, properties: ['openFile'], filters: [{name: 'echo test 用例', extensions: ['json']}]});
       if (result.canceled) return null;
       file = result.filePaths[0];
     }
@@ -327,7 +329,7 @@ async function dispatchStudioCall(role, method, args = {}) {
     if (busy) throw new Error('请先停止录制或执行');
     let file = currentPath;
     if (!file || args.as_new) {
-      const result = await dialog.showSaveDialog(window, {title: '保存测试用例', defaultPath: !args.as_new&&file?file:defaultCasePath(CASES,args.project?.name), filters: [{name: '诺亚测试用例', extensions: ['nycs.json']}]});
+      const result = await dialog.showSaveDialog(window, {title: '保存测试用例', defaultPath: !args.as_new&&file?file:defaultCasePath(CASES,args.project?.name), filters: [{name: 'echo test 用例', extensions: ['echo.json']}]});
       if (result.canceled) return null;
       file = result.filePath;
     }
@@ -433,9 +435,9 @@ app.whenReady().then(async () => {
   auditWrite('info','application','started',{electron:process.versions.electron});
   fs.mkdirSync(CASES,{recursive:true});
   try{const saved=JSON.parse(fs.readFileSync(path.join(app.getPath('userData'),'case-library.json'),'utf8'));if(Array.isArray(saved))for(const file of saved)if(typeof file==='string')knownCases.add(file);}catch(error){if(error.code!=='ENOENT')auditError('case_library.load',error);}
-  app.setAppUserModelId('local.nycs-test-studio');
+  app.setAppUserModelId('local.echo-test');
   try { recent = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'recent.json'), 'utf8')); if (!Array.isArray(recent)) recent = []; } catch {}
-  protocol.handle('nycs', request => {
+  protocol.handle('echo-test', request => {
     const url = new URL(request.url);
     const filename = path.resolve(RENDERER, '.' + decodeURIComponent(url.pathname));
     if (url.host !== 'studio' || !filename.startsWith(RENDERER + path.sep)) return new Response('Not found', {status: 404});
@@ -450,23 +452,23 @@ app.whenReady().then(async () => {
   window = new BrowserWindow({
     width: 1440, height: 1000, minWidth: 1120, minHeight: 740, backgroundColor: '#ffffff', show: false,skipTaskbar:false,
     icon:path.join(__dirname,'assets/studio.png'),
-    title: '诺亚测试工作台', titleBarStyle: 'hidden', titleBarOverlay: {color: '#f8f8f9', symbolColor: '#55585e', height: 42},
+    title: 'echo test', titleBarStyle: 'hidden', titleBarOverlay: {color: '#f8f8f9', symbolColor: '#55585e', height: 42},
     webPreferences: {preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true,backgroundThrottling:false}
   });
   secureWindow(window);
   window.setMenuBarVisibility(false);
   window.setSkipTaskbar(false);
-  if(!gameSmoke&&process.env.NYCS_SMOKE_TEST!=='1'){
+  if(!gameSmoke&&process.env.ECHO_TEST_SMOKE_TEST!=='1'){
     const statePath=runtimeFile('workbench-state.json');
     fs.writeFileSync(statePath,JSON.stringify({host:nativeHandle(window),host_pid:process.pid}));
     window.once('closed',()=>{try{if(JSON.parse(fs.readFileSync(statePath,'utf8')).host_pid===process.pid)fs.unlinkSync(statePath);}catch{}});
   }
   tray=new Tray(path.join(__dirname,'assets/studio.png'));
-  tray.setToolTip('诺亚测试工作台 · 点击恢复窗口');
+  tray.setToolTip('echo test · 点击恢复窗口');
   tray.on('click',showWorkbench);
   tray.setContextMenu(Menu.buildFromTemplate([
     {label:'显示工作台',click:showWorkbench},
-    {label:'显示游戏窗口',click:()=>openGameWindow().catch(error=>send({kind:'notice',message:error.message}))},
+    {label:'显示目标窗口',click:()=>openGameWindow().catch(error=>send({kind:'notice',message:error.message}))},
     {type:'separator'},
     {label:'退出工作台',click:()=>window.close()}
   ]));
@@ -493,14 +495,14 @@ app.whenReady().then(async () => {
     closing = true;
     detachGame().then(()=>mcpServer?.close()).then(() => bridge.shutdown()).then(() => {gameWindow?.destroy();window.destroy();}).catch(error => {
       closing=false;
-      dialog.showErrorBox('无法断开游戏工具栏',error.message);
+      dialog.showErrorBox('无法断开窗口工具栏',error.message);
     });
   });
-  window.loadURL('nycs://studio/index.html');
+  window.loadURL('echo-test://studio/index.html');
   if(mcpEnabled)window.webContents.once('did-finish-load',()=>enableMcp().catch(error=>{
     auditError('mcp.start',error);send({kind:'notice',level:'error',message:'MCP 启动失败：'+error.message});
   }));
-  if(process.argv.includes('--record-diagnose')&&!gameSmoke&&process.env.NYCS_SMOKE_TEST!=='1'){
+  if(process.argv.includes('--record-diagnose')&&!gameSmoke&&process.env.ECHO_TEST_SMOKE_TEST!=='1'){
     window.webContents.once('did-finish-load',()=>require('./tools/recording-probe.cjs').probe(window,()=>bridge.call('record_status'))
       .catch(error=>auditError('record.diagnose',error)));
   }
@@ -514,10 +516,10 @@ app.whenReady().then(async () => {
       finally{
         fs.writeFileSync(artifactFile('smoke', 'native-game-smoke.json'),JSON.stringify(result,null,2));
         try{await bridge.call('stop');await detachGame();await bridge.shutdown();closing=true;gameWindow?.destroy();window.destroy();}
-        catch(error){dialog.showErrorBox('验证结束，请恢复游戏',error.message);}
+        catch(error){dialog.showErrorBox('验证结束，请恢复目标应用',error.message);}
       }
     });
-  } else if (process.env.NYCS_SMOKE_TEST === '1') {
+  } else if (process.env.ECHO_TEST_SMOKE_TEST === '1') {
     window.webContents.once('did-finish-load', async () => {
       try {
         const result = await window.webContents.executeJavaScript(`new Promise(resolve => { const started=Date.now(); const timer=setInterval(() => { if(window.__studioReady || Date.now()-started>15000) { clearInterval(timer); resolve({ready:!!window.__studioReady,title:document.title,steps:document.querySelectorAll('.step-row').length,nav:document.querySelectorAll('.nav-button').length,errors:window.__studioErrors||[]}); }},100); })`);
@@ -525,7 +527,16 @@ app.whenReady().then(async () => {
         await new Promise(resolve => setTimeout(resolve, 500));
         const image = await window.webContents.capturePage();
         fs.writeFileSync(artifactFile('smoke', 'electron-preview.png'), image.toPNG());
+        const fixtureDirectory=path.join(app.getPath('userData'),'case-fixtures');
+        fs.mkdirSync(fixtureDirectory,{recursive:true});
+        const fixturePath=path.join(fixtureDirectory,'ui-smoke.echo.json');
+        fs.writeFileSync(fixturePath,JSON.stringify({name:'界面验证用例',schema_version:1,selectors:[{name:'按钮',kind:'coordinate',x:.5,y:.5,normalized:true}],steps:[{name:'单击按钮',action:'click',target:'按钮',params:{}}]}));
+        knownCases.add(fixturePath);
+        const secondFixturePath=path.join(fixtureDirectory,'ui-smoke-second.echo.json');
+        fs.writeFileSync(secondFixturePath,JSON.stringify({name:'第二个界面验证用例',schema_version:1,selectors:[{name:'按钮',kind:'coordinate',x:.4,y:.6,normalized:true}],steps:[{name:'单击按钮',action:'click',target:'按钮',params:{}}]}));
+        knownCases.add(secondFixturePath);
         const interaction = await window.webContents.executeJavaScript(`(async () => {
+          await refreshCases();
           const localCasesVisible=document.querySelectorAll('.library-list [data-act="case-open"]').length===S.library.length&&S.library.length>0;
           const caseDirectory=S.caseDirectory;
           const savedCase=S.library.find(item=>!item.error);

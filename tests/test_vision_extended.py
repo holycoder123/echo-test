@@ -8,9 +8,9 @@ import cv2
 import numpy as np
 from PIL import Image
 
-from nycs_studio.models import Project, Selector, Step, load_project, save_project
-from nycs_studio.vision import Vision
-from nycs_studio.engine import Runner
+from echo_test.models import Project, Selector, Step, load_project, save_project
+from echo_test.vision import Vision
+from echo_test.engine import Runner
 
 
 class RecognitionTests(unittest.TestCase):
@@ -137,7 +137,7 @@ class RecognitionTests(unittest.TestCase):
         self.store('mask.png', np.ones(self.pattern.shape[:2], dtype=np.uint8)*255)
         selector = Selector('button', kind='image', image='button.png', mask='mask.png', templates=[{'image':'hover.png','mask':'mask.png'}])
         text = Selector('text', kind='image', recognition='ocr', text='任务', anchor='button', roi=[0,20,60,30])
-        path = self.root/'portable'/'case.nycs.json'
+        path = self.root/'portable'/'case.echo.json'
         saved = save_project(Project(selectors=[selector,text]), path, self.root)
         self.assertEqual(saved.to_dict(), load_project(path).to_dict())
         for asset in saved.selectors[0].asset_paths():

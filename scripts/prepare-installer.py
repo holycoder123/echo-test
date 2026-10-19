@@ -13,11 +13,11 @@ def main():
             raise RuntimeError('Refusing redirected installer staging directory')
         shutil.rmtree(stage)
     stage.mkdir(parents=True)
-    with zipfile.ZipFile(ROOT/'dist'/'nycs-test-studio-win-x64.zip') as archive:
+    with zipfile.ZipFile(ROOT/'dist'/'echo-test-win-x64.zip') as archive:
         if not all((stage/name).resolve().is_relative_to(stage.resolve()) for name in archive.namelist()):
             raise RuntimeError('Unexpected path in portable archive')
         archive.extractall(stage)
-    payload = stage/'nycs-test-studio'
+    payload = stage/'echo-test'
     shutil.copy2(ROOT/'electron'/'assets'/'studio.ico',payload/'electron'/'assets'/'studio.ico')
     shutil.copy2(ROOT/'scripts'/'installer-guard.py',payload/'scripts'/'installer-guard.py')
     print(payload)

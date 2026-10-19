@@ -10,7 +10,7 @@ async function verify(main,toolbar){
   try{
     result.selection=await js(`(async()=>{
       S.dirty=false;await api('dirty',{value:false});S.view='game';S.handle=-1;
-      S.connection={handle:-1,width:1024,height:700,title:'验证游戏窗口'};render();
+      S.connection={handle:-1,width:1024,height:700,title:'验证目标窗口'};render();
       const file=S.library.find(item=>!item.error&&item.path!==S.path).path;
       const select=document.querySelector('#game-case');select.value=file;select.dispatchEvent(new Event('change',{bubbles:true}));
       const selected=S.gameCasePath===file;
@@ -72,7 +72,7 @@ async function verify(main,toolbar){
     await bar.webContents.executeJavaScript("G.busy='recording';renderState()");
     assert.equal(await bar.webContents.executeJavaScript("document.querySelector('#bundle').disabled"),true,'录制时不能切换窗口捆绑');
     await bar.webContents.executeJavaScript("Object.assign(G,{toolbarLinked:false,busy:''});renderState()");
-    assert.equal(await bar.webContents.executeJavaScript("document.querySelector('#bundle').textContent==='捆绑游戏'&&!document.querySelector('#bundle').disabled"),true);
+    assert.equal(await bar.webContents.executeJavaScript("document.querySelector('#bundle').textContent==='捆绑目标应用'&&!document.querySelector('#bundle').disabled"),true);
     bar.setSize(...originalSize);
     result.errors=await js('window.__studioErrors');assert.deepEqual(result.errors,[]);
     result.passed=true;return result;

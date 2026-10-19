@@ -1,7 +1,7 @@
 {
-  "name": "nycs-test-studio",
+  "name": "echo-test",
   "version": "2.0.1",
-  "description": "Noah's Legend low-code desktop testing studio",
+  "description": "echo test desktop automation testing workbench",
   "private": true,
   "main": "electron/main.cjs",
   "scripts": {
@@ -23,5 +23,6 @@
     "@modelcontextprotocol/sdk": "1.31.0",
     "koffi": "3.3.2",
     "zod": "4.6.5"
-  }
+  },
+  "productName": "echo test"
 }

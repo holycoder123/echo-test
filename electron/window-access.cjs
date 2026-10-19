@@ -5,7 +5,7 @@ function authorize(event,main,game,method,args) {
   for(const [role,win,page,methods] of [['main',main,'/index.html',MAIN_METHODS],['game',game,'/game.html',GAME_METHODS]]) {
     if(!win||win.isDestroyed()||event.sender!==win.webContents||event.senderFrame!==win.webContents.mainFrame)continue;
     const url=new URL(event.senderFrame.url);
-    if(url.protocol==='nycs:'&&url.host==='studio'&&url.pathname===page&&methods.has(method))return role;
+    if(url.protocol==='echo-test:'&&url.host==='studio'&&url.pathname===page&&methods.has(method))return role;
   }
   throw new Error('当前窗口不允许此操作');
 }

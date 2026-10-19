@@ -1,4 +1,4 @@
-// Replay UI uses mocked execution; this test sends no game input.
+// Replay UI uses mocked execution; this test sends no application input.
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {artifactFile}=require('../../paths.cjs');
@@ -59,7 +59,7 @@ async function verify(main){
       api=async(method,args)=>{if(method==='run')throw new Error('测试启动失败');if(method==='workbench_show')return {};return window.__replaySaved.api(method,args);};
       let failed=false;try{await replayRecording();}catch(error){failed=error.message==='测试启动失败';}
       const retry=failed&&!S.busy&&!S.recordReplaying&&S.recordPending===window.__replayPending;
-      S.handle=null;let disconnected=false;try{await replayRecording();}catch(error){disconnected=error.message==='请先连接游戏窗口';}
+      S.handle=null;let disconnected=false;try{await replayRecording();}catch(error){disconnected=error.message==='请先连接目标窗口';}
       S.handle=-1;S.recordPending={raw_count:0,duration:1,project:{steps:[],selectors:[]}};render();
       const empty=document.querySelector('[data-act="record-replay"]').disabled;await replayRecording();
       return {retry,disconnected,empty:empty&&!S.busy};
