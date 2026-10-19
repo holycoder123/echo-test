@@ -9,10 +9,10 @@ function authorize(event,main,game,method,args) {
   }
   throw new Error('当前窗口不允许此操作');
 }
-for(const method of ['audit_list','audit_export','audit_folder','renderer_error'])MAIN_METHODS.add(method);
+for(const method of ['audit_list','audit_delete','audit_export','audit_folder','renderer_error'])MAIN_METHODS.add(method);
 GAME_METHODS.add('renderer_error');
 GAME_METHODS.add('case_list');
 MAIN_METHODS.add('game_bundle');GAME_METHODS.add('game_bundle');
-MAIN_METHODS.add('script_import');
+MAIN_METHODS.add('script_import');MAIN_METHODS.add('reports_delete');
 for(const method of ['control_list','control_save','control_delete','control_import','control_category_save','control_category_delete'])MAIN_METHODS.add(method);
 module.exports={authorize};

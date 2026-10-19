@@ -23,6 +23,7 @@ from .native_windows import user32, get_long, ct, wt
 from .legacy_window_recovery import recover_legacy_window
 from .case_library import CaseLibrary
 from .control_library import ControlLibrary
+from .report_library import ReportLibrary
 from .paths import runtime_file
 from .window_pair import NativeToolbarPair
 
@@ -519,15 +520,10 @@ class Service:
         if method == "record_stop":
             return self.finish_recording()
         if method == "reports":
-            records = []
-            directory = ROOT / "reports"
-            for path in sorted(directory.glob("*/result.json"), reverse=True)[:100]:
-                try:
-                    result = json.loads(path.read_text(encoding="utf-8"))
-                    records.append({**result, "id": path.parent.name})
-                except (ValueError, OSError):
-                    continue
-            return records
+            return ReportLibrary(ROOT).list()
+        if method == "reports_delete":
+            self.idle()
+            return ReportLibrary(ROOT).delete(args.get('ids'))
         if method == "shutdown":
             self.stop_event.set()
             if self.recorder:

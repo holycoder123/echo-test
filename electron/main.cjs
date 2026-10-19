@@ -243,6 +243,13 @@ async function dispatchStudioCall(role, method, args = {}) {
     if(['game-pick-coordinate','game-pick-image','run'].includes(args.action))send({kind:'notice',message:existing?error.message:errorMessage(error),level:'error'});
     return {id:error.auditId};
   }
+  if(method==='audit_delete'){if(busy||recordStarting)throw new Error('请先停止录制或执行再删除日志');return audit.delete(args.ids);}
+  if(method==='reports_delete'){
+    if(busy||recordStarting)throw new Error('请先停止录制或执行再删除报告');
+    const result=await bridge.call(method,args);
+    if(runState.value&&result.ids.includes(runState.value.reportId)){runState.value.reportId=null;publishRun();}
+    return result;
+  }
   if(method==='audit_list')return {entries:audit.read(args),directory:audit.directory};
   if(method==='audit_folder'){const error=await shell.openPath(audit.directory);if(error)throw new Error(error);return {};}
   if(method==='audit_export'){
@@ -585,6 +592,7 @@ app.whenReady().then(async () => {
           await require('./tests/smoke/control-picker-smoke.cjs').verify(window);
           await require('./tests/smoke/control-library-responsive-smoke.cjs').verify(window);
           await require('./tests/smoke/modal-buttons-smoke.cjs').verify(window);
+          await require('./tests/smoke/history-delete-smoke.cjs').verify(window);
       } finally {closing = true; await bridge.shutdown();gameWindow?.destroy(); window.destroy();}
     });
   }

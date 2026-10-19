@@ -34,11 +34,12 @@ S.iterations = 1;S.recordStarting=false;S.auditEntries=[];S.auditLevel='';S.audi
 S.mcpOperation='';
 S.recordReplaying=false;S.recordReplayRun=null;
 S.connection=null;S.connecting=false;S.windowSearch='';
+S.historySelections={reports:new Set(),audit:new Set(),logs:new Set()};S.historyDeleting='';
 S.controls={entries:[],categories:[],total:0,uncategorized:0,warnings:[]};S.targetCategory='all';
 const root = document.querySelector('#app');
 const modal = document.querySelector('#modal');
 window.__studioErrors = [];
-let confirmation, dragIndex=null, pickStart=null;
+let confirmation, dragIndex=null, pickStart=null,logSequence=0;
 
 function toast(text, type='') {
   if(type==='error'){window.reportStudioError(text,'toast');window.__studioErrors.push(String(text));window.__studioErrors=window.__studioErrors.slice(-20);}
@@ -106,6 +107,7 @@ function render() {
     <section class="content ${S.view==='game'?'game-content':''}" id="content">${S.view==='game'?gameView():S.view==='cases'?caseView():S.view==='targets'?targetView():S.view==='record'?recordView():S.view==='diagnostics'?diagnosticsView():S.view==='help'?StudioHelp.render(S.helpSearch):runView()}</section>
     <footer class="subtle-footer"><i class="status-dot ${S.busy?'green':''}"></i><span>${S.busy==='recording'?'正在录制目标应用操作':S.busy==='running'?'用例执行中 · F12 停止':'就绪'}</span><span class="right file-location" title="${esc(S.path||'')}" >${S.path?esc(shortFile(S.path)):'尚未保存'}${S.dirty?' · 未保存':''}</span></footer>
   </main></div>`;
+  updateHistorySelection();
   if(S.view==='runs') document.querySelector('.log-lines')?.scrollTo(0,1e8);
 }
 
@@ -242,8 +244,8 @@ function rawLabel(event){if(event.kind==='key'){const name={13:'ENTER',16:'SHIFT
 function liveEvents(){return S.recordEvents.slice(-8).map(event=>`<div class="record-preview-row">${icon(event.kind==='key'?'key':event.event==='wheel'?'scroll':'click')}<span>${rawLabel(event)}</span><small>${event.t.toFixed(1)}s</small></div>`).join('')||'<div class="empty compact">等待目标应用操作…</div>';}
 function runView() {
   return `<div class="page-heading"><div><h1>运行记录</h1><p class="sub">查看步骤结果、失败原因和截图报告。</p></div><div class="heading-actions">${S.busy==='running'?button('停止执行','stop','primary','stop'):button('刷新记录','refresh-reports','','refresh')}</div></div>
-  ${S.logs.length?`<section class="run-current"><div class="run-current-header"><strong>${S.busy==='running'?'正在执行':S.lastResult?`本次执行 · ${LABELS[S.lastResult.status]||'结束'}`:'执行日志'}</strong>${S.lastResult?`<span class="badge ${S.lastResult.status}">${LABELS[S.lastResult.status]}</span>`:''}<div class="right">${S.lastResult?.id?button('查看报告','open-report','ghost','',`data-id="${esc(S.lastResult.id)}"`):''}</div></div><div class="log-lines">${S.logs.map(log=>`<div class="log-line ${log.type||''}"><span class="log-time">${log.time}</span><span>${esc(log.message)}</span></div>`).join('')}</div></section>`:''}
-  <div class="section-toolbar"><span>历史运行 · ${S.reports.length}</span></div>${S.reports.length?`<table class="report-table"><thead><tr><th>测试用例</th><th>运行时间</th><th>结果</th><th>步骤数</th><th></th></tr></thead><tbody>${S.reports.map(report=>`<tr><td>${esc(report.case)}</td><td>${esc(dateLabel(report.started))}</td><td><span class="badge ${report.status}">${LABELS[report.status]||report.status}</span></td><td>${report.steps.length}</td><td>${button('查看报告','open-report','ghost','',`data-id="${esc(report.id)}"`)}</td></tr>`).join('')}</tbody></table>`:`<div class="empty"><div class="empty-icon">${icon('history')}</div><strong>还没有运行记录</strong><p>运行一个用例，结果会显示在这里。</p>${button('返回用例','view-cases','quiet','cases')}</div>`}`;
+  ${S.logs.length?`<section class="run-current"><div class="run-current-header"><strong>${S.busy==='running'?'正在执行':S.lastResult?`本次执行 · ${LABELS[S.lastResult.status]||'结束'}`:'执行日志'}</strong>${S.lastResult?`<span class="badge ${S.lastResult.status}">${LABELS[S.lastResult.status]}</span>`:''}<div class="right">${S.lastResult?.id?button('查看报告','open-report','ghost','',`data-id="${esc(S.lastResult.id)}"`):''}</div></div>${historySelectionBar('logs')}<div class="log-lines">${historyRows('logs').map(row=>`<div class="log-line ${row.type||''}">${historyCheckbox('logs',row.id)}<span class="log-time">${row.time}</span><span>${esc(row.message)}</span></div>`).join('')}</div></section>`:''}
+  <div class="section-toolbar"><span>历史运行 · ${S.reports.length}</span></div>${S.reports.length?`${historySelectionBar('reports')}<table class="report-table"><thead><tr><th class="history-check-cell">${historyCheckbox('reports')}</th><th>测试用例</th><th>运行时间</th><th>结果</th><th>步骤数</th><th></th></tr></thead><tbody>${S.reports.map(report=>`<tr><td class="history-check-cell">${historyCheckbox('reports',report.id)}</td><td>${esc(report.case)}</td><td>${esc(dateLabel(report.started))}</td><td><span class="badge ${report.status}">${LABELS[report.status]||report.status}</span></td><td>${report.steps.length}</td><td>${button('查看报告','open-report','ghost','',`data-id="${esc(report.id)}"`)}</td></tr>`).join('')}</tbody></table>`:`<div class="empty"><div class="empty-icon">${icon('history')}</div><strong>还没有运行记录</strong><p>运行一个用例，结果会显示在这里。</p>${button('返回用例','view-cases','quiet','cases')}</div>`}`;
 }
 
 function menu(anchor) {
@@ -370,7 +372,7 @@ async function replayRecording(){
     await api('workbench_show').catch(()=>{});throw error;
   }
 }
-function log(message,type=''){S.logs.push({message,type,time:new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date())});if(S.logs.length>1000)S.logs.shift();}
+function log(message,type=''){S.logs.push({id:'run-log-'+(++logSequence),message,type,time:new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date())});if(S.logs.length>1000)S.logs.shift();}
 async function reports(){S.reports=await api('reports');if(S.view==='runs')render();}
 async function startRecord(){
   if(S.recordPending){S.view='record';render();toast('请先将上一段录制加入用例，或丢弃后重新录制');return;}
@@ -413,6 +415,7 @@ async function handleAction(action,node){
     if(lock()||!await canReplace())return;
     const data=await api('open_case',{path:node.dataset.path});setProject(data);S.view='cases';render();return;
   }
+  if(action==='history-delete')return deleteHistory(node.dataset.kind);
   if(action==='audit-refresh')return refreshAudit();
   if(action==='audit-folder')return api('audit_folder');
   if(action==='audit-export'){const result=await api('audit_export');if(result)toast('日志已导出','success');return;}
@@ -573,16 +576,16 @@ async function bootstrap(){
 bootstrap();
 
 let auditTimer;
-async function refreshAudit(){const focused=document.activeElement?.id,caret=document.activeElement?.selectionStart;const data=await api('audit_list',{level:S.auditLevel,search:S.auditSearch});S.auditEntries=data.entries;S.auditDirectory=data.directory;if(S.view==='diagnostics'){render();if(focused==='audit-search'){const input=document.querySelector('#audit-search');input?.focus();input?.setSelectionRange(caret,caret);}}}
+async function refreshAudit(){const focused=document.activeElement?.id,caret=document.activeElement?.selectionStart;const data=await api('audit_list',{level:S.auditLevel,search:S.auditSearch});S.auditEntries=data.entries;S.auditDirectory=data.directory;if(S.auditSelected&&!S.auditEntries.some(row=>row.id===S.auditSelected.id))S.auditSelected=null;if(S.view==='diagnostics'){render();if(focused==='audit-search'){const input=document.querySelector('#audit-search');input?.focus();input?.setSelectionRange(caret,caret);}}}
 function diagnosticsView(){
  const selected=S.auditSelected;
  return `<div class="page-heading"><div><h1>错误日志</h1><p class="sub">连接、录制、采集、执行和窗口切换的诊断记录，重启后仍保留。</p></div><div class="heading-actions">${button('刷新','audit-refresh','','refresh')}${button('打开日志目录','audit-folder','','folder')}${button('导出日志','audit-export','primary','upload')}</div></div>
  <div class="audit-filters"><select id="audit-level" aria-label="日志等级">${options([['','全部等级'],['error','错误'],['warning','提醒'],['info','操作记录']],S.auditLevel)}</select><input id="audit-search" placeholder="搜索功能、错误原因或日志编号" value="${esc(S.auditSearch)}"><span class="small">最近 ${S.auditEntries.length} 条 · 导出最多 1000 条</span></div>
- <div class="audit-layout"><div><table class="report-table"><thead><tr><th>时间</th><th>等级</th><th>功能 / 阶段</th><th>原因</th><th></th></tr></thead><tbody>${S.auditEntries.map(entry=>`<tr><td>${esc(new Date(entry.time).toLocaleString('zh-CN',{hour12:false}))}</td><td><span class="badge ${entry.level==='error'?'failed':entry.level==='warning'?'stopped':'passed'}">${{error:'错误',warning:'提醒',info:'记录'}[entry.level]}</span></td><td>${esc(entry.operation)}<br><span class="small">${esc(entry.stage)}</span></td><td>${esc(entry.message||'—')}</td><td>${button('详情','audit-detail','ghost','',`data-id="${esc(entry.id)}"`)}</td></tr>`).join('')}</tbody></table>${!S.auditEntries.length?'<div class="empty compact">没有匹配的日志</div>':''}</div>${selected?`<aside class="audit-detail"><strong>日志 #${esc(selected.id)}</strong><pre>${esc(JSON.stringify(selected,null,2))}</pre></aside>`:''}</div><p class="small audit-path">${esc(S.auditDirectory)}</p>`;
+ <div class="audit-layout"><div>${historySelectionBar('audit')}<table class="report-table"><thead><tr><th class="history-check-cell">${historyCheckbox('audit')}</th><th>时间</th><th>等级</th><th>功能 / 阶段</th><th>原因</th><th></th></tr></thead><tbody>${S.auditEntries.map(entry=>`<tr><td class="history-check-cell">${historyCheckbox('audit',entry.id)}</td><td>${esc(new Date(entry.time).toLocaleString('zh-CN',{hour12:false}))}</td><td><span class="badge ${entry.level==='error'?'failed':entry.level==='warning'?'stopped':'passed'}">${{error:'错误',warning:'提醒',info:'记录'}[entry.level]}</span></td><td>${esc(entry.operation)}<br><span class="small">${esc(entry.stage)}</span></td><td>${esc(entry.message||'—')}</td><td>${button('详情','audit-detail','ghost','',`data-id="${esc(entry.id)}"`)}</td></tr>`).join('')}</tbody></table>${!S.auditEntries.length?'<div class="empty compact">没有匹配的日志</div>':''}</div>${selected?`<aside class="audit-detail"><strong>日志 #${esc(selected.id)}</strong><pre>${esc(JSON.stringify(selected,null,2))}</pre></aside>`:''}</div><p class="small audit-path">${esc(S.auditDirectory)}</p>`;
 }
-document.addEventListener('change',event=>{if(event.target.id==='audit-level'){S.auditLevel=event.target.value;refreshAudit().catch(error=>toast(error.message,'error'));}});
+document.addEventListener('change',event=>{if(event.target.id==='audit-level'){S.auditLevel=event.target.value;S.historySelections.audit.clear();refreshAudit().catch(error=>toast(error.message,'error'));}});
 document.addEventListener('input',event=>{
-  if(event.target.id==='help-search'){S.helpSearch=event.target.value;document.querySelector('.help-results').innerHTML=StudioHelp.contents(S.helpSearch);return;}if(event.target.id==='audit-search'){S.auditSearch=event.target.value;clearTimeout(auditTimer);auditTimer=setTimeout(()=>refreshAudit().catch(error=>toast(error.message,'error')),350);}});
+  if(event.target.id==='help-search'){S.helpSearch=event.target.value;document.querySelector('.help-results').innerHTML=StudioHelp.contents(S.helpSearch);return;}if(event.target.id==='audit-search'){S.auditSearch=event.target.value;S.historySelections.audit.clear();updateHistorySelection();clearTimeout(auditTimer);auditTimer=setTimeout(()=>refreshAudit().catch(error=>toast(error.message,'error')),350);}});
 
 document.addEventListener('toggle',event=>{if(event.target.matches?.('.case-library'))S.libraryOpen=event.target.open;},true);
 document.addEventListener('input',event=>{

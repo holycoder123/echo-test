@@ -52,6 +52,7 @@ try {
   assert.equal(read('control-library-responsive-smoke.json').passed,true);
   assert.equal(read('modal-buttons-smoke.json').passed,true);
   assert.equal(read('window-search-smoke.json').passed,true);
+  assert.equal(read('history-delete-smoke.json').passed,true);
   console.log('UI smoke passed. Results: artifacts/smoke');
 } catch (error) {
   console.error(error.message);

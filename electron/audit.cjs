@@ -32,9 +32,36 @@ class AuditLog{
     if(throttle){if(this.repeated.size>100)this.repeated.clear();this.repeated.set(key,{time:now,count:0,id:entry.id});}
     error.auditId=entry.id;return entry;
   }
+  delete(ids){
+    if(!Array.isArray(ids)||!ids.length||ids.length>1000||ids.some(id=>typeof id!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(id)))throw new Error('请选择有效的日志记录');
+    const requested=new Set(ids),deleted=new Set(),changes=[];
+    const directory=path.resolve(this.directory);
+    const redirected=file=>fs.lstatSync(file).isSymbolicLink()||fs.realpathSync(file).toLowerCase()!==path.resolve(file).toLowerCase();
+    if(redirected(directory))throw new Error('日志目录不能使用重定向路径');
+    for(let index=0;index<this.files;index++){
+      const file=index?`${this.file}.${index}`:this.file;if(!fs.existsSync(file))continue;
+      if(redirected(file)||!fs.lstatSync(file).isFile())throw new Error('日志文件不能使用重定向路径');
+      const original=fs.readFileSync(file,'utf8');let count=0;
+      const kept=original.split('\n').filter(line=>{
+        try{const row=JSON.parse(line);if(requested.has(row?.id)){deleted.add(row.id);count++;return false;}}catch{}
+        return true;
+      });
+      if(count)changes.push({file,original,content:kept.join('\n'),temporary:path.join(directory,`.audit-delete-${randomUUID()}.tmp`)});
+    }
+    const committed=[];
+    try{
+      for(const item of changes)fs.writeFileSync(item.temporary,item.content,{encoding:'utf8',flag:'wx'});
+      for(const item of changes){fs.renameSync(item.temporary,item.file);committed.push(item);}
+    }catch(error){
+      for(const item of committed)fs.writeFileSync(item.file,item.original,'utf8');
+      throw error;
+    }finally{for(const item of changes)if(fs.existsSync(item.temporary))fs.unlinkSync(item.temporary);}
+    for(const [key,value] of this.repeated)if(deleted.has(value.id))this.repeated.delete(key);
+    return {deleted:deleted.size,ids:[...deleted]};
+  }
   read({level='',search='',limit=300}={}){
     const rows=[];
-    for(let index=this.files-1;index>=0;index--){const file=index?`${this.file}.${index}`:this.file;if(!fs.existsSync(file))continue;for(const line of fs.readFileSync(file,'utf8').split('\n')){try{rows.push(JSON.parse(line));}catch{}}}
+    for(let index=this.files-1;index>=0;index--){const file=index?`${this.file}.${index}`:this.file;if(!fs.existsSync(file))continue;for(const line of fs.readFileSync(file,'utf8').split('\n')){try{const row=JSON.parse(line);if(row&&typeof row==='object'&&!Array.isArray(row)&&typeof row.id==='string')rows.push(row);}catch{}}}
     const query=String(search).toLowerCase().slice(0,200);
     return rows.filter(row=>(!level||row.level===level)&&(!query||JSON.stringify(row).toLowerCase().includes(query))).slice(-Math.min(1000,Math.max(1,Number(limit)||300))).reverse();
   }

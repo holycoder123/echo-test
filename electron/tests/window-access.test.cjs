@@ -27,3 +27,11 @@ test('subframes, foreign pages and destroyed windows cannot call studio',()=>{
   main.isDestroyed=()=>true;
   assert.throws(()=>authorize(event(main),main,game,'bootstrap',{}));
 });
+
+test('only the main workbench can delete logs and execution reports',()=>{
+ const main=surface('index.html'),game=surface('game.html');
+ for(const method of ['audit_delete','reports_delete']){
+  assert.equal(authorize(event(main),main,game,method,{ids:['example']}),'main');
+  assert.throws(()=>authorize(event(game),main,game,method,{ids:['example']}));
+ }
+});
