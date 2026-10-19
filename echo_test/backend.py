@@ -5,6 +5,7 @@ from ctypes import wintypes as wt
 from dataclasses import dataclass
 import os
 import time
+import ntpath
 from PIL import ImageGrab
 
 if os.name != "nt":
@@ -75,6 +76,8 @@ user32.GetAsyncKeyState.restype = ct.c_short
 kernel32.OpenProcess.argtypes = [wt.DWORD, wt.BOOL, wt.DWORD]
 kernel32.OpenProcess.restype = wt.HANDLE
 kernel32.CloseHandle.argtypes = [wt.HANDLE]
+kernel32.QueryFullProcessImageNameW.argtypes = [wt.HANDLE, wt.DWORD, wt.LPWSTR, ct.POINTER(wt.DWORD)]
+kernel32.QueryFullProcessImageNameW.restype = wt.BOOL
 advapi32.OpenProcessToken.argtypes = [wt.HANDLE, wt.DWORD, ct.POINTER(wt.HANDLE)]
 advapi32.GetTokenInformation.argtypes = [wt.HANDLE, ct.c_int, ct.c_void_p, wt.DWORD, ct.POINTER(wt.DWORD)]
 
@@ -95,11 +98,28 @@ class GameWindow:
     handle: int
     title: str
     pid: int
+    process_name: str = ""
+
+
+def process_executable_name(pid):
+    """Return only the executable basename; inaccessible processes remain selectable."""
+    process = kernel32.OpenProcess(0x1000, False, pid)
+    if not process:
+        return ""
+    try:
+        image = ct.create_unicode_buffer(32768)
+        size = wt.DWORD(len(image))
+        if kernel32.QueryFullProcessImageNameW(process, 0, image, ct.byref(size)):
+            return ntpath.basename(image.value)
+        return ""
+    finally:
+        kernel32.CloseHandle(process)
 
 
 def list_game_windows(include_hidden=False):
     """Enumerate titled top-level application windows, regardless of product name."""
     results = []
+    process_names = {}
     excluded_pids = {os.getpid()}
     host_pid = os.environ.get('ECHO_TEST_HOST_PID', '')
     if host_pid.isdecimal():
@@ -122,7 +142,9 @@ def list_game_windows(include_hidden=False):
         rectangle = wt.RECT()
         if not user32.GetClientRect(handle, ct.byref(rectangle)) or rectangle.right <= rectangle.left or rectangle.bottom <= rectangle.top:
             return True
-        results.append(GameWindow(int(handle), title, pid.value))
+        if pid.value not in process_names:
+            process_names[pid.value] = process_executable_name(pid.value)
+        results.append(GameWindow(int(handle), title, pid.value, process_names[pid.value]))
         return True
     callback = callback_type(collect)
     user32.EnumWindows.argtypes = [callback_type, wt.LPARAM]

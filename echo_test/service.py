@@ -366,7 +366,7 @@ class Service:
         if method == 'game_info':
             game=self.window(args['handle']);rect=wt.RECT();origin=wt.POINT()
             if not user32.GetClientRect(game.handle,ct.byref(rect)):raise RuntimeError('无法读取目标应用客户区')
-            info={'handle':game.handle,'pid':game.pid,'width':rect.right,'height':rect.bottom,'title':game.title}
+            info={'handle':game.handle,'pid':game.pid,'width':rect.right,'height':rect.bottom,'title':game.title,'process_name':game.process_name}
             if not user32.IsIconic(game.handle) and user32.ClientToScreen(game.handle,ct.byref(origin)):
                 info['bounds']=[origin.x,origin.y,rect.right,rect.bottom]
                 frame=wt.RECT()

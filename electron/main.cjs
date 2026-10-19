@@ -573,6 +573,7 @@ app.whenReady().then(async () => {
           fs.writeFileSync(artifactFile('smoke', 'game-window-smoke.json'),JSON.stringify(independent));
           fs.writeFileSync(artifactFile('smoke', 'game-window-empty.png'),(await gameWindow.webContents.capturePage()).toPNG());
           await require('./tests/smoke/connection-smoke.cjs').verify(window);
+          await require('./tests/smoke/window-search-smoke.cjs').verify(window);
           await require('./tests/smoke/recording-smoke.cjs').verify(window);
           await require('./tests/smoke/replay-smoke.cjs').verify(window);
           await require('./tests/smoke/game-run-smoke.cjs').verify(window,()=>gameWindow);

@@ -33,7 +33,7 @@ S.gameCasePath='';S.gameRunStarting=false;S.runState=null;
 S.iterations = 1;S.recordStarting=false;S.auditEntries=[];S.auditLevel='';S.auditSearch='';S.auditDirectory='';S.auditSelected=null;
 S.mcpOperation='';
 S.recordReplaying=false;S.recordReplayRun=null;
-S.connection=null;S.connecting=false;
+S.connection=null;S.connecting=false;S.windowSearch='';
 S.controls={entries:[],categories:[],total:0,uncategorized:0,warnings:[]};S.targetCategory='all';
 const root = document.querySelector('#app');
 const modal = document.querySelector('#modal');
@@ -58,6 +58,30 @@ function field(label,body,help='') {return `<label class="field"><span>${label}<
 function input(value,attribute,type='text',extra='') {return `<input type="${type}" value="${esc(value)}" ${attribute} ${extra} ${disabled()}>`;}
 function options(values,selected) {return values.map(([value,label])=>`<option value="${esc(value)}" ${value===selected?'selected':''}>${esc(label)}</option>`).join('');}
 function serverTitle(window) { return window?.title || '未连接目标应用'; }
+function matchingWindows(){
+  const words=S.windowSearch.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  return S.windows.filter(window=>{const text=[window.title,window.process_name||'',window.pid].join(' ').toLocaleLowerCase();return words.every(word=>text.includes(word));});
+}
+function windowChoiceLabel(window){return [serverTitle(window),window.process_name,'PID '+window.pid].filter(Boolean).join(' · ');}
+function windowChoices(){
+  const matches=matchingWindows(),current=Number(S.connection?.handle);
+  const placeholder=matches.length?'连接目标窗口':S.windowSearch.trim()?'没有匹配的窗口':'未发现窗口，请刷新';
+  const choice=window=>`<option value="${window.handle}" ${window.handle===current?'selected':''}>${esc(windowChoiceLabel(window))}</option>`;
+  const pinned=S.connection&&!matches.some(window=>window.handle===current)?S.windows.find(window=>window.handle===current)||S.connection:null;
+  return `<option value="">${placeholder}</option>${pinned?`<optgroup label="当前连接 · 不匹配搜索">${choice(pinned)}</optgroup><optgroup label="搜索结果">${matches.map(choice).join('')}</optgroup>`:matches.map(choice).join('')}`;
+}
+function windowConnectLabel(){return S.connecting?'连接中…':S.connection&&matchingWindows().some(window=>window.handle===S.connection.handle)?'重新连接':'连接';}
+function windowConnectDisabled(){return !!(S.connecting||disabled()||!matchingWindows().length);}
+function windowConnectionControls(){
+  const locked=S.connecting?'disabled':disabled();
+  return `<i class="status-dot ${S.connection?'green':''}"></i><div class="search window-search"><input type="search" id="window-search" placeholder="搜索标题 / 进程 / PID" aria-label="搜索目标窗口" value="${esc(S.windowSearch)}" autocomplete="off" ${locked}>${icon('search')}<button type="button" class="icon-button" data-act="window-search-clear" aria-label="清除窗口搜索" title="清除搜索" ${S.windowSearch?'':'hidden'} ${locked}>${icon('close')}</button></div><select class="connection-select" id="connection" aria-label="选择目标窗口" ${locked}>${windowChoices()}</select>${button(windowConnectLabel(),'game-connect','','',`id="window-connect" ${windowConnectDisabled()?'disabled':''}`)}<button class="icon-button" data-act="refresh" title="刷新目标窗口">${icon('refresh')}</button>`;
+}
+function updateWindowChoices(){
+  const select=document.querySelector('#connection');if(!select)return;
+  select.innerHTML=windowChoices();
+  const button=document.querySelector('#window-connect');button.textContent=windowConnectLabel();button.disabled=windowConnectDisabled();
+  document.querySelector('[data-act="window-search-clear"]').hidden=!S.windowSearch;
+}
 function currentWindow() {return S.windows.find(window=>window.handle===Number(S.handle));}
 function shortFile(path) {return path.split(/[\\/]/).at(-1).replace(/\.echo\.json$|\.json$/,'');}
 function dateLabel(value) {try{return new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(value));}catch{return value;}}
@@ -78,7 +102,7 @@ function render() {
     <div class="nav-label">工作区</div><button class="recent-case" data-act="new">＋ 新建用例</button><button class="recent-case" data-act="open">打开本地用例</button>
     ${S.recent.length?'<div class="nav-label">最近使用</div>'+S.recent.slice(0,5).map((path,index)=>`<button class="recent-case" data-act="recent" data-i="${index}" title="${esc(path)}">${esc(shortFile(path))}</button>`).join(''):''}
     <div class="sidebar-bottom"><i class="status-dot ${S.admin?'green':''}"></i><span>${S.admin?'管理员权限':'普通权限'}</span><button data-act="environment" title="运行环境">${icon('settings')}</button></div>
-  </aside><main class="workspace"><header class="topbar"><div class="breadcrumb"><span>工作区</span><span>/</span><strong>${esc(titles[S.view])}</strong></div><div class="topbar-right"><i class="status-dot ${S.connection?'green':''}"></i><select class="connection-select" id="connection" aria-label="选择目标窗口" ${S.connecting?'disabled':disabled()}><option value="">连接目标窗口</option>${S.windows.map(w=>`<option value="${w.handle}" ${w.handle===Number(S.connection?.handle)?'selected':''}>${esc(serverTitle(w))} · ${w.pid}</option>`).join('')}</select>${button(S.connecting?'连接中…':S.connection?'重新连接':'连接','game-connect','','',S.connecting||S.busy||S.gameRunStarting||!S.windows.length?'disabled':'')}<button class="icon-button" data-act="refresh" title="刷新目标窗口">${icon('refresh')}</button></div></header>
+  </aside><main class="workspace"><header class="topbar"><div class="breadcrumb"><span>工作区</span><span>/</span><strong>${esc(titles[S.view])}</strong></div><div class="topbar-right">${windowConnectionControls()}</div></header>
     <section class="content ${S.view==='game'?'game-content':''}" id="content">${S.view==='game'?gameView():S.view==='cases'?caseView():S.view==='targets'?targetView():S.view==='record'?recordView():S.view==='diagnostics'?diagnosticsView():S.view==='help'?StudioHelp.render(S.helpSearch):runView()}</section>
     <footer class="subtle-footer"><i class="status-dot ${S.busy?'green':''}"></i><span>${S.busy==='recording'?'正在录制目标应用操作':S.busy==='running'?'用例执行中 · F12 停止':'就绪'}</span><span class="right file-location" title="${esc(S.path||'')}" >${S.path?esc(shortFile(S.path)):'尚未保存'}${S.dirty?' · 未保存':''}</span></footer>
   </main></div>`;
@@ -144,7 +168,8 @@ async function refreshGameWindows(){
   if(!S.windows.length)toast('没有发现目标窗口，请先启动目标应用后刷新');
 }
 async function reconnectGame(){
-  const handle=S.connection?.handle||(S.windows.length===1?S.windows[0].handle:null);
+  const matches=matchingWindows();
+  const handle=matches.find(window=>window.handle===S.connection?.handle)?.handle||(matches.length===1?matches[0].handle:null);
   if(!handle){toast('请先从右上角选择要连接的目标窗口');return;}
   await connectGame(handle);
 }
@@ -392,6 +417,7 @@ async function handleAction(action,node){
   if(action==='audit-folder')return api('audit_folder');
   if(action==='audit-export'){const result=await api('audit_export');if(result)toast('日志已导出','success');return;}
   if(action==='audit-detail'){S.auditSelected=S.auditEntries.find(entry=>entry.id===node.dataset.id);render();return;}
+  if(action==='window-search-clear'){S.windowSearch='';const search=document.querySelector('#window-search');search.value='';updateWindowChoices();search.focus();return;}
   if(action==='view-game')return api('game_open');
   if(action.startsWith('view-')){S.view=action.slice(5);render();if(S.view==='cases')await refreshCases();if(S.view==='runs')await reports();if(S.view==='diagnostics')await refreshAudit();if(S.view==='targets')await refreshControls();return;}
   if(action==='game-pick-coordinate')return pickGameControl('coordinate');
@@ -460,6 +486,7 @@ document.addEventListener('click',event=>{
 document.addEventListener('input',event=>{
   if(event.target.id==='help-search'){S.helpSearch=event.target.value;document.querySelector('.help-results').innerHTML=StudioHelp.contents(S.helpSearch);return;}
   const node=event.target;
+  if(node.id==='window-search'){if(!node.disabled){S.windowSearch=node.value;updateWindowChoices();}return;}
   if(node.id==='control-picker-search'&&S.modal?.kind==='control-picker'){S.modal.search=node.value;renderControlPickerResults();return;}
   if(node.id==='target-search'){S.targetSearch=node.value;const start=node.selectionStart;render();const field=document.querySelector('#target-search');field.focus();field.setSelectionRange(start,start);return;}
   if(node.hasAttribute('data-category-name')&&S.modal?.kind==='category-editor'){S.modal.name=node.value;return;}
