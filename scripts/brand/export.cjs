@@ -4,7 +4,28 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {pathToFileURL} = require('node:url');
 const root = path.resolve(__dirname, '../..');
-app.setPath('userData', path.join(root, '.runtime/brand-render'));
+const profile = path.join(root, '.runtime/brand-render');
+const reportFile = path.join(profile, 'export-result.json');
+const outputs = [];
+function report(status, error) {
+  fs.mkdirSync(profile, {recursive:true});
+  fs.writeFileSync(reportFile, JSON.stringify({status, outputs, ...(error ? {error:String(error.stack || error)} : {})}, null, 2));
+}
+function fail(error) {
+  // This is a background build tool: leave diagnostics instead of Electron's
+  // uncaught-exception dialog, which can trap unattended GUI processes.
+  try { report('failed', error); } catch {}
+  app.exit(1);
+}
+process.on('uncaughtException', fail);
+process.on('unhandledRejection', fail);
+for (const stream of [process.stdout, process.stderr]) {
+  stream?.on('error', error => {
+    if (error.code !== 'EPIPE' && error.code !== 'EOF') fail(error);
+  });
+}
+report('running');
+app.setPath('userData', profile);
 app.commandLine.appendSwitch('force-device-scale-factor', '1');
 app.disableHardwareAcceleration();
 app.whenReady().then(async () => {
@@ -20,8 +41,9 @@ app.whenReady().then(async () => {
       const png = await win.webContents.capturePage({x:0, y:0, width:item.width, height:item.height});
       fs.mkdirSync(path.dirname(path.join(root, item.output)), {recursive:true});
       fs.writeFileSync(path.join(root, item.output), png.toPNG());
-      console.log(item.output);
+      outputs.push(item.output);
     }
+    report('complete');
     win.destroy(); app.quit();
-  } catch (error) {console.error(error); app.exit(1);}
-});
+  } catch (error) {fail(error);}
+}).catch(fail);

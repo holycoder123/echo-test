@@ -121,9 +121,11 @@ def main():
     write('exports.json', json.dumps(jobs, indent=2)+'\n')
     env = os.environ.copy()
     env.pop('ELECTRON_RUN_AS_NODE', None)
-    rendered = subprocess.run([str(ROOT/'node_modules/electron/dist/electron.exe'), str(ROOT/'scripts/brand/export.cjs')], cwd=ROOT, env=env, capture_output=True, text=True, encoding='utf-8', errors='replace')
+    rendered = subprocess.run([str(ROOT/'node_modules/electron/dist/electron.exe'), str(ROOT/'scripts/brand/export.cjs')], cwd=ROOT, env=env, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=120)
     if rendered.returncode:
-        raise RuntimeError(rendered.stdout + rendered.stderr)
+        report_file = ROOT/'.runtime/brand-render/export-result.json'
+        detail = report_file.read_text(encoding='utf-8') if report_file.exists() else rendered.stdout + rendered.stderr
+        raise RuntimeError('Brand export failed: '+detail)
     ico_sizes = (16,20,24,32,40,48,64,128,256)
     frames = [Image.open(OUT/f'icons/echo-test-{size}.png').convert('RGBA') for size in ico_sizes]
     frames[-1].save(OUT/'echo-test.ico', format='ICO', sizes=[(s,s) for s in ico_sizes], append_images=frames[:-1])

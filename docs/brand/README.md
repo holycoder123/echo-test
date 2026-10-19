@@ -57,4 +57,6 @@ node scripts/python.cjs scripts/brand/build.py
 
 构建器由固定路径和字体轮廓生成 SVG，使用项目内 Electron 渲染 PNG，使用运行环境已有的 Pillow 封装 ICO，验证尺寸、透明通道与全部 ICO 帧，生成 ZIP 和 SHA256。
 
+后台导出不向终端写日志；结果和错误详情保存在 `.runtime/brand-render/export-result.json`。关闭启动终端或输出管道不会触发 Electron 异常弹窗。
+
 分享封面已备好；GitHub 的 Social preview 需在仓库 Settings 中上传 `social-preview.png`，提交文件不会自动更改此设置。
