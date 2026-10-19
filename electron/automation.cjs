@@ -1,6 +1,7 @@
 // Application operations exposed to MCP. The renderer and MCP share run/stop scheduling.
 const fs = require('node:fs');
 const path = require('node:path');
+const {explorationSchema} = require('./mcp-server.cjs');
 
 function safeName(name, suffix = '') {
   if (typeof name !== 'string') throw new Error('名称必须为文本');
@@ -39,7 +40,7 @@ class McpAutomation {
   status() {
     return {...this.state(),mcp:{enabled:true,bound:this.bound,operation:this.active,eventSequence:this.sequence}};
   }
-  cancelStart(){if(['echo_test_run_case','echo_test_record_start'].includes(this.active))this.startCancelled=true;}
+  cancelStart(){if(['echo_test_run_case','echo_test_record_start','echo_test_explore'].includes(this.active))this.startCancelled=true;}
   checkStart(){if(this.startCancelled)throw new Error('已取消尚未开始的执行或录制');}
   idle(replace = false) {
     const current = this.state();
@@ -128,6 +129,14 @@ class McpAutomation {
         const data = await this.load(args.name);
         this.checkStart();
         return {...await this.dispatch('run',{handle,expected_pid:this.bound.pid,project:data.project,iterations,source:'case'}),path:data.path};
+      }
+      if (tool === 'echo_test_explore') {
+        this.idle();
+        const {project,timeout}=explorationSchema.parse(args);
+        this.checkAssets(project);
+        const handle=await this.binding();
+        this.checkStart();
+        return await this.dispatch('automation_explore',{handle,expected_pid:this.bound.pid,project,timeout});
       }
       if (tool === 'echo_test_capture') {
         const handle = await this.binding();

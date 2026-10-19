@@ -14,7 +14,8 @@ def local_now():
 
 
 class Runner:
-    def __init__(self, backend, project: Project, base_dir: Path, report_root: Path, emit=None):
+    def __init__(self, backend, project: Project, base_dir: Path, report_root: Path, emit=None, *, persist_reports=True):
+        self.persist_reports = persist_reports
         self.backend = backend
         self.project = Project.from_dict(project.to_dict())
         self.vision = Vision(base_dir)
@@ -58,6 +59,8 @@ class Runner:
         params = step.params
         action = step.action
         if action == 'python':
+            if not self.persist_reports:
+                raise ValueError('探索接口不执行 Python 脚本，请保存为正式用例后运行')
             from .scripting import execute_script
             execute_script(self, step, record if record is not None else {})
             return None
@@ -99,14 +102,18 @@ class Runner:
             self.backend.pause(params.get("duration", 1))
         elif action == "screenshot":
             destination = self.directory / f"screen_{uuid4().hex[:8]}.png"
-            self.backend.capture().save(destination)
-            return destination.name
+            screen = self.backend.capture()
+            if self.persist_reports:
+                screen.save(destination)
+                return destination.name
+            return None
         return None
 
     def run(self, iterations=1):
         if type(iterations) is not int or not 1 <= iterations <= 1000:
             raise ValueError("用例循环次数必须为 1 ~ 1000")
-        self.directory.mkdir(parents=True, exist_ok=True)
+        if self.persist_reports:
+            self.directory.mkdir(parents=True, exist_ok=True)
         try:
             self.project.validate()
             self.backend.activate()
@@ -135,7 +142,7 @@ class Runner:
                             record.update(status="stopped" if self.backend.cancelled() else "failed", error=str(error), elapsed=round(time.monotonic() - started, 3))
                             if self.recognition:
                                 record["recognition"] = self.recognition
-                                if self.recognition_frame is not None:
+                                if self.persist_reports and self.recognition_frame is not None:
                                     from PIL import ImageDraw
                                     diagnostic_image = self.recognition_frame.copy()
                                     draw = ImageDraw.Draw(diagnostic_image)
@@ -147,12 +154,13 @@ class Runner:
                                     diagnostic_name = f"recognition_{index + 1}_{uuid4().hex[:6]}.png"
                                     diagnostic_image.save(self.directory / diagnostic_name)
                                     record["recognition_screenshot"] = diagnostic_name
-                            try:
-                                filename = f"failure_{index + 1}_{uuid4().hex[:6]}.png"
-                                self.backend.capture().save(self.directory / filename)
-                                record["screenshot"] = filename
-                            except Exception as capture_error:
-                                record["capture_error"] = str(capture_error)
+                            if self.persist_reports:
+                                try:
+                                    filename = f"failure_{index + 1}_{uuid4().hex[:6]}.png"
+                                    self.backend.capture().save(self.directory / filename)
+                                    record["screenshot"] = filename
+                                except Exception as capture_error:
+                                    record["capture_error"] = str(capture_error)
                             self.message(kind="step", **record)
                             raise
                         self.message(kind="step", **record)
@@ -167,8 +175,9 @@ class Runner:
                 except Exception as release_error:
                     self.result.update(status="failed", error=str(release_error))
             self.result["finished"] = local_now().isoformat()
-            self.write_reports()
-            self.message(kind="finished", result=self.result, directory=str(self.directory))
+            if self.persist_reports:
+                self.write_reports()
+            self.message(kind="finished", result=self.result, directory=str(self.directory) if self.persist_reports else None)
         return self.result
 
     def write_reports(self):

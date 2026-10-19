@@ -1,6 +1,8 @@
 """JSON-line service for the renderer, including explicit Python case steps."""
 from __future__ import annotations
 import base64
+from concurrent.futures import Future
+import math
 from dataclasses import asdict
 import hashlib
 import io
@@ -206,6 +208,81 @@ class Service:
         self.automation_capture_pid = game.pid
         self.automation_capture_at = time.monotonic()
         return {"id": capture_id, "image": encoded, "width": width, "height": height, "handle": handle}
+
+    def automation_explore(self, args):
+        """Run an inline fragment on a worker; keep the RPC loop free for stop/status."""
+        self.idle()
+        timeout = args.get("timeout", 15)
+        if type(timeout) not in (int, float) or not math.isfinite(timeout) or not 1 <= timeout <= 30:
+            raise ValueError("探索执行时限必须为 1 ~ 30 秒")
+        project = Project.from_dict(args["project"])
+        enabled = [step for step in project.steps if step.enabled]
+        if len(project.steps) > 10 or not enabled or sum(step.repeat for step in enabled) > 10:
+            raise ValueError("探索需启用步骤，最多执行 10 步（含重复）")
+        if any(step.action == "python" for step in project.steps):
+            raise ValueError("探索接口不执行 Python 脚本，请保存为正式用例后运行")
+        # Inline definitions are snapshots: do not import or resolve shared controls,
+        # change the editor's base directory, or create any case/report files.
+        for selector in project.selectors:
+            self.automation_selector_asset(selector)
+        handle = self.automation_handle(args["handle"])
+        game = self.window(handle)
+        self.verify_game_pid(game, args.get("expected_pid"))
+        directory = self.automation_directory()
+        self.stop_event.clear()
+        deadline = time.monotonic() + timeout
+        expired = False
+        final_capture = {}
+        response = Future()
+
+        def cancelled():
+            nonlocal expired
+            if self.stop_event.is_set():
+                return True
+            if time.monotonic() >= deadline:
+                expired = True
+            return expired
+
+        def emit(event):
+            if event.get("kind") == "finished":
+                result = event["result"]
+                result["source"] = "exploration"
+                if result["status"] == "stopped":
+                    result["stop_reason"] = "timeout" if expired else "user"
+                    if expired:
+                        result["error"] = f"探索达到 {timeout:g} 秒执行时限，已停止后续步骤"
+                # Runner has released all held input. Capture before emitting finished:
+                # the desktop restores the workbench on failure/stop at that event.
+                try:
+                    final_capture.update(self.automation_capture(handle, game.pid))
+                    final_capture["capture_id"] = final_capture["id"]
+                except Exception as error:
+                    final_capture.update(capture_id=None, capture_error=str(error))
+                    if result["status"] == "passed":
+                        result.update(status="failed", error="步骤执行结束，但最终截图失败：" + str(error))
+                event["source"] = "exploration"
+            self.emit(event)
+
+        backend = WindowsBackend(game, cancelled)
+        runner = Runner(backend, project, directory, ROOT / "reports", emit, persist_reports=False)
+        self.running = True
+
+        def work():
+            try:
+                result = runner.run()
+                response.set_result({"result": result, "saved": False, **final_capture})
+            except Exception as error:
+                self.running = False
+                self.emit({"kind": "run_error", "message": str(error), "traceback": traceback.format_exc()})
+                response.set_exception(error)
+
+        self.worker = threading.Thread(target=work, daemon=True)
+        try:
+            self.worker.start()
+        except Exception:
+            self.running = False
+            raise
+        return response
 
     def automation_save_template(self, capture_id, handle, name, rect, expected_pid=None):
         self.idle()
@@ -421,6 +498,8 @@ class Service:
             return self.project_response(project, path)
         if method == "capture":
             return self.capture(args["handle"])
+        if method == "automation_explore":
+            return self.automation_explore(args)
         if method == "automation_capture":
             return self.automation_capture(args["handle"], args.get("expected_pid"))
         if method == "automation_save_template":
@@ -537,6 +616,13 @@ class Service:
         raise ValueError("不支持的命令")
 
 
+def respond_future(request_id, completed):
+    try:
+        output({"id": request_id, "result": completed.result()})
+    except Exception as error:
+        output({"id": request_id, "error": str(error), "traceback": traceback.format_exc()})
+
+
 def main():
     sys.stdin.reconfigure(encoding="utf-8")
     sys.stdout.reconfigure(encoding="utf-8")
@@ -549,7 +635,11 @@ def main():
                 raise ValueError("请求过大")
             request = json.loads(line)
             result = service.call(request["method"], request.get("args") or {})
-            output({"id": request["id"], "result": result})
+            if isinstance(result, Future):
+                # Capture request identity now; later lines may arrive before completion.
+                result.add_done_callback(lambda completed, request_id=request["id"]: respond_future(request_id, completed))
+            else:
+                output({"id": request["id"], "result": result})
             if request["method"] == "shutdown":
                 break
         except Exception as error:

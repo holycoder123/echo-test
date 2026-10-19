@@ -15,7 +15,7 @@ async function fixture(t, options={}) {
   const calls = [], logs = [];
   const server = await startMcpServer({root,invoke:async (name,args) => {
     calls.push({name,args});
-    return name === 'echo_test_capture' || name === 'echo_test_preview_target'
+    return name === 'echo_test_capture' || name === 'echo_test_preview_target' || name === 'echo_test_explore'
       ? {image:`data:image/png;base64,${pixel}`,id:'observed_capture',width:1,height:1}
       : {tool:name,args};
   },status:async()=>({admin:true,busy:'',connection:{handle:123}}),audit:(...args)=>logs.push(args),...options});
@@ -46,8 +46,12 @@ test('real SDK client initializes, lists the allowlist and dispatches validated 
   const f = await fixture(t);
   const client = await clientFor(t,f);
   const listing = await client.listTools();
-  assert.equal(listing.tools.length,14);
+  assert.equal(listing.tools.length,15);
   assert.ok(listing.tools.some(tool=>tool.name === 'echo_test_run_case'));
+  const exploration=listing.tools.find(tool=>tool.name==='echo_test_explore');
+  assert.equal(exploration.inputSchema.properties.project.properties.steps.maxItems,10);
+  assert.equal(exploration.inputSchema.properties.timeout.maximum,30);
+  assert.ok(!exploration.inputSchema.properties.project.properties.steps.items.properties.action.enum.includes('python'));
   assert.ok(listing.tools.every(tool=>tool.name.startsWith('echo_test_')));
   const status = await client.callTool({name:'echo_test_status',arguments:{}});
   assert.equal(status.structuredContent.admin,true);
@@ -67,7 +71,7 @@ test('real SDK client initializes, lists the allowlist and dispatches validated 
 
 test('capture and selector previews expose MCP image pixels with separate structured metadata',async t=>{
   const f = await fixture(t),client = await clientFor(t,f);
-  for (const [name,args] of [['echo_test_capture',{}],['echo_test_preview_target',{selector:{name:'NPC',x:.2,y:.3}}]]) {
+  for (const [name,args] of [['echo_test_capture',{}],['echo_test_explore',{project:simpleProject()}],['echo_test_preview_target',{selector:{name:'NPC',x:.2,y:.3}}]]) {
     const result = await client.callTool({name,arguments:args});
     assert.equal(result.content[0].type,'image');assert.equal(result.content[0].mimeType,'image/png');
     assert.equal(result.content[0].data,pixel);assert.equal(result.structuredContent.id,'observed_capture');
@@ -187,4 +191,33 @@ test('shutdown closes a pending tool transport and returns promptly',async t=>{
   const result = await call;
   assert.ok(result.failed);
   await assert.rejects(fs.stat(f.server.runtimePath),{code:'ENOENT'});
+});
+
+
+test('exploration rejects oversized, empty, scripted or invalid fragments before invocation',async t=>{
+  const f=await fixture(t),client=await clientFor(t,f);
+  const base=simpleProject();
+  const invalid=[
+    {project:{...base,steps:[]}},
+    {project:{...base,steps:Array.from({length:11},()=>base.steps[0])}},
+    {project:{...base,steps:[{...base.steps[0],repeat:11}]}},
+    {project:{...base,steps:[{action:'python',params:{code:'print(1)'}}]}},
+    {project:{...base,steps:[{...base.steps[0],enabled:false}]}},
+    {project:{...base,steps:[{...base.steps[0],target:'missing'}]}},
+    ...[0,31,'15',null].map(timeout=>({project:base,timeout})),
+    {project:base,name:'temporary-case'},
+  ];
+  for(const args of invalid){const response=await raw(f,{body:{jsonrpc:'2.0',id:23,method:'tools/call',params:{name:'echo_test_explore',arguments:args}}});assert.equal(response.status,400,JSON.stringify(args));}
+  assert.deepEqual(f.calls,[]);
+  const valid=await client.callTool({name:'echo_test_explore',arguments:{project:{...base,steps:[{...base.steps[0],repeat:10}]},timeout:30}});
+  assert.equal(valid.content[0].type,'image');assert.equal(f.calls[0].args.timeout,30);
+});
+
+test('exploration returns failure details even when a final screenshot is unavailable',async t=>{
+  const f=await fixture(t,{invoke:async()=>({saved:false,result:{status:'failed',steps:[],error:'失焦'},capture_id:null,capture_error:'窗口关闭'})});
+  const client=await clientFor(t,f);
+  const result=await client.callTool({name:'echo_test_explore',arguments:{project:simpleProject()}});
+  assert.equal(result.structuredContent.result.status,'failed');
+  assert.equal(result.structuredContent.capture_id,null);assert.equal(result.content.length,1);
+  assert.equal(result.isError,undefined);
 });

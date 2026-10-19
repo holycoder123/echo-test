@@ -113,3 +113,42 @@ test('MCP stop while loading a case cancels the later start',async t=>{
   await assert.rejects(run,/已取消/);
   assert.equal(f.calls.some(row=>row.method==='run'),false);assert.equal(f.router.active,'');
 });
+
+
+test('exploration dispatches an inline snapshot and preserves dirty editor and pending recording',async t=>{
+  const f=fixture(t);
+  await f.router.invoke('echo_test_windows');await f.router.invoke('echo_test_connect',{handle:50});
+  Object.assign(f.state,{dirty:true,recordPending:{raw_count:4},path:'editor/draft.echo.json',case:'未保存内容'});
+  const before=structuredClone(f.state);f.calls.length=0;
+  await f.router.invoke('echo_test_explore',{project});
+  assert.deepEqual(f.state,before);
+  assert.deepEqual(f.calls.map(call=>call.method),['windows','automation_explore']);
+  assert.equal(f.calls[1].args.timeout,15);assert.equal(f.calls[1].args.expected_pid,100);
+  assert.equal(f.calls[1].args.project.steps[0].target,'NPC');
+  assert.deepEqual(fs.readdirSync(f.root),[]);
+});
+
+test('stop during exploration binding cancels its start without sending input',async t=>{
+  const f=fixture(t);
+  await f.router.invoke('echo_test_windows');await f.router.invoke('echo_test_connect',{handle:50});
+  const backend=f.router.backend;
+  f.router.backend=async(method,args)=>{const result=await backend(method,args);if(method==='windows')await f.router.invoke('echo_test_stop');return result;};
+  f.calls.length=0;
+  await assert.rejects(f.router.invoke('echo_test_explore',{project}),/已取消/);
+  assert.deepEqual(f.calls.map(call=>call.method),['windows','stop']);
+});
+
+test('exploration keeps stop/status/events available while awaiting the final screenshot',async t=>{
+  const f=fixture(t);
+  await f.router.invoke('echo_test_windows');await f.router.invoke('echo_test_connect',{handle:50});
+  let finish,started;const ready=new Promise(resolve=>{started=resolve;});
+  f.router.dispatch=async(method)=>{if(method==='automation_explore'){started();return new Promise(resolve=>{finish=resolve;});}return {stopping:true};};
+  const pending=f.router.invoke('echo_test_explore',{project});await ready;
+  assert.equal((await f.router.invoke('echo_test_status')).mcp.operation,'echo_test_explore');
+  await assert.rejects(f.router.invoke('echo_test_explore',{project}),/另一个/);
+  assert.deepEqual(await f.router.invoke('echo_test_stop'),{stopping:true});
+  f.router.receive({kind:'step',index:0,status:'stopped'});
+  assert.equal((await f.router.invoke('echo_test_events')).entries.length,1);
+  finish({saved:false,result:{status:'stopped'},image:'final pixels'});
+  assert.equal((await pending).saved,false);assert.equal(f.router.active,'');
+});

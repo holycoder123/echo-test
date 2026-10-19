@@ -35,7 +35,7 @@ async function mode(disabled){
       await client.connect(new StreamableHTTPClientTransport(new URL(connection.url),{requestInit:{headers:{Authorization:`Bearer ${connection.token}`}}}));
       const status=await client.callTool({name:'echo_test_status',arguments:{}});
       assert.equal(status.structuredContent.mcp.enabled,true);
-      const tools=await client.listTools();assert.equal(tools.tools.length,14);
+      const tools=await client.listTools();assert.equal(tools.tools.length,15);
     }
   }finally{
     if(client)await client.close();

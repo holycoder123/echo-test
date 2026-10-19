@@ -95,12 +95,25 @@ const projectSchema = z.object({name:label.default('目标应用测试用例'), 
     if (imageActions.has(step.action) && selectors.get(step.target)?.kind !== 'image') ctx.addIssue({code:'custom',path:['steps',index,'target'],message:'Image action needs an image selector'});
   }
 });
+// Exploration shares the case model, but runs a bounded fragment without saving it.
+const explorationStepSchema=stepSchema.safeExtend({
+  action:z.enum(actionNames.filter(action=>action!=='python')).default('click'),
+  repeat:z.int().min(1).max(10).default(1),
+});
+const explorationProjectSchema=projectSchema.safeExtend({steps:z.array(explorationStepSchema).min(1).max(10)});
+const explorationSchema = z.object({project:explorationProjectSchema,timeout:finite.min(1).max(30).default(15)}).strict().superRefine((value,ctx)=>{
+  const steps=value.project.steps;
+  if(steps.filter(step=>step.enabled).reduce((count,step)=>count+step.repeat,0)>10)
+    ctx.addIssue({code:'custom',path:['project','steps'],message:'Exploration supports at most 10 steps including repeats'});
+  if(!steps.some(step=>step.enabled))ctx.addIssue({code:'custom',path:['project','steps'],message:'Exploration needs an enabled step'});
+});
 const empty = z.object({}).strict();
 const tools = [
   ['echo_test_status', 'Read workbench state, window connection, administrator permission and current run.', empty, true],
   ['echo_test_windows', 'List application windows supported by this workbench.', empty, true],
   ['echo_test_connect', 'Connect a listed application window in native mode. The workbench rejects arbitrary windows.', z.object({handle:z.int().min(1).max(Number.MAX_SAFE_INTEGER)}).strict()],
   ['echo_test_capture', 'Capture the connected application. Returns PNG pixels and a capture id for creating templates.', empty, true],
+  ['echo_test_explore', 'Execute an inline project fragment (at most 10 steps including repeats, 1–30 seconds, default 15). Waits for completion and returns step results plus a fresh final PNG and capture_id, including on failure/stop when possible. Saves no case, controls or report and preserves editor changes. F12 or echo_test_stop stops it. Verify screenshot/assertions before saving a formal case. Python scripts require a saved case.', explorationSchema],
   ['echo_test_save_case', 'Validate and save a case under the workbench test_cases directory.', z.object({name:caseName,project:projectSchema}).strict()],
   ['echo_test_load_case', 'Load a saved case by filename within test_cases.', z.object({name:caseName}).strict(), true],
   ['echo_test_run_case', 'Run a validated saved case against the connected application. Poll echo_test_events and echo_test_status for completion; F12 or echo_test_stop stops execution.', z.object({name:caseName,iterations:z.int().min(1).max(10).default(1)}).strict()],
@@ -169,7 +182,7 @@ async function startMcpServer({invoke,status,root,token=randomBytes(32).toString
   const hideToken = value => String(value).split(token).join('[redacted]');
   const buildServer = () => {
     const server = new McpServer({name:'echo-test',version:VERSION}, {
-      instructions:'Operate only the game selected in the workbench. Read echo_test_windows, connect, and capture before building a case. Store cases and templates by safe names. Run saved cases and use status/events/report to verify real outcomes. Never infer task completion from a successful input step alone.',
+      instructions:'Operate only the game selected in the workbench. Read echo_test_windows, connect, and capture first. Prefer echo_test_explore for short inline fragments; it waits and returns results plus a final image without saving temporary cases. Verify screenshot/assertions, then assemble and save a formal case with echo_test_save_case. Store templates by safe names. For long saved cases use run_case and status/events/report. Never infer task completion from a successful input step alone.',
     });
     for (const [name, description, schema, readOnly=false] of tools) {
       server.registerTool(name,{description,inputSchema:schema,annotations:{readOnlyHint:readOnly,destructiveHint:!readOnly,idempotentHint:readOnly,openWorldHint:false}},async args => {
@@ -178,7 +191,7 @@ async function startMcpServer({invoke,status,root,token=randomBytes(32).toString
         try {
           const parsed = schema.parse(args);
           const output = name === 'echo_test_status' && typeof status === 'function' ? await status() : await invoke(name,parsed);
-          const result = name === 'echo_test_capture' || (name === 'echo_test_preview_target' && output?.image) ? imageResult(output) : jsonResult(output);
+          const result = name === 'echo_test_capture' || (['echo_test_preview_target','echo_test_explore'].includes(name) && output?.image) ? imageResult(output) : jsonResult(output);
           auditEntry(name,'complete',{elapsedMs:Date.now()-started});
           return result;
         } catch (error) {
@@ -283,4 +296,4 @@ async function startMcpServer({invoke,status,root,token=randomBytes(32).toString
   return {port:actualPort,url,runtimePath:runtime,close};
 }
 
-module.exports = {startMcpServer,projectSchema,selectorSchema,safeBasename,MAX_BODY_BYTES};
+module.exports = {startMcpServer,projectSchema,selectorSchema,explorationSchema,safeBasename,MAX_BODY_BYTES};

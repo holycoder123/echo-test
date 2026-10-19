@@ -164,7 +164,7 @@ function remember(file) {
 }
 function registerStop() {
   globalShortcut.unregister('F12');
-  if ((busy||['echo_test_run_case','echo_test_record_start'].includes(automation?.active)) && !globalShortcut.register('F12', () => stopCurrent().catch(error => send({kind: 'notice', message: error.message})))) {
+  if ((busy||['echo_test_run_case','echo_test_record_start','echo_test_explore'].includes(automation?.active)) && !globalShortcut.register('F12', () => stopCurrent().catch(error => send({kind: 'notice', message: error.message})))) {
     auditWrite('warning','stop.shortcut','unavailable',{message:'F12 快捷键被占用，请使用停止按钮'});
     send({kind: 'notice',level:'warning', message: 'F12 快捷键被占用，请使用停止按钮'});
   }
@@ -364,28 +364,30 @@ async function dispatchStudioCall(role, method, args = {}) {
     if (error) throw new Error(error);
     return {};
   }
-  if (['run', 'record_start', 'capture', 'preview','automation_capture','automation_preview'].includes(method)) {
+  if (['run', 'record_start', 'capture', 'preview','automation_capture','automation_preview','automation_explore'].includes(method)) {
     if(busy&&method==='automation_capture')return bridge.call(method,args);
     if (busy) throw new Error('请先停止录制或执行');
     if(method==='record_start'&&recordPending)throw new Error('请先在工作台处理上一段录制结果');
-    const continuous = ['run', 'record_start'].includes(method);
+    const execution = ['run','automation_explore'].includes(method);
+    const continuous = execution || method==='record_start';
     const generation=continuous?startGate.begin():0;
     if(continuous)continuousRole=role;
     const begin=()=>{
       // There is no await between cancellation checking and writing the backend request.
-      return continuous?startGate.submit(generation,()=>bridge.call(method,args)):bridge.call(method,args);
+      const request=()=>bridge.call(method,args,method==='automation_explore'?45000:20000);
+      return continuous?startGate.submit(generation,request):request();
     };
-    if(method==='run'){
-      const source=args.source==='recording'?'recording':'case';
-      runState.start(args.project,args.iterations||1,source==='recording'?null:currentPath,source);publishRun();
+    if(execution){
+      const source=method==='automation_explore'?'exploration':args.source==='recording'?'recording':'case';
+      runState.start(args.project,args.iterations||1,source==='case'?currentPath:null,source);publishRun();
     }
-    if (continuous) {if(method==='record_start'){recordStarting=true;recordStart=0;recordCount=0;}busy = method === 'run' ? 'running' : 'recording'; registerStop();sendGameState();}
+    if (continuous) {if(method==='record_start'){recordStarting=true;recordStart=0;recordCount=0;}busy = execution ? 'running' : 'recording'; registerStop();sendGameState();}
     try {
       // MCP observations leave the game foreground so the next authorized
       // operation can reuse it; manual renderer captures still return to the UI.
       return await handoff.call(begin, continuous || role === 'mcp');
     }
-    catch (error) {if(method==='run'){if(error.cancelled)runState.finish({status:'stopped',error:error.message});else runState.fail(error.message);publishRun();}if (continuous) {busy = '';continuousRole='';recordStarting=false; registerStop();sendGameState();} throw error;}
+    catch (error) {if(execution){if(error.cancelled)runState.finish({status:'stopped',error:error.message});else runState.fail(error.message);publishRun();}if (continuous) {busy = '';continuousRole='';recordStarting=false; registerStop();sendGameState();} throw error;}
     finally{if(continuous)startGate.finish();}
   }
   const data = await bridge.call(method, args);
@@ -584,6 +586,7 @@ app.whenReady().then(async () => {
           await require('./tests/smoke/recording-smoke.cjs').verify(window);
           await require('./tests/smoke/replay-smoke.cjs').verify(window);
           await require('./tests/smoke/game-run-smoke.cjs').verify(window,()=>gameWindow);
+          await require('./tests/smoke/exploration-smoke.cjs').verify(window);
           await require('./tests/smoke/sidebar-smoke.cjs').verify(gameWindow);
           await require('./tests/smoke/script-smoke.cjs').verify(window);
           await require('./tests/smoke/recognition-smoke.cjs').verify(window);

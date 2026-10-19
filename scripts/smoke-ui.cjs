@@ -36,6 +36,7 @@ try {
   assert.equal(toolbar.parent, null);
   assert.equal(toolbar.alwaysOnTop, false);
   assert.equal(read('game-run-smoke.json').passed, true);
+  assert.equal(read('exploration-smoke.json').passed, true);
   assert.equal(read('sidebar-smoke.json').passed,true);
   const connectionFile = path.join(ROOT, 'artifacts', 'smoke', 'connection-smoke.json');
   assert.ok(fs.statSync(connectionFile).mtimeMs >= started - 1000);
