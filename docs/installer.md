@@ -1,6 +1,6 @@
 # Windows 安装版
 
-安装包为 `dist/echo-test-2.1.0-setup-x64.exe`，适用于 Windows 10/11 x64。中文向导可以选择安装位置和桌面快捷方式，默认目录为当前用户的 `%LOCALAPPDATA%/Programs/echo test`，无需为程序本身申请管理员安装权限。
+安装包为 `dist/echo-test-1.0.0-setup-x64.exe`，适用于 Windows 10/11 x64。中文向导可以选择安装位置和桌面快捷方式，默认目录为当前用户的 `%LOCALAPPDATA%/Programs/echo test`，无需为程序本身申请管理员安装权限。
 
 安装内容包括工作台、Electron、Node、Python、Tcl/Tk、图片识别和 OCR 库及模型。桌面和开始菜单的默认入口会通过 Windows UAC 请求管理员权限，并默认启用 MCP；已具备管理员权限时直接启动，取消权限确认则不启动。旧的「MCP 管理员启动」入口仍兼容。关闭主窗口后，安装目录中的 `start_no_mcp.cmd` 可禁用本次 MCP。
 

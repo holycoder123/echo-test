@@ -4,9 +4,9 @@
 
 ## 启动
 
-从 [GitHub Releases](https://github.com/holycoder123/echo-test/releases) 下载安装版或便携版及 SHA256 校验文件。每个发布版本对应同名 Git 标签；版本说明见 [v2.1.0](docs/releases/v2.1.0.md)。
+从 [GitHub Releases](https://github.com/holycoder123/echo-test/releases) 下载安装版或便携版及 SHA256 校验文件。每个发布版本对应同名 Git 标签；版本说明见 [v1.0.0](docs/releases/v1.0.0.md)。
 
-安装版运行 `dist/echo-test-2.1.0-setup-x64.exe`，按中文向导安装后从桌面或开始菜单启动。支持选择安装目录、桌面快捷方式及卸载，升级和卸载保留用户用例、录制及报告。详细规则与构建方式见 [Windows 安装版](docs/installer.md)。
+安装版运行 `dist/echo-test-1.0.0-setup-x64.exe`，按中文向导安装后从桌面或开始菜单启动。支持选择安装目录、桌面快捷方式及卸载，升级和卸载保留用户用例、录制及报告。详细规则与构建方式见 [Windows 安装版](docs/installer.md)。
 
 双击 `start.cmd`，软件默认通过 Windows UAC 请求管理员权限；确认后打开工作台，取消则不启动。已具有管理员权限时不会重复请求。`start_admin.cmd` 仍兼容。打开工作台后选择并连接目标窗口，目标应用保持原生独立窗口。
 
