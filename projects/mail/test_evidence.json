@@ -1,0 +1,17 @@
+{
+  "case": "extract_all_mail.nycs.json",
+  "tested_at": "2026-09-30T18:34:07.200566+08:00",
+  "client_size": [
+    1024,
+    700
+  ],
+  "mail_pages": 2,
+  "mail_count": 8,
+  "execution": "same WindowsBackend and Runner used by Electron workbench, elevated CLI",
+  "full_flow_report": "C:\\Users\\wuting\\Documents\\ChatGPT\\New project\\nycs-test-studio\\reports\\20260930_183354_078407\\result.json",
+  "post_extraction_report": "C:\\Users\\wuting\\Documents\\ChatGPT\\New project\\nycs-test-studio\\reports\\20260930_183506_6fd50c\\result.json",
+  "full_flow_steps": 34,
+  "verification_steps": 10,
+  "verified": "Both pages selected; confirmation accepted; all 8 letter icons verified after extraction. No mail deleted.",
+  "preconditions": "Start with mail panel closed. Coordinates and row count match the observed 1024x700 client with 8 mails across 2 pages."
+}

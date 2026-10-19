@@ -1,0 +1,553 @@
+{
+  "name": "核对8封邮件附件全部提取",
+  "selectors": [
+    {
+      "name": "邮件入口",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_4f5086c1f075.png",
+      "threshold": 0.9,
+      "scales": [
+        1.0
+      ],
+      "roi": [
+        810,
+        75,
+        50,
+        50
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "系统邮件标题",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_62b2b0985a1f.png",
+      "threshold": 0.93,
+      "scales": [
+        1.0
+      ],
+      "roi": [
+        760,
+        190,
+        160,
+        36
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第一页",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_97e29f3d6a16.png",
+      "threshold": 0.93,
+      "scales": [
+        1.0
+      ],
+      "roi": [
+        756,
+        496,
+        74,
+        30
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第二页",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_da7172f8e0de.png",
+      "threshold": 0.93,
+      "scales": [
+        1.0
+      ],
+      "roi": [
+        756,
+        496,
+        74,
+        30
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "下一页",
+      "kind": "coordinate",
+      "x": 838,
+      "y": 509,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1.0
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "上一页",
+      "kind": "coordinate",
+      "x": 736,
+      "y": 509,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1.0
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "提取邮件",
+      "kind": "coordinate",
+      "x": 899,
+      "y": 509,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1.0
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第1行复选框",
+      "kind": "coordinate",
+      "x": 961,
+      "y": 290,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1.0
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第2行复选框",
+      "kind": "coordinate",
+      "x": 961,
+      "y": 336,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1.0
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第3行复选框",
+      "kind": "coordinate",
+      "x": 961,
+      "y": 383,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1.0
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第4行复选框",
+      "kind": "coordinate",
+      "x": 961,
+      "y": 430,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1.0
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第5行复选框",
+      "kind": "coordinate",
+      "x": 961,
+      "y": 477,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1.0
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第1行已勾选",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_f4d552cb1e05.png",
+      "threshold": 0.9,
+      "scales": [
+        1.0
+      ],
+      "roi": [
+        947,
+        277,
+        29,
+        27
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第2行已勾选",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_f4d552cb1e05.png",
+      "threshold": 0.9,
+      "scales": [
+        1.0
+      ],
+      "roi": [
+        947,
+        323,
+        29,
+        27
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第3行已勾选",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_f4d552cb1e05.png",
+      "threshold": 0.9,
+      "scales": [
+        1.0
+      ],
+      "roi": [
+        947,
+        370,
+        29,
+        27
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第4行已勾选",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_f4d552cb1e05.png",
+      "threshold": 0.9,
+      "scales": [
+        1.0
+      ],
+      "roi": [
+        947,
+        417,
+        29,
+        27
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第5行已勾选",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_f4d552cb1e05.png",
+      "threshold": 0.9,
+      "scales": [
+        1.0
+      ],
+      "roi": [
+        947,
+        464,
+        29,
+        27
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "提取确认提示",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_b0f28eeab5e6.png",
+      "threshold": 0.93,
+      "scales": [
+        1.0
+      ],
+      "roi": [
+        360,
+        302,
+        302,
+        82
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "确认提取",
+      "kind": "coordinate",
+      "x": 452,
+      "y": 363,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1.0
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第1行附件已提取",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_04f50cf5aff6.png",
+      "threshold": 0.91,
+      "scales": [
+        1.0
+      ],
+      "roi": [
+        715,
+        270,
+        36,
+        36
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第2行附件已提取",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_04f50cf5aff6.png",
+      "threshold": 0.91,
+      "scales": [
+        1.0
+      ],
+      "roi": [
+        715,
+        316,
+        36,
+        36
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第3行附件已提取",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_04f50cf5aff6.png",
+      "threshold": 0.91,
+      "scales": [
+        1.0
+      ],
+      "roi": [
+        715,
+        363,
+        36,
+        36
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第4行附件已提取",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_04f50cf5aff6.png",
+      "threshold": 0.91,
+      "scales": [
+        1.0
+      ],
+      "roi": [
+        715,
+        410,
+        36,
+        36
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第5行附件已提取",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_04f50cf5aff6.png",
+      "threshold": 0.91,
+      "scales": [
+        1.0
+      ],
+      "roi": [
+        715,
+        457,
+        36,
+        36
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    }
+  ],
+  "steps": [
+    {
+      "name": "核对第1封已无附件",
+      "action": "assert_image",
+      "target": "第1行附件已提取",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "核对第2封已无附件",
+      "action": "assert_image",
+      "target": "第2行附件已提取",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "核对第3封已无附件",
+      "action": "assert_image",
+      "target": "第3行附件已提取",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "核对第4封已无附件",
+      "action": "assert_image",
+      "target": "第4行附件已提取",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "核对第5封已无附件",
+      "action": "assert_image",
+      "target": "第5行附件已提取",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "核对第二页提取结果",
+      "action": "click",
+      "target": "下一页",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0.3,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "核对第6封已无附件",
+      "action": "assert_image",
+      "target": "第1行附件已提取",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "核对第7封已无附件",
+      "action": "assert_image",
+      "target": "第2行附件已提取",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "核对第8封已无附件",
+      "action": "assert_image",
+      "target": "第3行附件已提取",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "保存第二页提取结果",
+      "action": "screenshot",
+      "target": "",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    }
+  ],
+  "schema_version": 1
+}

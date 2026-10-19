@@ -1,0 +1,81 @@
+{
+  "name": "新手_01_接待员",
+  "selectors": [
+    {
+      "name": "初始任务_初临曙光站",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_a0863781e35c.png",
+      "threshold": 0.87,
+      "scales": [
+        1
+      ],
+      "roi": [
+        790,
+        230,
+        220,
+        75
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "接待员布兰妮",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_c0538172ff98.png",
+      "threshold": 0.87,
+      "scales": [
+        1
+      ],
+      "roi": [
+        220,
+        100,
+        240,
+        235
+      ],
+      "offset_x": 0,
+      "offset_y": 65
+    }
+  ],
+  "steps": [
+    {
+      "name": "确认初始任务",
+      "action": "assert_image",
+      "target": "初始任务_初临曙光站",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "前往接待员布兰妮",
+      "action": "double_click",
+      "target": "接待员布兰妮",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 4,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "保存接待员交互画面",
+      "action": "screenshot",
+      "target": "",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    }
+  ],
+  "schema_version": 1
+}

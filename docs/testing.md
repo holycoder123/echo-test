@@ -1,0 +1,96 @@
+# 开发与验证
+
+以下命令在项目根目录运行。Node 测试保存在 `electron/tests`，Python 测试保存在 `tests`。
+
+```powershell
+npm start
+npm run check
+npm test
+npm run test:python
+npm run test:all
+```
+
+`test:all` 依次执行前端语法检查、Node 单元测试和 Python 单元测试。`NYCS_PYTHON` 可指定 Electron 后端使用的 Python 可执行文件；Python 测试与工作台使用同一个运行时选择器，优先选择项目内便携 Python，无便携环境时再寻找本机 64 位 Python。
+
+便携版优先使用 `runtime/python`。直接运行项目内 `runtime/node/node.exe scripts/smoke-ui.cjs` 可验证界面；`verify_portable.cmd` 验证屏蔽系统 Node/Python 路径后的依赖导入和禁止外部 HTTP 请求时的 OCR 推理。构建和运行说明见 [便携运行包](portable.md)。
+
+2026-10-04 的自动检查通过：60 项 Node 测试、169 项 Python 测试，完整输出保存在 [test-all-python-latest.log](../artifacts/test-all-python-latest.log)。
+
+MCP 回归覆盖标准 SDK 握手和工具模式、认证与文件边界、启动时旧主窗口识别、取消开始以及前台交接。成功的 MCP 截图、定位预览和 `passed` 执行保持工作台最小化；失败、停止和失联恢复工作台，录制停止返回录制结果。测试使用模拟窗口和后端，不发送真实游戏输入。真实任务是否完成，需要另按 [MCP 验收流程](mcp.md#用完成所有新手任务验收) 检查游戏截图、任务列表和执行报告。
+
+识别回归覆盖多模板、倍率、锚点移动和缺失、颜色排除相似候选、遮罩动态区域、OCR 坐标与置信度、资产另存为和失败报告。界面冒烟的 `recognition-smoke.json` 检查新控件配置、锚点重命名 / 删除保护和未命中预览。`npm run test:ocr` 使用真实本地 OCR 模型读取已保存的游戏「接受任务」「完成任务」模板，结果保存在 `artifacts/recognition-ocr-smoke.json`。这些检查不点击游戏；真实识别率仍需要用不同状态的实机截图评估。Python 测试与工作台使用相同的运行时选择规则。
+
+## 界面冒烟
+
+```powershell
+npm run test:ui
+```
+
+使用独立应用配置，检查页面加载、用例库、控件编辑、录制结果转换和游戏工具栏空状态。结果位于 `artifacts/smoke/electron-smoke.json`、`electron-interaction.json`、`game-window-smoke.json`，截图也位于同一目录。结果中的 `errors` 应为空。用例运行面板的额外结果保存在 `artifacts/smoke/game-run-smoke.json`：验证本地用例选择、保留游戏页、步骤 / 错误显示、进度更新保留运行结果区域、未保存内容保护及独立工具栏状态；这部分拦截运行请求，不发送游戏输入。测试会退出，不向游戏发送输入。
+
+也兼容设置 `NYCS_SMOKE_TEST=1` 后启动应用。
+
+`replay-smoke.json` 验证录制完成后的重放按钮、单次执行和停止、执行进度与报告、编辑内容及录制结果保留，以及重复点击、空录制、未连接和启动失败保护。执行请求被拦截，不向游戏发送输入；预览位于 `record-replay-preview.png`。
+
+`script-smoke.json` 验证 Python 步骤的添加、编辑、展开编辑、Tab 缩进、导入、运行期间锁定和代码的 HTML 转义，截图为 `python-editor-preview.png`。Python 的 `test_scripting.py` 使用真实独立解释器和模拟游戏后端，验证游戏 API、源码与输出报告、跨步骤变量、异常行号、死循环超时、停止、输出上限、导入后另存为，以及 Windows Job Object 对脚本子进程的清理。MCP 测试验证脚本源码传递及大小校验。这些测试不操作真实游戏。
+
+
+## 真实游戏窗口验证
+
+`scripts/smoke-mcp-startup.cjs` 使用独立工作台配置验证默认 MCP 启动、带随机凭证的 SDK 握手、显式关闭和正常退出后的凭证清理，不连接游戏或发送输入。已有工作台状态或 MCP 凭证时会拒绝覆盖；可以在安装测试的隔离目录中运行。结果为 `artifacts/mcp-startup-smoke.json`。
+
+`help-smoke.json` 验证内置使用说明的导航、关键词搜索、目录跳转、F1、无游戏连接时从工具栏打开，以及未保存用例和录制结果保留；同时检查搜索文本不会作为 HTML 执行。页面预览为 `help-preview.png`，文档在本地静态加载，无需联网。
+
+独立窗口捆绑可先用两个临时测试窗口验证，无需连接游戏：
+
+```powershell
+npm run test:pair
+```
+
+该测试在两个独立进程中创建 Win32 窗口，检查右侧捆绑、双向移动、最小化与恢复、解绑后的独立移动、游戏窗口关闭，以及原生游戏样式和尺寸保持。测试窗口自动关闭，结果保存在 `artifacts/smoke/window-pair-native.json`，不向实际游戏发送输入。界面冒烟的 `sidebar-smoke.json` 验证 300 × 600、380 × 730、420 × 800 三种面板尺寸下按钮可见、长名称换行、步骤默认展开、单一滚动区域及完整错误详情；预览为 `right-sidebar-running.png` 和 `right-sidebar-failure.png`。`game-run-smoke.json` 还检查捆绑提示和录制期间禁用解绑。
+
+录制回归包含启动过程、监听通知、事件计数、监听失败后恢复按钮，以及空录制重新启动和已有结果保护。`artifacts/smoke/recording-smoke.json` 记录工作台录制页回归结果，录制请求被拦截，不发送游戏输入。真实窗口验证另外检查 `game_enabled` 和 `game_hit_test`；仅启动监听不代表验证了手动操作采集。
+
+零事件录制的错误日志包含鼠标按钮、滚轮和按键的观察计数，以及本工具回放输入、失焦、客户区之外和被其他窗口遮挡的过滤计数。`mouse_queued` 区分钩子是否收到待处理的操作，`mouse_recorded` 表示通过窗口过滤的事件数。窗口查询在后台处理，回调立即返回，避免慢查询导致 Windows 静默移除钩子。诊断不写入按键内容；仅移动鼠标不会生成用例步骤。
+
+需要当前游戏句柄、可交互桌面以及与游戏匹配的管理员权限。先正常关闭现有工作台，再连接同一客户端开展验证。
+
+```powershell
+python app.py --list-windows
+npm run test:game -- --game <游戏句柄>
+```
+
+`--game-smoke` 验证原生游戏连接、工具栏移动和解绑 / 重新捆绑、原生样式与尺寸保持、录制监听启停和截图采集入口。它不执行用例或发送游戏输入，结束后正常关闭工作台。结果保存在 `artifacts/smoke/native-game-smoke.json`，`passed` 应为 `true`，`errors` 应为空。
+
+手动焦点诊断：
+
+```powershell
+node_modules\electron\dist\electron.exe electron/tools/focus-probe.cjs <游戏句柄>
+```
+
+诊断只激活、截图和短暂监听游戏，结果保存在 `artifacts/probes/focus-probe.json`。
+
+`node_modules\electron\dist\electron.exe . --record-diagnose --game <游戏句柄>` 可在正常工作台中自动启动录制诊断。游戏连接后手动点击；收到一次完整鼠标操作后自动停止，最长等待五分钟，也可手动停止。诊断不向游戏发送操作，结束后正常保存录制并显示结果，计数和过滤原因存放在 `.runtime/recording-probe.json`。已有运行或待处理录制时取消诊断，不覆盖编辑内容。
+
+录制同步注册 `RIDEV_INPUTSINK` 接收 Raw Input，在钩子收不到输入时提供独立通道。不会设置 `NOLEGACY` 或 `CAPTUREMOUSE`，不会改变游戏的输入处理。同一个设备选择一个有效事件流，避免双重录制；`raw_mouse_observed`、`raw_key_observed`、`mouse_source`、`key_source` 和 `raw_input_error` 用于区分通道故障。实现依据 [Microsoft Raw Input](https://learn.microsoft.com/en-us/windows/win32/inputdev/using-raw-input)。
+
+## CLI
+
+```powershell
+python app.py --case projects/demo/open_shop.nycs.json
+python app.py --run --case path/to/case.nycs.json --window 123456 --iterations 1
+```
+
+`app.py` 默认打开 Electron。CLI 执行必须显式指定用例和当前游戏句柄；实际执行会向该窗口发送用例输入，执行报告保存在 `reports/<运行编号>`。
+
+## 通用控件库回归
+
+`tests/test_control_library.py` 验证跨用例更新和改名、旧控件去重与同名冲突、分类与搜索、图片／遮罩／锚点迁移、便携快照、删除保护、脚本名称兼容，以及服务在执行前解析最新配置。
+
+界面冒烟的 `shared-controls-smoke.json` 使用隔离的共享库目录，验证分类创建和删除、名称／分类／OCR 搜索、步骤引用、切换用例后的库可见性和共享修改同步，不写入用户控件库，也不向游戏发送输入。
+
+## 默认管理员启动
+
+`electron/tests/elevation.test.cjs` 和 `tests/test_mcp_startup.py` 验证默认 UAC 请求、已提权直接启动、参数引用与单实例锁释放、取消或失败停止启动，以及旧普通权限实例的预检。系统提权调用使用模拟，不弹出实际 UAC；Win32 适配器仅查询当前令牌。
+
+界面冒烟使用 `NYCS_SMOKE_TEST=1` 隔离配置，MCP 启动冒烟显式传入 `--no-admin`，避免自动检查请求管理员权限或连接实际游戏。普通调试可显式使用 `python app.py --no-admin` 或 `scripts/start-studio.ps1 -NoAdmin`；默认入口仍请求管理员权限。

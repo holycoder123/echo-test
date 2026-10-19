@@ -1,0 +1,31 @@
+{
+  "name": "新手_20_检查剩余任务分类",
+  "selectors": [],
+  "steps": [
+    {
+      "name": "打开任务面板核对新手分类",
+      "action": "key",
+      "target": "",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0.5,
+      "repeat": 1,
+      "params": {
+        "keys": "Q"
+      }
+    },
+    {
+      "name": "保存剩余任务分类",
+      "action": "screenshot",
+      "target": "",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    }
+  ],
+  "schema_version": 1
+}

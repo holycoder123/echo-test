@@ -1,0 +1,6 @@
+Pillow>=10,<13
+numpy>=1.26,<3
+opencv-python>=4.8,<5
+rapidocr>=3.9.2,<4
+onnxruntime>=1.23,<2
+protobuf>=4.25.8,<5

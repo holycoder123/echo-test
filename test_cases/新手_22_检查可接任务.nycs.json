@@ -1,0 +1,45 @@
+{
+  "name": "新手_22_检查可接任务",
+  "selectors": [
+    {
+      "name": "可接主支线任务标签",
+      "kind": "coordinate",
+      "x": 416,
+      "y": 204,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    }
+  ],
+  "steps": [
+    {
+      "name": "查看当前等级可接任务",
+      "action": "click",
+      "target": "可接主支线任务标签",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0.5,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "保存可接任务列表",
+      "action": "screenshot",
+      "target": "",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    }
+  ],
+  "schema_version": 1
+}

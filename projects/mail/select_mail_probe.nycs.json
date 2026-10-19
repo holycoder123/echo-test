@@ -1,0 +1,212 @@
+{
+  "name": "邮件流程－逐封全选实测",
+  "selectors": [
+    {
+      "name": "系统邮件标题",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_62b2b0985a1f.png",
+      "threshold": 0.93,
+      "scales": [
+        1.0
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第1封邮件复选框",
+      "kind": "coordinate",
+      "x": 961,
+      "y": 290,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1.0
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第2封邮件复选框",
+      "kind": "coordinate",
+      "x": 961,
+      "y": 336,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1.0
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第3封邮件复选框",
+      "kind": "coordinate",
+      "x": 961,
+      "y": 383,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1.0
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第4封邮件复选框",
+      "kind": "coordinate",
+      "x": 961,
+      "y": 430,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1.0
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第5封邮件复选框",
+      "kind": "coordinate",
+      "x": 961,
+      "y": 477,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1.0
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "下一页",
+      "kind": "coordinate",
+      "x": 838,
+      "y": 509,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1.0
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    }
+  ],
+  "steps": [
+    {
+      "name": "确认邮件面板",
+      "action": "assert_image",
+      "target": "系统邮件标题",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0.5,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "勾选第1封邮件",
+      "action": "click",
+      "target": "第1封邮件复选框",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0.15,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "勾选第2封邮件",
+      "action": "click",
+      "target": "第2封邮件复选框",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0.15,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "勾选第3封邮件",
+      "action": "click",
+      "target": "第3封邮件复选框",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0.15,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "勾选第4封邮件",
+      "action": "click",
+      "target": "第4封邮件复选框",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0.15,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "勾选第5封邮件",
+      "action": "click",
+      "target": "第5封邮件复选框",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0.15,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "保存第一页全选状态",
+      "action": "screenshot",
+      "target": "",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0.2,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "查看第二页邮件",
+      "action": "click",
+      "target": "下一页",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0.6,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "保存第二页邮件",
+      "action": "screenshot",
+      "target": "",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    }
+  ],
+  "schema_version": 1
+}

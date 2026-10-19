@@ -1,0 +1,50 @@
+{
+  "name": "新手_04_接受奥丁报到",
+  "selectors": [
+    {
+      "name": "接受任务按钮",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_94f4a3e0e7e1.png",
+      "threshold": 0.88,
+      "scales": [
+        1
+      ],
+      "roi": [
+        700,
+        385,
+        180,
+        75
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    }
+  ],
+  "steps": [
+    {
+      "name": "接受前往奥丁报到任务",
+      "action": "click",
+      "target": "接受任务按钮",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 8,
+      "delay": 1,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "保存奥丁报到目标",
+      "action": "screenshot",
+      "target": "",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    }
+  ],
+  "schema_version": 1
+}

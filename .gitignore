@@ -1,0 +1,30 @@
+# Dependencies and Python caches
+node_modules/
+.venv/
+runtime/
+dist/
+__pycache__/
+*.py[cod]
+
+# Generated outputs and local runtime state
+artifacts/
+.runtime/
+reports/
+recordings/
+test_cases/.drafts/
+projects/untitled*/
+
+# Compatibility with older app versions writing recovery files at root
+.embed-recovery.json
+.workbench-state.json
+.workbench-close.json
+
+# Local credentials and machine-specific assistant settings
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+.codex/
+.agents/

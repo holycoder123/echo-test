@@ -1,0 +1,50 @@
+{
+  "name": "新手_02_提交初始任务",
+  "selectors": [
+    {
+      "name": "继续对话按钮",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_4e6d6272ee37.png",
+      "threshold": 0.9,
+      "scales": [
+        1
+      ],
+      "roi": [
+        700,
+        385,
+        180,
+        70
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    }
+  ],
+  "steps": [
+    {
+      "name": "继续接待员对话",
+      "action": "click",
+      "target": "继续对话按钮",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 8,
+      "delay": 0.8,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "保存任务提交页面",
+      "action": "screenshot",
+      "target": "",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    }
+  ],
+  "schema_version": 1
+}

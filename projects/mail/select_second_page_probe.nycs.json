@@ -1,0 +1,319 @@
+{
+  "name": "邮件流程－跨页全选核对",
+  "selectors": [
+    {
+      "name": "上一页",
+      "kind": "coordinate",
+      "x": 736,
+      "y": 509,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1.0
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第1封邮件复选框",
+      "kind": "coordinate",
+      "x": 961,
+      "y": 290,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1.0
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第2封邮件复选框",
+      "kind": "coordinate",
+      "x": 961,
+      "y": 336,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1.0
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第3封邮件复选框",
+      "kind": "coordinate",
+      "x": 961,
+      "y": 383,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1.0
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第4封邮件复选框",
+      "kind": "coordinate",
+      "x": 961,
+      "y": 430,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1.0
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第5封邮件复选框",
+      "kind": "coordinate",
+      "x": 961,
+      "y": 477,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1.0
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第1封邮件已勾选",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_f4d552cb1e05.png",
+      "threshold": 0.9,
+      "scales": [
+        1.0
+      ],
+      "roi": [
+        947,
+        277,
+        29,
+        27
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第2封邮件已勾选",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_f4d552cb1e05.png",
+      "threshold": 0.9,
+      "scales": [
+        1.0
+      ],
+      "roi": [
+        947,
+        323,
+        29,
+        27
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第3封邮件已勾选",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_f4d552cb1e05.png",
+      "threshold": 0.9,
+      "scales": [
+        1.0
+      ],
+      "roi": [
+        947,
+        370,
+        29,
+        27
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第4封邮件已勾选",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_f4d552cb1e05.png",
+      "threshold": 0.9,
+      "scales": [
+        1.0
+      ],
+      "roi": [
+        947,
+        417,
+        29,
+        27
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "第5封邮件已勾选",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_f4d552cb1e05.png",
+      "threshold": 0.9,
+      "scales": [
+        1.0
+      ],
+      "roi": [
+        947,
+        464,
+        29,
+        27
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    }
+  ],
+  "steps": [
+    {
+      "name": "勾选第6封邮件",
+      "action": "click",
+      "target": "第1封邮件复选框",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0.2,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "勾选第7封邮件",
+      "action": "click",
+      "target": "第2封邮件复选框",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0.2,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "勾选第8封邮件",
+      "action": "click",
+      "target": "第3封邮件复选框",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0.2,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "保存第二页全选状态",
+      "action": "screenshot",
+      "target": "",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0.1,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "返回第一页核对跨页选择",
+      "action": "click",
+      "target": "上一页",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0.5,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "核对第1封邮件保持选中",
+      "action": "assert_image",
+      "target": "第1封邮件已勾选",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "核对第2封邮件保持选中",
+      "action": "assert_image",
+      "target": "第2封邮件已勾选",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "核对第3封邮件保持选中",
+      "action": "assert_image",
+      "target": "第3封邮件已勾选",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "核对第4封邮件保持选中",
+      "action": "assert_image",
+      "target": "第4封邮件已勾选",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "核对第5封邮件保持选中",
+      "action": "assert_image",
+      "target": "第5封邮件已勾选",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "保存全部选中状态",
+      "action": "screenshot",
+      "target": "",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    }
+  ],
+  "schema_version": 1
+}

@@ -1,0 +1,76 @@
+{
+  "name": "新手_13_装备任务奖励",
+  "selectors": [
+    {
+      "name": "推荐换装提示",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_3faca6194dea.png",
+      "threshold": 0.9,
+      "scales": [
+        1
+      ],
+      "roi": [
+        780,
+        435,
+        155,
+        45
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "推荐换装确定按钮",
+      "kind": "coordinate",
+      "x": 861,
+      "y": 635,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    }
+  ],
+  "steps": [
+    {
+      "name": "等待紧急启动奖励的推荐换装",
+      "action": "wait_image",
+      "target": "推荐换装提示",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 15,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "确认穿戴紧急启动任务奖励",
+      "action": "click",
+      "target": "推荐换装确定按钮",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 1,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "保存巩固战线开始画面",
+      "action": "screenshot",
+      "target": "",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    }
+  ],
+  "schema_version": 1
+}

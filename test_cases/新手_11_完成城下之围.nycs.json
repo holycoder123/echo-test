@@ -1,0 +1,81 @@
+{
+  "name": "新手_11_完成城下之围",
+  "selectors": [
+    {
+      "name": "恶魔机甲清理完成对话",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_72da0242d4ed.png",
+      "threshold": 0.88,
+      "scales": [
+        1
+      ],
+      "roi": [
+        430,
+        320,
+        330,
+        50
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "完成任务按钮",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_8060cebdb93c.png",
+      "threshold": 0.88,
+      "scales": [
+        1
+      ],
+      "roi": [
+        700,
+        385,
+        180,
+        75
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    }
+  ],
+  "steps": [
+    {
+      "name": "等待消灭五个恶魔机甲并自动进入提交对话",
+      "action": "wait_image",
+      "target": "恶魔机甲清理完成对话",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 90,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "提交城下之围任务",
+      "action": "click",
+      "target": "完成任务按钮",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 8,
+      "delay": 1,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "保存战斗引导完成结果",
+      "action": "screenshot",
+      "target": "",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    }
+  ],
+  "schema_version": 1
+}

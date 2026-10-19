@@ -1,0 +1,45 @@
+{
+  "name": "打开商城",
+  "selectors": [
+    {
+      "name": "商城按钮",
+      "kind": "coordinate",
+      "x": 0.964,
+      "y": 0.07,
+      "normalized": true,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    }
+  ],
+  "steps": [
+    {
+      "name": "点击右上角商城",
+      "action": "click",
+      "target": "商城按钮",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 1,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "保存商城画面",
+      "action": "screenshot",
+      "target": "",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    }
+  ],
+  "schema_version": 1
+}

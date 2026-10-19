@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; frame-src 'none'">
+  <title>诺亚游戏工具栏</title>
+  <link rel="stylesheet" href="run-panel.css">
+  <link rel="stylesheet" href="game.css">
+</head>
+<body>
+  <header class="titlebar"><span class="mark">N</span><span>游戏工具栏</span><button id="help" title="使用说明 · F1" aria-label="打开使用说明">?</button></header>
+  <div class="panel-content">
+    <section class="toolbar" aria-label="游戏连接与录制">
+      <div class="connection-row">
+        <div class="connection"><strong id="server">未连接游戏</strong><div class="connection-meta"><span id="resolution">在工作台选择客户端</span><span class="subtitle" id="pair-status">独立模式</span></div></div>
+        <button id="bundle" class="quiet" disabled aria-pressed="false">捆绑游戏</button>
+      </div>
+      <div class="actions">
+        <button id="record" class="record" disabled><span class="record-dot"></span><span id="record-label">开始录制</span><kbd>F12 停止</kbd></button>
+        <button id="coordinate" disabled>＋ 采集坐标</button><button id="image" disabled>▧ 采集图片</button>
+      </div>
+    </section>
+    <section class="game-case-controls" aria-label="选择并运行测试用例">
+      <div class="section-heading"><label for="game-case">测试用例</label><button id="case-refresh" class="quiet" title="刷新用例列表">刷新</button></div>
+      <label class="case-choice"><select id="game-case" aria-label="选择运行用例"></select></label>
+      <div class="case-run-row"><label>循环<input id="game-iterations" type="number" value="1" min="1" max="1000" aria-label="用例循环次数"><span>次</span></label><button id="run" disabled>运行用例</button></div>
+    </section>
+    <div class="run-area"><section id="game-run-results" class="game-run-results" aria-label="用例运行状态"></section></div>
+  </div>
+  <nav class="workspace-actions" aria-label="工作台入口"><button id="logs" class="quiet">错误日志</button><button id="workbench" class="quiet">工作台 ↗</button></nav>
+  <footer><div class="status-line"><span class="indicator" id="indicator"></span><span id="status">就绪</span></div><span id="clock">工具栏可自由移动</span></footer>
+  <div id="notice" role="status" aria-live="polite" hidden></div>
+  <script src="diagnostics.js"></script>
+  <script src="run-panel.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

@@ -1,0 +1,71 @@
+{
+  "name": "邮件流程－重置实测",
+  "selectors": [
+    {
+      "name": "关闭邮件",
+      "kind": "coordinate",
+      "x": 978,
+      "y": 208,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1.0
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "邮件入口",
+      "kind": "coordinate",
+      "x": 835,
+      "y": 100,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1.0
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    }
+  ],
+  "steps": [
+    {
+      "name": "关闭邮件窗口",
+      "action": "click",
+      "target": "关闭邮件",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0.3,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "重新打开邮件",
+      "action": "click",
+      "target": "邮件入口",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0.5,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "保存重新打开后的状态",
+      "action": "screenshot",
+      "target": "",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    }
+  ],
+  "schema_version": 1
+}

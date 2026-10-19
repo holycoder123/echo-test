@@ -1,0 +1,133 @@
+{
+  "name": "新手_07_装备武器并返回奥丁",
+  "selectors": [
+    {
+      "name": "推荐换装提示",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_3faca6194dea.png",
+      "threshold": 0.9,
+      "scales": [
+        1
+      ],
+      "roi": [
+        780,
+        435,
+        155,
+        45
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "推荐换装确定按钮",
+      "kind": "coordinate",
+      "x": 861,
+      "y": 635,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "更换装备返回奥丁链接",
+      "kind": "coordinate",
+      "x": 881,
+      "y": 265,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "奥丁对话标题",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_2e3176e1bdc3.png",
+      "threshold": 0.88,
+      "scales": [
+        1
+      ],
+      "roi": [
+        440,
+        260,
+        95,
+        40
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    }
+  ],
+  "steps": [
+    {
+      "name": "等待领取武器后的换装提示",
+      "action": "wait_image",
+      "target": "推荐换装提示",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 30,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "确认穿戴新武器",
+      "action": "click",
+      "target": "推荐换装确定按钮",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0.7,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "返回奥丁提交更换装备",
+      "action": "click",
+      "target": "更换装备返回奥丁链接",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0.5,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "等待自动寻路返回奥丁",
+      "action": "wait_image",
+      "target": "奥丁对话标题",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 45,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "保存返回奥丁的任务页面",
+      "action": "screenshot",
+      "target": "",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    }
+  ],
+  "schema_version": 1
+}

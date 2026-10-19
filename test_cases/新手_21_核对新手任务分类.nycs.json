@@ -1,0 +1,89 @@
+{
+  "name": "新手_21_核对新手任务分类",
+  "selectors": [
+    {
+      "name": "完成任务按钮",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_8060cebdb93c.png",
+      "threshold": 0.88,
+      "scales": [
+        1
+      ],
+      "roi": [
+        700,
+        385,
+        180,
+        75
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "任务分类检查_关闭NPC对话",
+      "kind": "coordinate",
+      "x": 842,
+      "y": 280,
+      "normalized": false,
+      "image": "",
+      "threshold": 0.86,
+      "scales": [
+        1
+      ],
+      "roi": null,
+      "offset_x": 0,
+      "offset_y": 0
+    }
+  ],
+  "steps": [
+    {
+      "name": "确认当前处于NPC任务对话",
+      "action": "assert_image",
+      "target": "完成任务按钮",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "关闭任务NPC对话以查看分类",
+      "action": "click",
+      "target": "任务分类检查_关闭NPC对话",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0.3,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "打开Q任务面板核对分类",
+      "action": "key",
+      "target": "",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0.5,
+      "repeat": 1,
+      "params": {
+        "keys": "Q"
+      }
+    },
+    {
+      "name": "保存任务分类界面",
+      "action": "screenshot",
+      "target": "",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    }
+  ],
+  "schema_version": 1
+}

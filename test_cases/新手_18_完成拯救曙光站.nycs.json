@@ -1,0 +1,81 @@
+{
+  "name": "新手_18_完成拯救曙光站",
+  "selectors": [
+    {
+      "name": "拯救曙光站最终汇报对话",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_491db6033e7c.png",
+      "threshold": 0.86,
+      "scales": [
+        1
+      ],
+      "roi": [
+        430,
+        305,
+        405,
+        75
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    },
+    {
+      "name": "完成任务按钮",
+      "kind": "image",
+      "x": 0.5,
+      "y": 0.5,
+      "normalized": true,
+      "image": "assets/template_8060cebdb93c.png",
+      "threshold": 0.88,
+      "scales": [
+        1
+      ],
+      "roi": [
+        700,
+        385,
+        180,
+        75
+      ],
+      "offset_x": 0,
+      "offset_y": 0
+    }
+  ],
+  "steps": [
+    {
+      "name": "等待拯救曙光站十个步骤和最终汇报完成",
+      "action": "wait_image",
+      "target": "拯救曙光站最终汇报对话",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 600,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "提交拯救曙光站任务",
+      "action": "click",
+      "target": "完成任务按钮",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 8,
+      "delay": 1,
+      "repeat": 1,
+      "params": {}
+    },
+    {
+      "name": "保存拯救曙光站最终完成画面",
+      "action": "screenshot",
+      "target": "",
+      "end_target": "",
+      "enabled": true,
+      "timeout": 5,
+      "delay": 0,
+      "repeat": 1,
+      "params": {}
+    }
+  ],
+  "schema_version": 1
+}
