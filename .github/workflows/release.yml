@@ -1,0 +1,129 @@
+name: Release echo test
+run-name: Release ${{ inputs.tag }}
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing source tag to build
+        required: true
+        default: v1.0.0
+        type: string
+      release_id:
+        description: Existing draft release ID
+        required: true
+        type: string
+permissions:
+  contents: write
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+jobs:
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: powershell
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      RELEASE_ID: ${{ inputs.release_id }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+      - name: Validate version and draft
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:RELEASE_TAG -notmatch '^v\d+\.\d+\.\d+$' -or $env:RELEASE_ID -notmatch '^\d+$') { throw 'Invalid release input' }
+          $package = Get-Content package.json -Raw | ConvertFrom-Json
+          if ('v'+$package.version -ne $env:RELEASE_TAG) { throw 'Tag and package version differ' }
+          $sha = (git rev-parse HEAD).Trim()
+          $release = gh api "repos/$env:GITHUB_REPOSITORY/releases/$env:RELEASE_ID" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or !$release.draft -or $release.tag_name -ne $env:RELEASE_TAG -or $release.target_commitish -ne $sha) { throw 'Draft does not match the source commit' }
+          "RELEASE_SHA=$sha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "RELEASE_VERSION=$($package.version)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          New-Item -ItemType Directory -Force artifacts, .runtime | Out-Null
+      - name: Provide Chinese font for generated OCR probe
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $font = Join-Path $env:SystemRoot 'Fonts\msyh.ttc'
+          if (!(Test-Path -LiteralPath $font)) {
+            # A pinned SIL Open Font License font is used only on this disposable runner.
+            $url = 'https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf'
+            Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $font
+          }
+      - name: Prepare verified offline runtime
+        run: |
+          & scripts/build-portable.ps1 -SkipArchive
+          if ($LASTEXITCODE -ne 0) { throw 'Offline runtime preparation failed' }
+          (Join-Path (Get-Location) 'runtime\node') | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          $metadata = @{product='echo test';version=$env:RELEASE_VERSION;tag=$env:RELEASE_TAG;source_commit=$env:RELEASE_SHA;source_url="https://github.com/$env:GITHUB_REPOSITORY/tree/$env:RELEASE_SHA";built_at_utc=[DateTime]::UtcNow.ToString('o');build_url="https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"}
+          [IO.File]::WriteAllText((Join-Path (Get-Location) 'runtime/release.json'),($metadata | ConvertTo-Json -Depth 5),(New-Object Text.UTF8Encoding $false))
+      - name: Check source and run unit tests
+        run: |
+          npm run test:all
+          if ($LASTEXITCODE -ne 0) { throw 'Source verification failed' }
+      - name: Build portable archive and installer
+        run: |
+          & runtime/python/python.exe -X utf8 scripts/package-portable.py
+          if ($LASTEXITCODE -ne 0) { throw 'Portable archive failed' }
+          & scripts/build-installer.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Installer build failed' }
+      - name: Verify installation, upgrade, offline UI, MCP and uninstall
+        run: |
+          & scripts/test-installer.ps1 -TestName github-release
+          if ($LASTEXITCODE -ne 0) { throw 'Installer verification failed' }
+      - name: Validate payload and generate checksums
+        run: |
+          $code = @'
+          from pathlib import Path
+          import hashlib, json, os, shutil, subprocess, zipfile
+          root=Path.cwd(); version=os.environ['RELEASE_VERSION']; tag=os.environ['RELEASE_TAG']; commit=os.environ['RELEASE_SHA']
+          report=json.loads((root/'artifacts/installer-test.json').read_text(encoding='utf-8-sig'))
+          assert report['passed'] and report['version']==version
+          archive=root/'dist/echo-test-win-x64.zip'
+          with zipfile.ZipFile(archive) as bundle:
+              assert bundle.testzip() is None
+              names=bundle.namelist(); prefix='echo-test/'
+              assert all(n.startswith(prefix) for n in names)
+              assert not any(n.startswith(prefix+d) for n in names for d in ('.git/','.runtime/','artifacts/','reports/','recordings/','nycs_studio/'))
+              package=json.loads(bundle.read(prefix+'package.json')); assert package['version']==version and package['name']=='echo-test'
+              metadata=json.loads(bundle.read(prefix+'runtime/release.json')); assert metadata['source_commit']==commit and metadata['tag']==tag
+              controls=json.loads(bundle.read(prefix+'control_library/controls.json')); assert not controls['entries'] and not controls['categories']
+              assert not any(n.startswith(prefix+d) and n.endswith(('.echo.json','.nycs.json')) for n in names for d in ('test_cases/','projects/'))
+              tracked=subprocess.check_output(['git','ls-files','-z']).decode('utf-8').split('\0')
+              for name in tracked:
+                  if name and prefix+name in names: assert bundle.read(prefix+name)==(root/name).read_bytes(), name
+          output=root/'dist/release'; output.mkdir()
+          sums=[]
+          for source,dest in [(root/f'dist/echo-test-{version}-setup-x64.exe',output/f'echo-test-{version}-setup-x64.exe'),(archive,output/f'echo-test-{version}-portable-x64.zip')]:
+              shutil.copy2(source,dest)
+              with dest.open('rb') as stream: digest=hashlib.file_digest(stream,'sha256').hexdigest()
+              line=digest+'  '+dest.name+'\n'; dest.with_name(dest.name+'.sha256').write_bytes(line.encode('ascii')); sums.append(line)
+          (output/'SHA256SUMS.txt').write_bytes(''.join(sums).encode('ascii'))
+          '@
+          & runtime/python/python.exe -X utf8 -c $code
+          if ($LASTEXITCODE -ne 0) { throw 'Payload verification failed' }
+      - name: Upload verified release assets
+        run: |
+          $files = @(Get-ChildItem dist/release -File | ForEach-Object FullName)
+          gh release upload $env:RELEASE_TAG @files --clobber --repo $env:GITHUB_REPOSITORY
+          if ($LASTEXITCODE -ne 0) { throw 'Asset upload failed' }
+          $assets = gh api "repos/$env:GITHUB_REPOSITORY/releases/$env:RELEASE_ID/assets" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $assets.Count -ne 5) { throw 'Release asset count mismatch' }
+          foreach ($file in Get-ChildItem dist/release -File) {
+            $asset = @($assets | Where-Object name -eq $file.Name)
+            $digest = 'sha256:'+(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($asset.Count -ne 1 -or $asset[0].state -ne 'uploaded' -or $asset[0].size -ne $file.Length -or $asset[0].digest -ne $digest) { throw "Remote asset mismatch: $($file.Name)" }
+          }
+      - name: Publish release
+        run: |
+          $release = gh api "repos/$env:GITHUB_REPOSITORY/releases/$env:RELEASE_ID" | ConvertFrom-Json
+          if (!$release.draft -or $release.target_commitish -ne $env:RELEASE_SHA) { throw 'Release source changed' }
+          $body = $release.body+"`n`nGitHub 构建记录：https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID`n"
+          [IO.File]::WriteAllText((Join-Path (Get-Location) '.runtime/release-notes.md'),$body,(New-Object Text.UTF8Encoding $false))
+          gh release edit $env:RELEASE_TAG --draft=false --latest --notes-file .runtime/release-notes.md --repo $env:GITHUB_REPOSITORY
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
