@@ -55,6 +55,12 @@ jobs:
             $url = 'https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf'
             Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $font
           }
+      - name: Install locked JavaScript dependencies and Electron binary
+        run: |
+          npm ci --include=dev --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { throw 'JavaScript dependency installation failed' }
+          node node_modules/electron/install.js
+          if ($LASTEXITCODE -ne 0) { throw 'Electron runtime download failed' }
       - name: Prepare verified offline runtime
         run: |
           & scripts/build-portable.ps1 -SkipArchive
