@@ -20,7 +20,7 @@ def main():
     mcp_mode = parser.add_mutually_exclusive_group()
     mcp_mode.add_argument("--mcp", dest="mcp", action="store_true", help="启用本机 MCP 接口（默认启用）")
     mcp_mode.add_argument("--no-mcp", dest="mcp", action="store_false", help="本次启动关闭 MCP 接口")
-    parser.set_defaults(mcp=True, admin=True)
+    parser.set_defaults(mcp=None, admin=None)
     args = parser.parse_args()
     from echo_test.backend import list_game_windows, WindowsBackend, is_admin
     if args.list_windows:
@@ -44,6 +44,13 @@ def main():
                         Path(__file__).parent / "reports", lambda event: print(event, flush=True))
         result = runner.run(args.iterations)
         return 0 if result["status"] == "passed" else 1
+    from echo_test.startup_preferences import startup_preferences
+    preferences = startup_preferences()
+    explicit_admin = args.admin is True
+    explicit_mcp = args.mcp is True
+    explicit_no_mcp = args.mcp is False
+    if args.admin is None: args.admin = preferences['admin']
+    if args.mcp is None: args.mcp = preferences['mcp']
     import subprocess
     root = Path(__file__).resolve().parent
     if args.mcp:
@@ -63,8 +70,11 @@ def main():
     command = [str(electron), str(root)]
     if args.mcp:
         command.append("--enable-mcp")
-    else:
+        if explicit_mcp: command.append("--force-mcp")
+    elif explicit_no_mcp:
         command.append("--disable-mcp")
+    if explicit_admin:
+        command.append('--force-admin')
     if not args.admin:
         command.append("--no-admin")
     if args.case:

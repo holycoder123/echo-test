@@ -1,4 +1,4 @@
-const {app, BrowserWindow, ipcMain, dialog, protocol, net, shell, globalShortcut, Tray, Menu, screen} = require('electron');
+const {app, BrowserWindow, ipcMain, dialog, protocol, net, shell, globalShortcut, Tray, Menu, screen, clipboard} = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const {pathToFileURL} = require('node:url');
@@ -12,7 +12,7 @@ const runState=new RunState();
 let currentCaseName='当前编辑用例';
 let automation,mcpServer,backendAdmin=false;
 let editRevision=0;
-const mcpEnabled=!process.argv.includes('--disable-mcp');
+const mcpAllowed=!process.argv.includes('--disable-mcp');
 const mcpStartupSmoke=process.argv.includes('--mcp-startup-smoke');
 const {authorize}=require('./window-access.cjs');
 
@@ -23,9 +23,12 @@ app.setPath('userData',path.join(app.getPath('appData'),'echo-test'));
 const gameSmoke=process.argv.includes('--game-smoke');
 if (process.env.ECHO_TEST_SMOKE_TEST === '1' || gameSmoke) app.setPath('userData', path.join(app.getPath('temp'), gameSmoke?'echo-test-game-smoke':'echo-test-smoke-'+process.pid));
 if(mcpStartupSmoke)app.setPath('userData',path.join(app.getPath('temp'),'echo-test-mcp-startup-smoke'));
+const {SettingsStore,DEFAULTS,validateSettings,ShortcutRegistry}=require('./settings.cjs');
+const settingsStore=new SettingsStore(app.getPath('userData'));
+let settings=settingsStore.value,shortcutRegistry,settingsChanging=false,forceExit=false;
 const primaryInstance = app.requestSingleInstanceLock();
 if (!primaryInstance) app.quit();
-if (primaryInstance) {
+if (primaryInstance && (settings.startup.admin||process.argv.includes('--force-admin'))) {
   try {
     const outcome=require('./elevation.cjs').ensureAdministrator({
       executable:process.execPath,argv:process.argv.slice(1),cwd:ROOT,
@@ -45,10 +48,12 @@ const CASES=path.join(ROOT,'test_cases');
 const {defaultCasePath}=require('./case-path.cjs');
 let tray;
 let gameWindow,gameLoaded,gameClosing=false;
-let toolbarLinked=false,toolbarLinkWanted=true;
+let toolbarLinked=false,toolbarLinkWanted=settings.target.linkToolbar;
 let recordStart=0,recordCount=0,recordPending=false;
 let continuousRole='';
 let selectedGame=null,connectingGame=false;
+let windowDiscoverySignature='';
+let windowPickOverlay=null,windowPickHover=null;
 const {AuditLog}=require('./audit.cjs');
 let audit,recordStarting=false;
 const critical=new Set(['bootstrap','game_connect','game_disconnect','game_focus','capture','save_template','import_template','preview','run','stop','record_start','record_stop','record_reviewed','save_project','load_project','open_project','open_recent','open_case','case_list','game_action','game_open','shutdown']);
@@ -122,16 +127,62 @@ async function openGameWindow(){
   return gameState();
 }
 
-async function connectSelectedGame(handle){
-  if(busy)throw new Error('请先停止录制或执行');
+async function connectSelectedGame(handle,expectedPid,fromPicker=false){
+  if(busy&&!(fromPicker&&busy==='selecting'))throw new Error('请先停止录制或执行');
   if(connectingGame)throw new Error('正在连接目标应用，请稍候');
   connectingGame=true;
   try{
-    await detachGame();
-    selectedGame=await bridge.call('game_info',{handle});
-    publishConnection();await openGameWindow();
+    await detachGame();toolbarLinkWanted=settings.target.linkToolbar;
+    selectedGame=await bridge.call('game_info',{handle,restore:true,expected_pid:expectedPid});
+    publishConnection();if(settings.target.autoToolbar)await openGameWindow();
     return {connection:selectedGame};
   }finally{connectingGame=false;}
+}
+
+function showWindowPickHover(event){
+  windowPickHover=event;
+  if(!windowPickOverlay||windowPickOverlay.isDestroyed())return;
+  const bounds=event.window?.bounds;
+  if(!bounds){if(windowPickOverlay.isVisible())windowPickOverlay.hide();return;}
+  const [x,y,width,height]=bounds;
+  if(![x,y,width,height].every(Number.isFinite)||width<=0||height<=0)return;
+  windowPickOverlay.setBounds(screen.screenToDipRect(null,{x,y,width,height}));
+  windowPickOverlay.webContents.send('studio:event',event);
+  if(!windowPickOverlay.isVisible())windowPickOverlay.showInactive();
+}
+async function pickTargetWindow(){
+  if(busy||recordStarting||connectingGame)throw new Error('请先停止录制或执行');
+  const toolbarVisible=gameWindow&&!gameWindow.isDestroyed()&&gameWindow.isVisible();
+  let selected=false;
+  const generation=startGate.begin();
+  busy='selecting';registerStop();sendGameState();
+  try{
+    windowPickOverlay=new BrowserWindow({width:100,height:100,show:false,frame:false,transparent:true,focusable:false,
+      skipTaskbar:true,alwaysOnTop:true,hasShadow:false,resizable:false,
+      webPreferences:{preload:path.join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
+    secureWindow(windowPickOverlay);windowPickOverlay.setIgnoreMouseEvents(true);
+    windowPickOverlay.webContents.once('did-finish-load',()=>{if(windowPickHover)showWindowPickHover(windowPickHover);});
+    await windowPickOverlay.loadURL('echo-test://studio/window-picker.html');
+    if(toolbarVisible)gameWindow.hide();
+    window.minimize();
+    const data=await startGate.submit(generation,()=>bridge.call('window_pick_start',{overlay_handle:nativeHandle(windowPickOverlay)},75000));
+    windowPickOverlay.destroy();windowPickOverlay=null;windowPickHover=null;
+    if(data.selected){
+      const result=await connectSelectedGame(data.selected.handle,data.selected.pid,true);
+      selected=true;return {...data,...result};
+    }
+    return data;
+  }catch(error){
+    if(error.cancelled)return {selected:null,cancelled:true,reason:'cancelled'};
+    throw error;
+  }finally{
+    startGate.finish();
+    await bridge.call('window_pick_cancel').catch(()=>{});
+    windowPickOverlay?.destroy();windowPickOverlay=null;windowPickHover=null;
+    busy='';registerStop();sendGameState();
+    if(toolbarVisible&&!selected&&gameWindow&&!gameWindow.isDestroyed())gameWindow.showInactive();
+    if(!closing&&window&&!window.isDestroyed())showWorkbench();
+  }
 }
 
 async function detachGame(){
@@ -170,6 +221,7 @@ function registerStop() {
   }
 }
 function receive(event) {
+  if(event.kind==='window_pick_hover'){showWindowPickHover(event);return;}
   automation?.receive(event);
   if(['toolbar_pair_error','toolbar_pair_closed'].includes(event.kind)){
     toolbarLinked=false;
@@ -226,7 +278,8 @@ function createBridge() {
 
 async function studioCall(event, method, args = {}) {
   const role=authorize(event,window,gameWindow,method,args);
-  if(automation?.active&&!['dirty','stop','record_stop','game_state','audit_list','control_list','renderer_error'].includes(method))throw new Error('MCP 正在操作工作台，请稍候');
+  if(settingsChanging&&!['settings_get','dirty','stop','record_stop','renderer_error','game_state','audit_list'].includes(method))throw new Error('设置正在更新，请稍后重试');
+  if(automation?.active&&!['dirty','stop','record_stop','window_pick_cancel','game_state','audit_list','control_list','renderer_error'].includes(method))throw new Error('MCP 正在操作工作台，请稍候');
   return dispatchStudioCall(role,method,args);
 }
 function stopCurrent(method='stop'){
@@ -243,6 +296,7 @@ async function dispatchStudioCall(role, method, args = {}) {
     if(['game-pick-coordinate','game-pick-image','run'].includes(args.action))send({kind:'notice',message:existing?error.message:errorMessage(error),level:'error'});
     return {id:error.auditId};
   }
+  if(method.startsWith('settings_'))return settingsCall(method,args);
   if(method==='audit_delete'){if(busy||recordStarting)throw new Error('请先停止录制或执行再删除日志');return audit.delete(args.ids);}
   if(method==='reports_delete'){
     if(busy||recordStarting)throw new Error('请先停止录制或执行再删除报告');
@@ -288,10 +342,12 @@ async function dispatchStudioCall(role, method, args = {}) {
   if (method === 'dirty') { dirty = Boolean(args.value);if(dirty)editRevision++;if(typeof args.caseName==='string')currentCaseName=args.caseName;sendGameState(); return {}; }
   if (method === 'game_focus') {
     if(!selectedGame||selectedGame.handle!==Number(args.handle))throw new Error('请先连接所选目标应用');
-    await openGameWindow();await grantForeground(bridge,ROOT);
+    if(settings.target.autoToolbar)await openGameWindow();await grantForeground(bridge,ROOT);
     return bridge.call('game_focus',args);
   }
-  if (method === 'game_connect')return connectSelectedGame(args.handle);
+  if (method === 'game_connect')return connectSelectedGame(args.handle,args.expected_pid);
+  if(method==='window_pick_start')return pickTargetWindow();
+  if(method==='window_pick_cancel')return bridge.call(method);
   if (method === 'game_disconnect') {
     if (busy) throw new Error('请先停止录制或执行');
     return detachGame();
@@ -302,11 +358,13 @@ async function dispatchStudioCall(role, method, args = {}) {
     const data = await bridge.call('bootstrap',{preferred_handle:preferredHandle});
     currentPath = data.path;
     currentCaseName=data.project.name;sendGameState();
-    return {...data, recent,library:await caseList(), autoConnect:gameIndex>=0&&process.env.ECHO_TEST_SMOKE_TEST !== '1'&&!mcpStartupSmoke, preferredHandle:gameIndex>=0?Number(process.argv[gameIndex+1]):null};
+    return {...data, settings:settingsSnapshot(),recent,library:await caseList(), autoConnect:gameIndex>=0&&process.env.ECHO_TEST_SMOKE_TEST !== '1'&&!mcpStartupSmoke, preferredHandle:gameIndex>=0?Number(process.argv[gameIndex+1]):null};
   }
   if(method==='windows'){
     const data=await bridge.call(method);
-    auditWrite('info','game.windows','discovered',{count:data.windows.length,handles:data.windows.map(item=>item.handle),connectedHandle:selectedGame?.handle||null});
+    const signature=JSON.stringify(data.windows.map(item=>[item.handle,item.pid,item.title,item.process_name||'']).sort((a,b)=>a[0]-b[0]));
+    if(!args.automatic||signature!==windowDiscoverySignature)auditWrite('info','game.windows','discovered',{count:data.windows.length,handles:data.windows.map(item=>item.handle),connectedHandle:selectedGame?.handle||null,automatic:!!args.automatic});
+    windowDiscoverySignature=signature;
     return data;
   }
   if (['open_project','open_recent','open_case'].includes(method)) {
@@ -365,8 +423,8 @@ async function dispatchStudioCall(role, method, args = {}) {
     return {};
   }
   if (['run', 'record_start', 'capture', 'preview','automation_capture','automation_preview','automation_explore'].includes(method)) {
-    if(busy&&method==='automation_capture')return bridge.call(method,args);
-    if (busy) throw new Error('请先停止录制或执行');
+    if(busy&&busy!=='selecting'&&method==='automation_capture')return bridge.call(method,args);
+    if (busy||settingsChanging) throw new Error('请先停止录制或执行，或等待设置保存完成');
     if(method==='record_start'&&recordPending)throw new Error('请先在工作台处理上一段录制结果');
     const execution = ['run','automation_explore'].includes(method);
     const continuous = execution || method==='record_start';
@@ -392,6 +450,99 @@ async function dispatchStudioCall(role, method, args = {}) {
   }
   const data = await bridge.call(method, args);
   return data;
+}
+function shortcutAction(action){
+  if(action==='stop'){stopCurrent().catch(error=>send({kind:'notice',message:error.message}));return;}
+  if(action==='show'){showWorkbench();return;}
+  if(closing||busy||recordStarting||automation?.active||settingsChanging)return;
+  if(shortcutsCapturing)return;
+  send({kind:'shortcut_action',action});
+}
+function saveWorkbenchBounds(){
+  if(!settings.startup.rememberBounds||!window||window.isDestroyed()||window.isMinimized()||window.isFullScreen())return;
+  try{fs.writeFileSync(path.join(app.getPath('userData'),'window-bounds.json'),JSON.stringify({bounds:window.getNormalBounds(),maximized:window.isMaximized()}));}catch(error){auditError('settings.bounds',error,{},true);}
+}
+function restoreWorkbenchBounds(){
+  if(!settings.startup.rememberBounds)return;
+  try{const saved=JSON.parse(fs.readFileSync(path.join(app.getPath('userData'),'window-bounds.json'),'utf8'));
+    const bounds=require('./settings-runtime.cjs').visibleBounds(saved.bounds,screen.getAllDisplays());
+    if(bounds){window.setBounds(bounds);if(saved.maximized)window.maximize();}
+  }catch(error){if(error.code!=='ENOENT')auditError('settings.bounds',error);}
+}
+function settingsSnapshot(){return {values:settings,defaults:DEFAULTS,version:require('../package.json').version,
+  mcp:{running:!!mcpServer,url:mcpServer?.url||'',allowed:mcpAllowed},warning:settingsStore.warning,
+  shortcuts:shortcutRegistry?Object.fromEntries([...shortcutRegistry.bindings].map(([key,action])=>[action,key])):{}};}
+let mcpChangePromise=null;
+async function changeMcp(enabled,reset=false){
+  if(mcpChangePromise)await mcpChangePromise;
+  const operation=async()=>{
+    if((!enabled||reset)&&mcpServer){await mcpServer.close();mcpServer=null;automation=null;sendGameState();}
+    if(enabled&&mcpAllowed&&!mcpServer)await enableMcp();
+  };
+  const pending=operation();mcpChangePromise=pending;
+  try{await pending;}finally{if(mcpChangePromise===pending)mcpChangePromise=null;}
+}
+let shortcutsCapturing=false;
+function restoreShortcuts(){if(shortcutsCapturing){shortcutsCapturing=false;try{shortcutRegistry?.replace(settings.shortcuts);}catch(error){auditError('shortcuts.restore',error);}}}
+let cleanupPreview=null;
+async function previewCleanup(){
+  const days=settings.history.retentionDays,cutoff=Date.now()-days*86400000;
+  const reports=await bridge.call('reports_cleanup_preview',{days});
+  const logs=audit.read({limit:1000}).filter(row=>Number.isFinite(Date.parse(row.time))&&Date.parse(row.time)<cutoff);
+  return {reports,logs:logs.map(row=>({id:row.id,time:row.time,bytes:Buffer.byteLength(JSON.stringify(row)+'\n')})),days};
+}
+async function settingsCall(method,args){
+  if(method==='settings_get')return settingsSnapshot();
+  if(method==='settings_shortcut_capture'){
+    if(busy||recordStarting||settingsChanging)throw new Error('请先停止操作');
+    if(args.active===true){shortcutRegistry.replace({});shortcutsCapturing=true;}else restoreShortcuts();return {};
+  }
+  if(method==='settings_mcp_copy'){
+    const node=path.join(ROOT,'runtime','node','node.exe');
+    const command=fs.existsSync(node)?node:'node',proxy=path.join(ROOT,'scripts','mcp-proxy.cjs');
+    const config=args.format==='json'?JSON.stringify({mcpServers:{'echo-test':{command,args:[proxy],cwd:ROOT}}},null,2):`[mcp_servers.echo-test]\ncommand = ${JSON.stringify(command)}\nargs = [${JSON.stringify(proxy)}]\ncwd = ${JSON.stringify(ROOT)}\nstartup_timeout_sec = 15\ntool_timeout_sec = 60\n`;
+    clipboard.writeText(config);return {copied:true};
+  }
+  if(method==='settings_export'){
+    const result=await dialog.showSaveDialog(window,{title:'导出设置',defaultPath:path.join(app.getPath('documents'),'echo-test-settings.json'),filters:[{name:'设置',extensions:['json']}]});
+    if(result.canceled)return null;fs.writeFileSync(result.filePath,JSON.stringify(settings,null,2)+'\n');return {exported:true};
+  }
+  if(method==='settings_import'){
+    const result=await dialog.showOpenDialog(window,{title:'导入设置',properties:['openFile'],filters:[{name:'设置',extensions:['json']}]});
+    if(result.canceled)return null;const file=result.filePaths[0];if(fs.statSync(file).size>64*1024)throw new Error('设置文件过大');
+    return {values:validateSettings(JSON.parse(fs.readFileSync(file,'utf8')))};
+  }
+  if(busy||recordStarting||automation?.active||settingsChanging)throw new Error('请先停止操作，再修改设置或清理历史');
+  settingsChanging=true;
+  try{
+    if(method==='settings_cleanup_preview'){
+      cleanupPreview={...await previewCleanup(),token:require('node:crypto').randomUUID()};return cleanupPreview;
+    }
+    if(method==='settings_cleanup_delete'){
+      if(!cleanupPreview||args.token!==cleanupPreview.token)throw new Error('清理预览已失效，请重新预览');
+      const preview=cleanupPreview;cleanupPreview=null;
+      const fresh=await previewCleanup(),allowed=new Set(fresh.reports.entries.map(row=>row.id)),logAllowed=new Set(fresh.logs.map(row=>row.id));
+      const ids=preview.reports.entries.map(row=>row.id).filter(id=>allowed.has(id));
+      const logIds=preview.logs.map(row=>row.id).filter(id=>logAllowed.has(id));
+      const reports=ids.length?await dispatchStudioCall('main','reports_delete',{ids}):{deleted:0};
+      const logs=logIds.length?audit.delete(logIds):{deleted:0};
+      return {reports:reports.deleted,logs:logs.deleted};
+    }
+    if(method==='settings_mcp_reset'){await changeMcp(settings.mcp.enabled,true);return settingsSnapshot();}
+    if(method==='settings_save'){
+      const next=validateSettings(args.values),previous=settings;
+      try{
+        shortcutRegistry.replace(next.shortcuts);shortcutsCapturing=false;
+        await changeMcp(next.mcp.enabled);
+        settingsStore.save(next);settings=next;cleanupPreview=null;
+      }catch(error){
+        try{shortcutRegistry.replace(previous.shortcuts);await changeMcp(previous.mcp.enabled);}catch(rollback){auditError('settings.rollback',rollback);}
+        throw error;
+      }
+      send({kind:'settings_changed',settings:settingsSnapshot()});return settingsSnapshot();
+    }
+    throw new Error('不支持的设置操作');
+  }finally{settingsChanging=false;}
 }
 async function enableMcp(){
   const {startMcpServer,projectSchema,selectorSchema}=require('./mcp-server.cjs');
@@ -421,8 +572,8 @@ async function enableMcp(){
       currentPath=data.path;currentCaseName=data.project.name;dirty=false;remember(data.path);sendGameState();
       send({kind:'project_loaded',...data,recent,library:await caseList()});
     }});
-  mcpServer=await startMcpServer({root:ROOT,runtimePath:descriptor,invoke:(tool,args)=>automation.invoke(tool,args),
-    status:()=>automation.status(),audit:auditWrite});
+  mcpServer=await startMcpServer({root:ROOT,runtimePath:descriptor,invoke:(tool,args)=>{if(settingsChanging)throw new Error('设置正在更新，请稍后重试');return automation.invoke(tool,args);},
+    status:()=>automation.status(),audit:auditWrite,explorationTimeout:()=>settings.mcp.explorationTimeout});
   auditWrite('info','mcp','listening',{url:mcpServer.url,admin:backendAdmin});
   send({kind:'notice',message:'MCP 已启用，可通过项目的 mcp-proxy 连接；F12 可停止执行。'});
 }
@@ -442,6 +593,7 @@ app.whenReady().then(async () => {
   if (!primaryInstance) return;
   audit=new AuditLog(path.join(app.getPath('userData'),'logs'),{onEntry:entry=>send({kind:'audit_entry',entry})});
   auditWrite('info','application','started',{electron:process.versions.electron});
+  if(settingsStore.warning)auditWrite('warning','settings','load',{message:settingsStore.warning});
   fs.mkdirSync(CASES,{recursive:true});
   try{const saved=JSON.parse(fs.readFileSync(path.join(app.getPath('userData'),'case-library.json'),'utf8'));if(Array.isArray(saved))for(const file of saved)if(typeof file==='string')knownCases.add(file);}catch(error){if(error.code!=='ENOENT')auditError('case_library.load',error);}
   app.setAppUserModelId('local.echo-test');
@@ -464,7 +616,12 @@ app.whenReady().then(async () => {
     title: 'EchoTest', titleBarStyle: 'hidden', titleBarOverlay: {color: '#f8f8f9', symbolColor: '#55585e', height: 42},
     webPreferences: {preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true,backgroundThrottling:false}
   });
+  restoreWorkbenchBounds();
+  for(const event of ['resize','move'])window.on(event,saveWorkbenchBounds);
+  try{shortcutRegistry=new ShortcutRegistry(globalShortcut,shortcutAction);shortcutRegistry.replace(settings.shortcuts);}catch(error){send({kind:'notice',level:'warning',message:error.message+'，可在设置中调整后重试。'});auditError('shortcuts.start',error);}
   secureWindow(window);
+  window.on('blur',restoreShortcuts);
+  window.on('restore',()=>{if(busy==='selecting'){startGate.cancel();bridge.call('window_pick_cancel').catch(()=>{});}});
   window.setMenuBarVisibility(false);
   window.setSkipTaskbar(false);
   if(!gameSmoke&&process.env.ECHO_TEST_SMOKE_TEST!=='1'){
@@ -479,7 +636,7 @@ app.whenReady().then(async () => {
     {label:'显示工作台',click:showWorkbench},
     {label:'显示目标窗口',click:()=>openGameWindow().catch(error=>send({kind:'notice',message:error.message}))},
     {type:'separator'},
-    {label:'退出工作台',click:()=>window.close()}
+    {label:'退出工作台',click:()=>{forceExit=true;window.close();}}
   ]));
   handoff = new GameHandoff(window, () => grantForeground(bridge, ROOT));
   window.webContents.setWindowOpenHandler(() => ({action: 'deny'}));
@@ -499,7 +656,9 @@ app.whenReady().then(async () => {
   window.on('close', event => {
     if (closing) return;
     event.preventDefault();
-    if (busy) {dialog.showMessageBoxSync(window, {type: 'info', message: '请先停止录制或执行，再关闭工作台。', buttons: ['知道了']}); return;}
+    if(settings.startup.closeAction==='tray'&&!forceExit){window.hide();return;}
+    forceExit=false;
+    if (busy||settingsChanging) {dialog.showMessageBoxSync(window, {type: 'info', message: '请先停止录制或执行，再关闭工作台。', buttons: ['知道了']}); return;}
     if (dirty && dialog.showMessageBoxSync(window, {type: 'question', message: '当前用例有未保存的修改。', detail: '可以取消关闭，保存后再退出。', buttons: ['继续编辑', '放弃修改并退出'], defaultId: 0, cancelId: 0}) === 0) return;
     closing = true;
     detachGame().then(()=>mcpServer?.close()).then(() => bridge.shutdown()).then(() => {gameWindow?.destroy();window.destroy();}).catch(error => {
@@ -508,7 +667,7 @@ app.whenReady().then(async () => {
     });
   });
   window.loadURL('echo-test://studio/index.html');
-  if(mcpEnabled)window.webContents.once('did-finish-load',()=>enableMcp().catch(error=>{
+  if(mcpAllowed&&(settings.mcp.enabled||process.argv.includes('--force-mcp')))window.webContents.once('did-finish-load',()=>changeMcp(true).catch(error=>{
     auditError('mcp.start',error);send({kind:'notice',level:'error',message:'MCP 启动失败：'+error.message});
   }));
   if(process.argv.includes('--record-diagnose')&&!gameSmoke&&process.env.ECHO_TEST_SMOKE_TEST!=='1'){
@@ -534,6 +693,7 @@ app.whenReady().then(async () => {
         const result = await window.webContents.executeJavaScript(`new Promise(resolve => { const started=Date.now(); const timer=setInterval(() => { if(window.__studioReady || Date.now()-started>15000) { clearInterval(timer); resolve({ready:!!window.__studioReady,title:document.title,steps:document.querySelectorAll('.step-row').length,nav:document.querySelectorAll('.nav-button').length,errors:window.__studioErrors||[]}); }},100); })`);
         fs.writeFileSync(artifactFile('smoke', 'electron-smoke.json'), JSON.stringify(result));
         await new Promise(resolve => setTimeout(resolve, 500));
+        await window.webContents.executeJavaScript('windowDiscovery.stop()');
         const image = await window.webContents.capturePage();
         fs.writeFileSync(artifactFile('smoke', 'electron-preview.png'), image.toPNG());
         const fixtureDirectory=path.join(app.getPath('userData'),'case-fixtures');
@@ -583,6 +743,9 @@ app.whenReady().then(async () => {
           fs.writeFileSync(artifactFile('smoke', 'game-window-empty.png'),(await gameWindow.webContents.capturePage()).toPNG());
           await require('./tests/smoke/connection-smoke.cjs').verify(window);
           await require('./tests/smoke/window-search-smoke.cjs').verify(window);
+          await require('./tests/smoke/window-discovery-smoke.cjs').verify(window);
+          await require('./tests/smoke/target-window-smoke.cjs').verify(window);
+          await require('./tests/smoke/window-pick-session-smoke.cjs').verify(window,{bridge,pick:pickTargetWindow,hover:showWindowPickHover,overlay:()=>windowPickOverlay,state:gameState,disconnect:detachGame,cancel:stopCurrent});
           await require('./tests/smoke/recording-smoke.cjs').verify(window);
           await require('./tests/smoke/replay-smoke.cjs').verify(window);
           await require('./tests/smoke/game-run-smoke.cjs').verify(window,()=>gameWindow);
@@ -596,6 +759,7 @@ app.whenReady().then(async () => {
           await require('./tests/smoke/control-library-responsive-smoke.cjs').verify(window);
           await require('./tests/smoke/modal-buttons-smoke.cjs').verify(window);
           await require('./tests/smoke/history-delete-smoke.cjs').verify(window);
+          await require('./tests/smoke/settings-smoke.cjs').verify(window);
           if(process.env.ECHO_TEST_BRAND_PREVIEW==='1')await require('../scripts/brand/screenshots.cjs').capture(window,gameWindow);
       } finally {closing = true; await bridge.shutdown();gameWindow?.destroy(); window.destroy();}
     });

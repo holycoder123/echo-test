@@ -140,7 +140,11 @@ def list_game_windows(include_hidden=False):
         if not pid.value or pid.value in excluded_pids:
             return True
         rectangle = wt.RECT()
-        if not user32.GetClientRect(handle, ct.byref(rectangle)) or rectangle.right <= rectangle.left or rectangle.bottom <= rectangle.top:
+        has_client = bool(user32.GetClientRect(handle, ct.byref(rectangle)) and
+                          rectangle.right > rectangle.left and rectangle.bottom > rectangle.top)
+        # Some game clients report 0x0 while minimized. Keep their real main
+        # window selectable; discovering a window must never restore or focus it.
+        if not has_client and not user32.IsIconic(handle):
             return True
         if pid.value not in process_names:
             process_names[pid.value] = process_executable_name(pid.value)

@@ -4,9 +4,9 @@
 
 ## 启动
 
-从 [GitHub Releases](https://github.com/holycoder123/echo-test/releases) 下载安装版或便携版及 SHA256 校验文件。每个发布版本对应同名 Git 标签；版本说明见 [v1.0.0](releases/v1.0.0.md)。
+从 [GitHub Releases](https://github.com/holycoder123/echo-test/releases) 下载安装版或便携版及 SHA256 校验文件。每个发布版本对应同名 Git 标签；版本说明见 [v1.0.1](releases/v1.0.1.md)。
 
-安装版运行 `dist/echo-test-1.0.0-setup-x64.exe`，按中文向导安装后从桌面或开始菜单启动。支持选择安装目录、桌面快捷方式及卸载，升级和卸载保留用户用例、录制及报告。详细规则与构建方式见 [Windows 安装版](installer.md)。
+安装版运行 `dist/echo-test-1.0.1-setup-x64.exe`，按中文向导安装后从桌面或开始菜单启动。支持选择安装目录、桌面快捷方式及卸载，升级和卸载保留用户用例、录制及报告。详细规则与构建方式见 [Windows 安装版](installer.md)。
 
 双击 `start.cmd`，软件默认通过 Windows UAC 请求管理员权限；确认后打开工作台，取消则不启动。已具有管理员权限时不会重复请求。`start_admin.cmd` 仍兼容。打开工作台后选择并连接目标窗口，目标应用保持原生独立窗口。
 
@@ -69,3 +69,5 @@ npm run test:ui
 界面冒烟结果保存到 `artifacts/smoke`。实际目标应用回归见开发文档，需使用与目标应用匹配的权限。
 
 运行上述检查可验证当前版本。测试数据在临时目录生成，不向真实应用发送回放输入。
+
+工作台设置见 [设置说明](settings.md)。

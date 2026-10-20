@@ -108,7 +108,7 @@ class McpAutomation {
         const previous = this.seen.get(args.handle);
         const found = (await this.backend('windows')).windows.find(win => win.handle === args.handle && win.pid === previous.pid);
         if (!found) throw new Error('目标窗口已变化，请重新列出窗口');
-        const result = await this.connect(args.handle);
+        const result = await this.connect(args.handle,found.pid);
         this.bound = {handle:found.handle,pid:found.pid,title:found.title};
         return result;
       }

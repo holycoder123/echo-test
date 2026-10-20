@@ -81,6 +81,30 @@ test('capture and selector previews expose MCP image pixels with separate struct
   assert.equal(template.structuredContent.args.capture_id,'observed_capture');
 });
 
+test('MCP exploration uses the configured default and explicit request timeout wins',async t=>{
+  let timeout=8;
+  const f=await fixture(t,{explorationTimeout:()=>timeout}),client=await clientFor(t,f);
+  await client.callTool({name:'echo_test_explore',arguments:{project:simpleProject()}});
+  assert.equal(f.calls.at(-1).args.timeout,8);
+  timeout=12;
+  await client.callTool({name:'echo_test_explore',arguments:{project:simpleProject()}});
+  assert.equal(f.calls.at(-1).args.timeout,12);
+  await client.callTool({name:'echo_test_explore',arguments:{project:simpleProject(),timeout:3}});
+  assert.equal(f.calls.at(-1).args.timeout,3);
+});
+
+test('MCP restart rotates the connection secret and rejects the previous credential',async t=>{
+  const f=await fixture(t),old=f.descriptor.token;
+  await f.server.close();
+  await assert.rejects(fs.stat(f.server.runtimePath),{code:'ENOENT'});
+  const next=await startMcpServer({root:f.root,invoke:async()=>({ok:true})});
+  t.after(()=>next.close());
+  const descriptor=JSON.parse(await fs.readFile(next.runtimePath,'utf8'));
+  assert.notEqual(descriptor.token,old);
+  const response=await raw({server:next,descriptor},{headers:{Authorization:'Bearer '+old}});
+  assert.equal(response.status,401);
+});
+
 test('authentication, origin and Host validation reject browser access and DNS rebinding',async t=>{
   const f = await fixture(t);
   for (const [headers,status] of [

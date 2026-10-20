@@ -6,7 +6,7 @@ on:
       tag:
         description: Existing source tag to build
         required: true
-        default: v1.0.0
+        default: v1.0.1
         type: string
       release_id:
         description: Existing draft release ID

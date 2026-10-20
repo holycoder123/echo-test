@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import time
 
 
 class ReportLibrary:
@@ -73,3 +74,35 @@ class ReportLibrary:
             shutil.rmtree(path)
             deleted.append(path.name)
         return {'deleted': len(deleted), 'ids': deleted}
+
+    def cleanup_preview(self, days, now=None):
+        if type(days) is not int or days not in (7, 30, 90, 180, 365):
+            raise ValueError('无效的历史保留天数')
+        self._check_root()
+        cutoff = (time.time() if now is None else now) - days * 86400
+        entries, total, skipped = [], 0, 0
+        if not self.directory.exists():
+            return {'entries': entries, 'total_bytes': 0, 'delete_bytes': 0, 'skipped': 0}
+        for candidate in sorted(self.directory.iterdir()):
+            try:
+                directory = self._report(candidate.name)
+                result = directory / 'result.json'
+                if not result.is_file() or self._redirected(result):
+                    continue
+                size = 0
+                newest = result.stat().st_mtime
+                for base, folders, files in os.walk(directory, followlinks=False):
+                    for name in folders + files:
+                        child = Path(base) / name
+                        if self._redirected(child):
+                            raise ValueError('报告包含重定向路径')
+                        newest = max(newest, child.stat().st_mtime)
+                        if child.is_file():
+                            size += child.stat().st_size
+                total += size
+                if newest < cutoff and len(entries) < 1000:
+                    entries.append({'id': candidate.name, 'bytes': size, 'modified': newest})
+            except (ValueError, OSError):
+                skipped += 1
+        return {'entries': entries, 'total_bytes': total,
+                'delete_bytes': sum(row['bytes'] for row in entries), 'skipped': skipped}

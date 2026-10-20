@@ -66,6 +66,7 @@ class Service:
         self.automation_capture_pid = None
         self.automation_capture_at = None
         self.worker = None
+        self.window_picker = None
         self.toolbar_pair = NativeToolbarPair(self.emit)
         recovery = os.environ.get('ECHO_TEST_EMBED_RECOVERY')
         recovery_path = Path(recovery) if recovery else runtime_file('embed-recovery.json', ROOT)
@@ -79,7 +80,7 @@ class Service:
         output({"event": event})
 
     def idle(self):
-        if self.running or self.recorder:
+        if self.running or self.recorder or getattr(getattr(self, 'window_picker', None), 'active', False):
             raise ValueError("请先停止执行或录制")
 
     def window(self, handle):
@@ -443,7 +444,16 @@ class Service:
             return self.toolbar_pair.show()
         if method == 'game_info':
             game=self.window(args['handle']);rect=wt.RECT();origin=wt.POINT()
-            if not user32.GetClientRect(game.handle,ct.byref(rect)):raise RuntimeError('无法读取目标应用客户区')
+            self.verify_game_pid(game,args.get('expected_pid'))
+            restore=args.get('restore') is True
+            if restore and user32.IsIconic(game.handle):
+                user32.ShowWindow(game.handle,9)
+            deadline=time.monotonic()+1
+            while True:
+                if not user32.GetClientRect(game.handle,ct.byref(rect)):raise RuntimeError('无法读取目标应用客户区')
+                if not restore or (rect.right>0 and rect.bottom>0):break
+                if time.monotonic()>=deadline:raise RuntimeError('目标窗口恢复后客户区尚未就绪，请稍后重试连接')
+                time.sleep(.025)
             info={'handle':game.handle,'pid':game.pid,'width':rect.right,'height':rect.bottom,'title':game.title,'process_name':game.process_name}
             if not user32.IsIconic(game.handle) and user32.ClientToScreen(game.handle,ct.byref(origin)):
                 info['bounds']=[origin.x,origin.y,rect.right,rect.bottom]
@@ -456,6 +466,15 @@ class Service:
             return {}
         if method == "bootstrap":
             return self.bootstrap(args.get('preferred_handle'))
+        if method == 'window_pick_start':
+            self.idle()
+            from .window_picker import WindowPicker
+            self.window_picker = WindowPicker(self.emit, overlay_handle=args.get('overlay_handle'))
+            return self.window_picker.start()
+        if method == 'window_pick_cancel':
+            if getattr(self, 'window_picker', None):
+                self.window_picker.cancel()
+            return {'cancelled': True}
         if method == "windows":
             return {"windows": [asdict(w) for w in list_game_windows()], "admin": is_admin()}
         if method == "new_project":
@@ -574,6 +593,7 @@ class Service:
             self.worker.start()
             return {"started": True}
         if method == "stop":
+            if getattr(self, 'window_picker', None):self.window_picker.cancel()
             self.stop_event.set()
             if self.recorder:
                 return self.finish_recording()
@@ -600,10 +620,14 @@ class Service:
             return self.finish_recording()
         if method == "reports":
             return ReportLibrary(ROOT).list()
+        if method == "reports_cleanup_preview":
+            self.idle()
+            return ReportLibrary(ROOT).cleanup_preview(args.get('days'))
         if method == "reports_delete":
             self.idle()
             return ReportLibrary(ROOT).delete(args.get('ids'))
         if method == "shutdown":
+            if getattr(self, 'window_picker', None):self.window_picker.close()
             self.stop_event.set()
             if self.recorder:
                 self.finish_recording()

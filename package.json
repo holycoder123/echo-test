@@ -1,6 +1,6 @@
 {
   "name": "echo-test",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "EchoTest desktop automation testing workbench",
   "private": true,
   "main": "electron/main.cjs",
@@ -14,7 +14,7 @@
     "test:pair": "node scripts/python.cjs scripts/smoke-window-pair.py",
     "mcp:info": "node scripts/mcp-connect-info.cjs",
     "test:game": "electron . --game-smoke",
-    "check": "node --check electron/main.cjs && node --check electron/elevation.cjs && node --check electron/preload.cjs && node --check electron/run-state.cjs && node --check electron/renderer/app.js && node --check electron/renderer/controls.js && node --check electron/renderer/history.js && node --check electron/renderer/help.js && node --check electron/renderer/game.js && node --check electron/renderer/run-panel.js && node --check electron/automation.cjs && node --check electron/mcp-server.cjs && node --check scripts/mcp-proxy.cjs"
+    "check": "node --check electron/main.cjs && node --check electron/elevation.cjs && node --check electron/preload.cjs && node --check electron/run-state.cjs && node --check electron/settings.cjs && node --check electron/settings-runtime.cjs && node --check electron/renderer/settings.js && node --check electron/renderer/app.js && node --check electron/renderer/target-window.js && node --check electron/renderer/window-picker.js && node --check electron/renderer/controls.js && node --check electron/renderer/history.js && node --check electron/renderer/help.js && node --check electron/renderer/game.js && node --check electron/renderer/run-panel.js && node --check electron/automation.cjs && node --check electron/mcp-server.cjs && node --check scripts/mcp-proxy.cjs"
   },
   "devDependencies": {
     "electron": "44.5.1"

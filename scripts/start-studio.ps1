@@ -29,7 +29,7 @@ try {
             }
         }
         $launchArguments = @((Join-Path $projectRoot 'app.py'))
-        if ($requestAdmin) { $launchArguments += '--admin' } else { $launchArguments += '--no-admin' }
+        if ($Admin) { $launchArguments += '--admin' } elseif ($NoAdmin) { $launchArguments += '--no-admin' }
         if ($Mcp) { $launchArguments += '--mcp' }
         if ($NoMcp) { $launchArguments += '--no-mcp' }
         & $pythonExe -X utf8 @launchArguments

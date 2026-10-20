@@ -35,3 +35,20 @@ test('only the main workbench can delete logs and execution reports',()=>{
   assert.throws(()=>authorize(event(game),main,game,method,{ids:['example']}));
  }
 });
+
+
+test('only the workbench can start or cancel native window selection',()=>{
+ const main=surface('index.html'),game=surface('game.html');
+ for(const method of ['window_pick_start','window_pick_cancel']){
+   assert.equal(authorize(event(main),main,game,method,{}),'main');
+   assert.throws(()=>authorize(event(game),main,game,method,{}));
+ }
+});
+
+test('only the workbench can manage settings and reset MCP or clean history',()=>{
+ const main=surface('index.html'),game=surface('game.html');
+ for(const method of ['settings_get','settings_save','settings_shortcut_capture','settings_mcp_copy','settings_mcp_reset','settings_import','settings_export','settings_cleanup_preview','settings_cleanup_delete']){
+  assert.equal(authorize(event(main),main,game,method,{}),'main');
+  assert.throws(()=>authorize(event(game),main,game,method,{}));
+ }
+});

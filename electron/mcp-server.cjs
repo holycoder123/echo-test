@@ -6,7 +6,7 @@ const {McpServer} = require('@modelcontextprotocol/sdk/server/mcp.js');
 const {StreamableHTTPServerTransport} = require('@modelcontextprotocol/sdk/server/streamableHttp.js');
 const {z} = require('zod/v4');
 
-const VERSION = '1.0.0';
+const VERSION = require('../package.json').version;
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
 const MAX_ACTIVE_REQUESTS = 16;
 const finite = z.number().finite();
@@ -166,7 +166,7 @@ async function readBody(request) {
 }
 
 /** Expose only the workbench tool allowlist. invoke must enforce game and filesystem boundaries too. */
-async function startMcpServer({invoke,status,root,token=randomBytes(32).toString('hex'),port=0,runtimePath,audit} = {}) {
+async function startMcpServer({invoke,status,root,token=randomBytes(32).toString('hex'),port=0,runtimePath,audit,explorationTimeout=()=>15} = {}) {
   if (typeof invoke !== 'function' || typeof root !== 'string' || !root) throw new TypeError('invoke and root are required');
   if (!/^[a-f0-9]{64}$/.test(token)) throw new TypeError('Invalid MCP bearer token');
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new TypeError('Invalid MCP port');
@@ -184,7 +184,8 @@ async function startMcpServer({invoke,status,root,token=randomBytes(32).toString
     const server = new McpServer({name:'echo-test',version:VERSION}, {
       instructions:'Operate only the game selected in the workbench. Read echo_test_windows, connect, and capture first. Prefer echo_test_explore for short inline fragments; it waits and returns results plus a final image without saving temporary cases. Verify screenshot/assertions, then assemble and save a formal case with echo_test_save_case. Store templates by safe names. For long saved cases use run_case and status/events/report. Never infer task completion from a successful input step alone.',
     });
-    for (const [name, description, schema, readOnly=false] of tools) {
+    for (const [name, description, baseSchema, readOnly=false] of tools) {
+      const schema=name==='echo_test_explore'?baseSchema.safeExtend({timeout:finite.min(1).max(30).default(explorationTimeout())}):baseSchema;
       server.registerTool(name,{description,inputSchema:schema,annotations:{readOnlyHint:readOnly,destructiveHint:!readOnly,idempotentHint:readOnly,openWorldHint:false}},async args => {
         const started = Date.now();
         auditEntry(name,'start');

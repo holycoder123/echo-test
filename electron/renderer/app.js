@@ -33,7 +33,17 @@ S.gameCasePath='';S.gameRunStarting=false;S.runState=null;
 S.iterations = 1;S.recordStarting=false;S.auditEntries=[];S.auditLevel='';S.auditSearch='';S.auditDirectory='';S.auditSelected=null;
 S.mcpOperation='';
 S.recordReplaying=false;S.recordReplayRun=null;
-S.connection=null;S.connecting=false;S.windowSearch='';
+S.connection=null;S.connecting=false;S.windowSearch='';S.targetWindowMode='pick';S.windowPicking=false;
+let windowRefreshPromise=null;
+const windowDiscovery={
+  timer:null,enabled:false,
+  blocked(){return !window.__studioReady||document.hidden||!!disabled()||S.connecting||S.recordStarting||!!S.modal||document.activeElement?.id==='connection';},
+  refresh(){if(!this.enabled||this.blocked())return Promise.resolve();return refreshGameWindows({silent:true}).catch(()=>{});},
+  start(){this.stop();this.enabled=true;this.refresh();const seconds=S.settingsData?.values.target.refreshSeconds??3;if(seconds)this.timer=setInterval(()=>this.refresh(),seconds*1000);else this.enabled=false;},
+  stop(){this.enabled=false;clearInterval(this.timer);this.timer=null;},
+};
+function windowListSignature(windows){return JSON.stringify(windows.map(item=>[item.handle,item.pid,item.title,item.process_name||'']).sort((a,b)=>a[0]-b[0]));}
+
 S.historySelections={reports:new Set(),audit:new Set(),logs:new Set()};S.historyDeleting='';
 S.controls={entries:[],categories:[],total:0,uncategorized:0,warnings:[]};S.targetCategory='all';
 const root = document.querySelector('#app');
@@ -52,8 +62,8 @@ function dirty() {
   document.querySelectorAll('[data-save-dot]').forEach(node=>node.style.display='inline-block');
   document.title=`${S.project.name} · EchoTest`;
 }
-function lock() { if(S.busy||S.gameRunStarting||S.mcpOperation) {toast(S.mcpOperation?'MCP 正在操作工作台，请稍候':S.gameRunStarting?'正在准备用例，请稍候':'请先停止录制或执行');return true;} return false; }
-const disabled = () => S.busy||S.gameRunStarting||S.mcpOperation ? 'disabled' : '';
+function lock() { if(S.busy||S.gameRunStarting||S.mcpOperation||S.windowPicking) {toast(S.mcpOperation?'MCP 正在操作工作台，请稍候':S.gameRunStarting?'正在准备用例，请稍候':'请先停止录制或执行');return true;} return false; }
+const disabled = () => S.busy||S.gameRunStarting||S.mcpOperation||S.windowPicking ? 'disabled' : '';
 function button(label,action,kind='',symbol='',extra='') {return `<button class="btn ${kind}" data-act="${action}" ${extra}>${symbol?icon(symbol):''}${label}</button>`;}
 function field(label,body,help='') {return `<label class="field"><span>${label}</span>${body}${help?`<div class="field-help">${help}</div>`:''}</label>`;}
 function input(value,attribute,type='text',extra='') {return `<input type="${type}" value="${esc(value)}" ${attribute} ${extra} ${disabled()}>`;}
@@ -74,12 +84,15 @@ function windowChoices(){
 function windowConnectLabel(){return S.connecting?'连接中…':S.connection&&matchingWindows().some(window=>window.handle===S.connection.handle)?'重新连接':'连接';}
 function windowConnectDisabled(){return !!(S.connecting||disabled()||!matchingWindows().length);}
 function windowConnectionControls(){
+  if(S.view==='select-window')return `<div class="target-header-status"><i class="status-dot ${S.connection?'green':''}"></i><span>${S.connection?'当前目标':'尚未连接目标窗口'}</span>${S.connection?`<span title="${esc(S.connection.title)}">${esc(S.connection.title)}</span>`:''}</div>`;
   const locked=S.connecting?'disabled':disabled();
   return `<i class="status-dot ${S.connection?'green':''}"></i><div class="search window-search"><input type="search" id="window-search" placeholder="搜索标题 / 进程 / PID" aria-label="搜索目标窗口" value="${esc(S.windowSearch)}" autocomplete="off" ${locked}>${icon('search')}<button type="button" class="icon-button" data-act="window-search-clear" aria-label="清除窗口搜索" title="清除搜索" ${S.windowSearch?'':'hidden'} ${locked}>${icon('close')}</button></div><select class="connection-select" id="connection" aria-label="选择目标窗口" ${locked}>${windowChoices()}</select>${button(windowConnectLabel(),'game-connect','','',`id="window-connect" ${windowConnectDisabled()?'disabled':''}`)}<button class="icon-button" data-act="refresh" title="刷新目标窗口">${icon('refresh')}</button>`;
 }
-function updateWindowChoices(){
-  const select=document.querySelector('#connection');if(!select)return;
+function updateWindowChoices({preserveSelection=false}={}){
+  const select=document.querySelector('#connection');if(!select){updateTargetWindowResults();return;}
+  const previous=select.value;
   select.innerHTML=windowChoices();
+  if(preserveSelection&&[...select.options].some(option=>option.value===previous))select.value=previous;
   const button=document.querySelector('#window-connect');button.textContent=windowConnectLabel();button.disabled=windowConnectDisabled();
   document.querySelector('[data-act="window-search-clear"]').hidden=!S.windowSearch;
 }
@@ -96,18 +109,19 @@ function paramsSummary(step) {
 }
 
 function render() {
-  const titles={game:'目标窗口 ↗',cases:'测试用例',targets:'通用控件库',record:'录制',runs:'运行记录',diagnostics:'错误日志',help:'使用说明'};
+  const titles={'select-window':'选择目标窗口',cases:'测试用例',targets:'通用控件库',record:'录制',runs:'运行记录',diagnostics:'错误日志',help:'使用说明',settings:'设置'};
   root.innerHTML=`<div class="shell"><aside class="sidebar">
     <div class="brand"><div class="brand-icon"><img src="brand/mark.svg" alt=""></div><div><strong>EchoTest</strong><span>桌面自动化测试工作台</span></div></div>
-    ${Object.entries(titles).map(([view,title])=>`<button class="nav-button ${S.view===view?'active':''}" data-act="view-${view}">${icon(view==='runs'?'history':view)}<span>${title}</span>${view==='record'&&S.busy==='recording'?'<span class="count"><i class="status-dot red"></i></span>':''}</button>`).join('')}
+    ${Object.entries(titles).map(([view,title])=>`<button class="nav-button ${S.view===view?'active':''}" data-act="view-${view}">${icon(view==='runs'?'history':view==='select-window'?'game':view)}<span>${title}</span>${view==='record'&&S.busy==='recording'?'<span class="count"><i class="status-dot red"></i></span>':''}</button>`).join('')}
     <div class="nav-label">工作区</div><button class="recent-case" data-act="new">＋ 新建用例</button><button class="recent-case" data-act="open">打开本地用例</button>
     ${S.recent.length?'<div class="nav-label">最近使用</div>'+S.recent.slice(0,5).map((path,index)=>`<button class="recent-case" data-act="recent" data-i="${index}" title="${esc(path)}">${esc(shortFile(path))}</button>`).join(''):''}
-    <div class="sidebar-bottom"><i class="status-dot ${S.admin?'green':''}"></i><span>${S.admin?'管理员权限':'普通权限'}</span><button data-act="environment" title="运行环境">${icon('settings')}</button></div>
-  </aside><main class="workspace"><header class="topbar"><div class="breadcrumb"><span>工作区</span><span>/</span><strong>${esc(titles[S.view])}</strong></div><div class="topbar-right">${windowConnectionControls()}</div></header>
-    <section class="content ${S.view==='game'?'game-content':''}" id="content">${S.view==='game'?gameView():S.view==='cases'?caseView():S.view==='targets'?targetView():S.view==='record'?recordView():S.view==='diagnostics'?diagnosticsView():S.view==='help'?StudioHelp.render(S.helpSearch):runView()}</section>
+    <div class="sidebar-bottom"><i class="status-dot ${S.admin?'green':''}"></i><span>${S.admin?'管理员权限':'普通权限'}</span><button data-act="view-settings" title="设置">${icon('settings')}</button></div>
+  </aside><main class="workspace"><header class="topbar"><div class="breadcrumb"><span>工作区</span><span>/</span><strong>${esc(titles[S.view]||'目标窗口')}</strong></div><div class="topbar-right">${windowConnectionControls()}</div></header>
+    <section class="content ${S.view==='game'?'game-content':''}" id="content">${S.view==='select-window'?targetWindowSelectionView():S.view==='game'?gameView():S.view==='cases'?caseView():S.view==='targets'?targetView():S.view==='record'?recordView():S.view==='diagnostics'?diagnosticsView():S.view==='help'?StudioHelp.render(S.helpSearch):S.view==='settings'?settingsView():runView()}</section>
     <footer class="subtle-footer"><i class="status-dot ${S.busy?'green':''}"></i><span>${S.busy==='recording'?'正在录制目标应用操作':S.busy==='running'?'用例执行中 · F12 停止':'就绪'}</span><span class="right file-location" title="${esc(S.path||'')}" >${S.path?esc(shortFile(S.path)):'尚未保存'}${S.dirty?' · 未保存':''}</span></footer>
   </main></div>`;
   updateHistorySelection();
+  if(S.view==='select-window')updateTargetWindowResults();
   if(S.view==='runs') document.querySelector('.log-lines')?.scrollTo(0,1e8);
 }
 
@@ -155,19 +169,38 @@ async function connectGame(handle){
   S.connecting=true;render();
   try{
     if(!requested){await api('game_disconnect');S.handle=null;S.connection=null;return;}
-    const data=await api('game_connect',{handle:requested});
+    const data=await api('game_connect',{handle:requested,expected_pid:S.windows.find(item=>item.handle===requested)?.pid});
     S.connection=data.connection;S.handle=data.connection?.handle||null;
     await api('game_focus',{handle:requested});
   }catch(error){S.handle=S.connection?.handle||null;throw error;}
   finally{S.connecting=false;render();}
 }
-async function refreshGameWindows(){
-  if(lock()||S.connecting)return;
-  const data=await api('windows');S.windows=data.windows;S.admin=data.admin;
-  if(S.connection&&!S.windows.some(w=>w.handle===S.connection.handle))await connectGame(null);
-  S.handle=S.connection?.handle||null;
-  render();
-  if(!S.windows.length)toast('没有发现目标窗口，请先启动目标应用后刷新');
+async function refreshGameWindows({silent=false}={}){
+  if(silent?(!windowDiscovery.enabled||windowDiscovery.blocked()):(lock()||S.connecting))return;
+  if(windowRefreshPromise)return windowRefreshPromise;
+  const refresh=async()=>{
+    const data=await api('windows',silent?{automatic:true}:{});
+    // A run, modal or native window picker may have opened while enumerating.
+    if(silent&&(!windowDiscovery.enabled||windowDiscovery.blocked()))return;
+    const changed=windowListSignature(S.windows)!==windowListSignature(data.windows)||S.admin!==data.admin;
+    S.windows=data.windows;S.admin=data.admin;
+    // A discovery snapshot can temporarily omit a hidden/minimized target.
+    // Background scans never disconnect or focus the user's selected window.
+    if(!silent&&S.connection&&!S.windows.some(w=>w.handle===S.connection.handle))await connectGame(null);
+    S.handle=S.connection?.handle||null;
+    if(silent){
+      if(changed){
+        updateWindowChoices({preserveSelection:true});
+        const emptyConnect=document.querySelector('.empty [data-act="game-connect"]');
+        if(emptyConnect)emptyConnect.disabled=!!S.connecting||!S.windows.length;
+      }
+    }else{
+      render();
+      if(!S.windows.length)toast('没有发现目标窗口，请先启动目标应用后刷新');
+    }
+  };
+  windowRefreshPromise=refresh();
+  try{return await windowRefreshPromise;}finally{windowRefreshPromise=null;}
 }
 async function reconnectGame(){
   const matches=matchingWindows();
@@ -295,7 +328,7 @@ function previewDetails(shot) {
 }
 function renderModal() {
   const m=S.modal;if(!m)return;
-  modal.className=m.kind==='control-picker'?'control-picker-modal':['picker','preview'].includes(m.kind)?'picker-modal':m.kind==='script'?'script-modal':'';
+  modal.className=m.kind==='control-picker'?'control-picker-modal':['picker','preview','screenshot'].includes(m.kind)?'picker-modal':m.kind==='script'?'script-modal':'';
   const sharedModal=sharedControlModals(m);if(sharedModal!==null){modal.innerHTML=sharedModal;return;}
   if(m.kind==='script')modal.innerHTML=header('编辑 Python 脚本')+`<div class="modal-body">${field('Python 代码',`<textarea id="script-code" class="python-editor" spellcheck="false" aria-label="Python 脚本编辑器" ${disabled()}>${esc(m.code)}</textarea>`)}<div class="field-help">可使用 game、case_dir、report_dir、step_name 和 variables。Tab 插入四个空格，F12 停止执行。</div></div><footer class="modal-footer">${button('取消','close-modal')}${button('应用到步骤','script-apply','primary', '',disabled())}</footer>`;
   if(m.kind==='confirm') modal.innerHTML=header('确认操作')+`<div class="modal-body"><p>${esc(m.message)}</p><p class="modal-message" style="margin-top:10px">${esc(m.detail)}</p></div><footer class="modal-footer">${button('取消','confirm-no')}${button('继续','confirm-yes','primary')}</footer>`;
@@ -306,6 +339,7 @@ function renderModal() {
     ${image?recognitionFields(t):`<div class="field-grid">${field('X 坐标',input(t.x??.5,'data-dfield="x"','number','step="0.001"'))}${field('Y 坐标',input(t.y??.5,'data-dfield="y"','number','step="0.001"'))}</div><label class="check-line"><input type="checkbox" data-dfield="normalized" ${t.normalized!==false?'checked':''}>使用比例坐标 · 0 到 1</label><div class="field-help" style="margin:10px 0 17px">以目标应用客户区左上角为原点，不包含标题栏。</div>${button('从目标应用截图取点','pick-target','quiet wide','coordinate')}`}
     <details class="details"><summary>点击偏移</summary><div class="field-grid">${field('X 偏移 · 像素',input(t.offset_x||0,'data-dfield="offset_x"','number'))}${field('Y 偏移 · 像素',input(t.offset_y||0,'data-dfield="offset_y"','number'))}</div></details></div><footer class="modal-footer">${button('取消','close-modal')}${button('保存控件','save-target','primary')}</footer>`;
   }
+  if(m.kind==='screenshot')modal.innerHTML=header('目标窗口截图')+`<div class="modal-body"><div class="image-stage-wrap"><img src="${m.shot.image}" alt="目标窗口截图" style="max-width:100%;max-height:60vh"></div><p class="field-help">${m.shot.width} × ${m.shot.height}</p></div><footer class="modal-footer">${button('关闭','close-modal','primary')}</footer>`;
   if(['picker','preview'].includes(m.kind)) {
     const preview=m.kind==='preview', shot=m.shot;
     modal.innerHTML=header(preview?'定位预览':'从目标应用截图选取')+`<div class="modal-body"><div class="image-stage-wrap"><div class="image-stage" id="image-stage"><img src="${shot.image}" alt="目标应用客户区截图"><div id="selection-overlay">${preview?previewOverlay(shot):''}</div></div></div><div class="capture-hint"><span id="pick-hint">${preview?esc(previewHint(shot)):m.returnModal.draft.kind==='image'?'拖动框选控件模板':'点击目标位置'}</span><span>${shot.width} × ${shot.height}</span></div>${preview?previewDetails(shot):''}</div><footer class="modal-footer">${button(preview?'关闭':'取消',preview?'close-modal':'cancel-pick')}${preview?'':button('使用此位置 / 区域','accept-pick','primary')}</footer>`;
@@ -405,6 +439,7 @@ async function handleAction(action,node){
     if(S.modal?.kind!=='confirm'||!confirmation||lock())return;
     const resolve=confirmation;confirmation=null;closeModal();resolve(true);return;
   }
+  if(action.startsWith('settings-')){await settingsAction(action,node);return;}
   const index=Number(node.dataset.i);
   if(SHARED_CONTROL_ACTIONS.has(action)){await sharedControlAction(action,node);return;}
   if(action==='help-section'){document.getElementById('guide-'+node.dataset.section)?.scrollIntoView({block:'start',behavior:'smooth'});return;}
@@ -420,9 +455,15 @@ async function handleAction(action,node){
   if(action==='audit-folder')return api('audit_folder');
   if(action==='audit-export'){const result=await api('audit_export');if(result)toast('日志已导出','success');return;}
   if(action==='audit-detail'){S.auditSelected=S.auditEntries.find(entry=>entry.id===node.dataset.id);render();return;}
-  if(action==='window-search-clear'){S.windowSearch='';const search=document.querySelector('#window-search');search.value='';updateWindowChoices();search.focus();return;}
+  if(action==='window-search-clear'){S.windowSearch='';const search=document.querySelector('#window-search')||document.querySelector('#target-window-search');search.value='';updateWindowChoices();search.focus();return;}
+  if(action==='target-mode'){S.targetWindowMode=node.dataset.mode==='search'?'search':'pick';render();if(S.targetWindowMode==='search')await refreshGameWindows();return;}
+  if(action==='target-pick-start')return chooseTargetWindow();
+  if(action==='target-pick-cancel')return api('window_pick_cancel');
+  if(action==='target-connect')return connectGame(Number(node.dataset.handle));
+  if(action==='target-disconnect')return connectGame(null);
   if(action==='view-game')return api('game_open');
-  if(action.startsWith('view-')){S.view=action.slice(5);render();if(S.view==='cases')await refreshCases();if(S.view==='runs')await reports();if(S.view==='diagnostics')await refreshAudit();if(S.view==='targets')await refreshControls();return;}
+  if(action==='view-settings'){S.view='settings';render();await loadSettings();return;}
+  if(action.startsWith('view-')){S.view=action.slice(5);render();if(S.view==='select-window')await refreshGameWindows();if(S.view==='cases')await refreshCases();if(S.view==='runs')await reports();if(S.view==='diagnostics')await refreshAudit();if(S.view==='targets')await refreshControls();return;}
   if(action==='game-pick-coordinate')return pickGameControl('coordinate');
   if(action==='game-pick-image')return pickGameControl('image');
   if(action==='step-menu')return menu(node);
@@ -489,11 +530,11 @@ document.addEventListener('click',event=>{
 document.addEventListener('input',event=>{
   if(event.target.id==='help-search'){S.helpSearch=event.target.value;document.querySelector('.help-results').innerHTML=StudioHelp.contents(S.helpSearch);return;}
   const node=event.target;
-  if(node.id==='window-search'){if(!node.disabled){S.windowSearch=node.value;updateWindowChoices();}return;}
+  if(node.id==='window-search'||node.id==='target-window-search'){if(!node.disabled){S.windowSearch=node.value;updateWindowChoices();}return;}
   if(node.id==='control-picker-search'&&S.modal?.kind==='control-picker'){S.modal.search=node.value;renderControlPickerResults();return;}
   if(node.id==='target-search'){S.targetSearch=node.value;const start=node.selectionStart;render();const field=document.querySelector('#target-search');field.focus();field.setSelectionRange(start,start);return;}
   if(node.hasAttribute('data-category-name')&&S.modal?.kind==='category-editor'){S.modal.name=node.value;return;}
-  if((S.busy||S.gameRunStarting||S.mcpOperation)&&node.closest('#app'))return;
+  if((S.busy||S.gameRunStarting||S.mcpOperation||S.windowPicking)&&node.closest('#app'))return;
   if(node.id==='game-iterations'){S.iterations=Number(node.value);return;}
   if(node.id==='iterations'){S.iterations=Number(node.value);return;}
   if(node.hasAttribute('data-project-name')){S.project.name=node.value;dirty();return;}
@@ -510,7 +551,7 @@ document.addEventListener('input',event=>{
 });
 document.addEventListener('change',event=>{
   const node=event.target;
-  if((S.busy||S.gameRunStarting||S.mcpOperation)&&node.closest('#app'))return;
+  if((S.busy||S.gameRunStarting||S.mcpOperation||S.windowPicking)&&node.closest('#app'))return;
   if(node.id==='control-category-choice'&&S.modal?.kind==='selector'){S.modal.categoryId=node.value;return;}
   if(node.id==='game-case'){if(!S.busy)S.gameCasePath=node.value;return;}
   if(node.id==='connection'){connectGame(node.value).catch(error=>toast(error.message,'error'));return;}
@@ -543,6 +584,8 @@ document.addEventListener('keydown',event=>{
 });
 
 window.studio.onEvent(event=>{
+  if(event.kind==='settings_changed'){applySettingsConfig(event.settings);if(S.view==='settings')render();return;}
+  if(event.kind==='shortcut_action'){handleShortcutAction(event.action).catch(error=>toast(error.message,'error'));return;}
   if(event.kind==='workbench_state'){
     const changed=S.busy!==event.busy||S.recordStarting!==event.recordStarting||S.mcpOperation!==event.mcpOperation;
     S.busy=event.busy;S.recordStarting=event.recordStarting;S.mcpOperation=event.mcpOperation;
@@ -560,6 +603,7 @@ window.studio.onEvent(event=>{
   if(event.kind==='notice')toast(event.message,event.level==='error'?'error':'');
   if(['log','match','notice'].includes(event.kind))log(event.message,event.kind==='log'?'error':'');
   if(event.kind==='finished'){S.busy='';if(S.recordReplaying){S.recordReplaying=false;S.view='record';api('workbench_show').catch(()=>{});}S.lastResult={...event.result,id:(event.directory||'').split(/[\\/]/).at(-1)};log(`执行结束 · ${LABELS[event.result.status]}`,event.result.status==='failed'?'error':'success');if(event.directory)reports().catch(()=>{});}
+  if(event.kind==='service_error')windowDiscovery.stop();
   if(['run_error','service_error'].includes(event.kind)){S.recordStarting=false;S.busy='';if(S.recordReplaying){S.recordReplaying=false;S.view='record';api('workbench_show').catch(()=>{});}log(event.message,'error');toast(event.message,'error');}
   if(event.kind==='record_started'){S.recordStarting=false;S.busy='recording';S.recordStart=Date.now();S.recordCount=0;S.recordEvents=[];}
   if(event.kind==='record_event'){S.recordCount=event.count;S.recordEvents.push(event.event);if(S.recordEvents.length>50)S.recordEvents.shift();if(S.view==='record'&&document.querySelector('#live-events'))document.querySelector('#live-events').innerHTML=liveEvents();const status=document.querySelector('.game-status span');if(status)status.textContent=`正在录制 · ${S.recordCount} 个事件`;return;}
@@ -570,7 +614,7 @@ window.studio.onEvent(event=>{
 });
 setInterval(()=>{RunPanel.tick(document.querySelector('#game-run-results'),S.runState);RunPanel.tick(document.querySelector('#record-replay-results'),S.recordReplayRun);const clock=document.querySelector('#record-clock');if(clock&&S.busy==='recording')clock.textContent=elapsed();},500);
 async function bootstrap(){
-  try{const data=await api('bootstrap');S.windows=data.windows;S.admin=data.admin;const candidate=data.windows.find(w=>w.handle===data.preferredHandle);S.handle=null;setProject(data);await reports();if(data.autoConnect&&candidate){try{await connectGame(candidate.handle);}catch(error){toast(error.message,'error');}}window.__studioReady=true;}
+  try{const data=await api('bootstrap');if(data.settings){applySettingsConfig(data.settings);S.settingsDraft=clone(data.settings.values);}S.windows=data.windows;S.admin=data.admin;const candidate=data.windows.find(w=>w.handle===data.preferredHandle);S.handle=null;setProject(data);await reports();if(data.autoConnect&&candidate){try{await connectGame(candidate.handle);}catch(error){toast(error.message,'error');}}window.__studioReady=true;windowDiscovery.start();}
   catch(error){window.__studioErrors.push(error.message);root.innerHTML=`<div class="loading"><div class="empty"><strong>测试服务未能启动</strong><p>${esc(error.message)}</p><p>请确认 Python 和依赖已安装，再重新打开工作台。</p></div></div>`;toast(error.message,'error');}
 }
 bootstrap();
@@ -590,5 +634,21 @@ document.addEventListener('input',event=>{
 document.addEventListener('toggle',event=>{if(event.target.matches?.('.case-library'))S.libraryOpen=event.target.open;},true);
 document.addEventListener('input',event=>{
   if(event.target.id==='help-search'){S.helpSearch=event.target.value;document.querySelector('.help-results').innerHTML=StudioHelp.contents(S.helpSearch);return;}if(event.target.id==='case-search'){S.caseSearch=event.target.value;const position=event.target.selectionStart;render();const input=document.querySelector('#case-search');input?.focus();input?.setSelectionRange(position,position);}});
-window.addEventListener('focus',()=>{if(window.__studioReady&&['cases','game'].includes(S.view))refreshCases().catch(error=>toast(error.message,'error'));});
+window.addEventListener('focus',()=>{windowDiscovery.refresh();if(window.__studioReady&&!disabled()&&['cases','game'].includes(S.view))refreshCases().catch(error=>toast(error.message,'error'));});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)windowDiscovery.refresh();});
+document.addEventListener('focusin',event=>{if(['window-search','target-window-search'].includes(event.target.id))windowDiscovery.refresh();});
+document.addEventListener('pointerover',event=>{if(event.target.id==='connection')windowDiscovery.refresh();});
+document.addEventListener('focusout',event=>{if(event.target.id==='connection')setTimeout(()=>windowDiscovery.refresh(),0);});
+window.addEventListener('beforeunload',()=>windowDiscovery.stop());
 
+
+async function handleShortcutAction(action){
+  if(!window.__studioReady||modal.open)return;
+  if(action==='run')return run();
+  if(action==='record')return startRecord();
+  if(action==='pick')return chooseTargetWindow();
+  if(action==='screenshot'){
+    if(lock())return;if(!S.handle)throw new Error('请先连接目标窗口');
+    const shot=await api('capture',{handle:S.handle});await api('workbench_show');showModal({kind:'screenshot',shot});
+  }
+}

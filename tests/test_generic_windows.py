@@ -26,6 +26,7 @@ class GenericWindowTests(unittest.TestCase):
              patch.object(native.user32, 'GetShellWindow', return_value=91), \
              patch.object(native.user32, 'GetDesktopWindow', return_value=90), \
              patch.object(native.user32, 'IsWindowVisible', side_effect=lambda handle: handle != 6), \
+             patch.object(native.user32, 'IsIconic', return_value=False), \
              patch.object(native.user32, 'GetWindowThreadProcessId', side_effect=process), \
              patch.object(native.user32, 'GetClientRect', side_effect=rectangle), \
              patch.object(native.user32, 'EnumWindows', side_effect=enumerate_windows):
@@ -33,6 +34,30 @@ class GenericWindowTests(unittest.TestCase):
             self.assertEqual(names.call_count, 2)
             self.assertEqual([window.process_name for window in native.list_game_windows()], ['CalculatorApp.exe', 'notepad.exe', 'notepad.exe'])
             self.assertEqual([window.handle for window in native.list_game_windows(include_hidden=True)], [1, 2, 6, 9])
+
+    def test_minimized_zero_size_window_remains_selectable_without_restoring_it(self):
+        def enumerate_windows(callback, _):
+            for handle in [1, 2, 3]:
+                callback(handle, 0)
+            return 1
+        def process(handle, output):
+            output._obj.value = 200 + handle
+            return 1
+        def rectangle(handle, output):
+            output._obj.right = output._obj.bottom = 0
+            return handle != 3
+        with patch.object(native, 'process_executable_name', return_value='Client.exe'), \
+             patch.object(native, 'window_title', return_value='应用主窗口'), \
+             patch.object(native.user32, 'GetShellWindow', return_value=90), \
+             patch.object(native.user32, 'GetDesktopWindow', return_value=91), \
+             patch.object(native.user32, 'IsWindowVisible', return_value=True), \
+             patch.object(native.user32, 'IsIconic', side_effect=lambda handle: handle in [1, 3]), \
+             patch.object(native.user32, 'GetWindowThreadProcessId', side_effect=process), \
+             patch.object(native.user32, 'GetClientRect', side_effect=rectangle), \
+             patch.object(native.user32, 'EnumWindows', side_effect=enumerate_windows), \
+             patch.object(native.user32, 'ShowWindow') as show:
+            self.assertEqual([window.handle for window in native.list_game_windows()], [1, 3])
+            show.assert_not_called()
 
     def test_window_validation_accepts_changed_title_and_still_rejects_pid_reuse(self):
         backend = native.WindowsBackend(native.GameWindow(10, '文档 - 记事本', 201))
@@ -74,3 +99,39 @@ class ProcessNameTests(unittest.TestCase):
              patch.object(native.kernel32, 'CloseHandle') as closed:
             self.assertEqual(native.process_executable_name(201), '')
             closed.assert_called_once_with(1001)
+
+
+class MinimizedConnectionTests(unittest.TestCase):
+    def setUp(self):
+        from echo_test import service
+        self.service_module=service
+        self.service=service.Service.__new__(service.Service)
+        self.game=native.GameWindow(10,'最小化应用',201,'Client.exe')
+        self.service.window=lambda handle:self.game
+        self.minimized=True
+        def rectangle(_handle, output):
+            output._obj.right=0 if self.minimized else 1024
+            output._obj.bottom=0 if self.minimized else 700
+            return True
+        def show(_handle, _mode):
+            self.minimized=False
+        self.enterContext(patch.object(native.user32,'GetClientRect',side_effect=rectangle))
+        self.enterContext(patch.object(native.user32,'IsIconic',side_effect=lambda handle:self.minimized))
+        self.enterContext(patch.object(native.user32,'ClientToScreen',return_value=False))
+        self.show=self.enterContext(patch.object(native.user32,'ShowWindow',side_effect=show))
+
+    def test_explicit_connection_restores_before_reading_size(self):
+        data=self.service.call('game_info',{'handle':10,'restore':True})
+        self.show.assert_called_once_with(10,9)
+        self.assertEqual((data['width'],data['height']),(1024,700))
+
+    def test_metadata_read_does_not_restore_or_focus_window(self):
+        data=self.service.call('game_info',{'handle':10})
+        self.show.assert_not_called()
+        self.assertEqual((data['width'],data['height']),(0,0))
+
+    def test_window_that_does_not_restore_returns_error_instead_of_zero_size_connection(self):
+        self.show.side_effect=None
+        with patch.object(self.service_module.time,'monotonic',side_effect=[0,2]):
+            with self.assertRaisesRegex(RuntimeError,'尚未就绪'):
+                self.service.call('game_info',{'handle':10,'restore':True})
