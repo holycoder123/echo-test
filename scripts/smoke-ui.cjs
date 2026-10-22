@@ -46,6 +46,8 @@ try {
   assert.equal(JSON.parse(fs.readFileSync(recordingFile,'utf8')).passed,true);
   assert.equal(read('replay-smoke.json').passed,true);
   assert.equal(read('script-smoke.json').passed,true);
+  assert.equal(read('case-modes-smoke.json').passed,true);
+  assert.equal(read('python-completion-smoke.json').passed,true);
   assert.equal(read('recognition-smoke.json').passed,true);
   assert.equal(read('help-smoke.json').passed,true);
   assert.equal(read('shared-controls-smoke.json').passed,true);

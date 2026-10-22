@@ -14,6 +14,7 @@ GAME_METHODS.add('renderer_error');
 GAME_METHODS.add('case_list');
 MAIN_METHODS.add('game_bundle');GAME_METHODS.add('game_bundle');
 MAIN_METHODS.add('script_import');MAIN_METHODS.add('reports_delete');
+for(const method of ['generate_python','python_copy','case_context'])MAIN_METHODS.add(method);
 for(const method of ['control_list','control_save','control_delete','control_import','control_category_save','control_category_delete'])MAIN_METHODS.add(method);
 MAIN_METHODS.add('window_pick_start');MAIN_METHODS.add('window_pick_cancel');
 for(const method of ['settings_get','settings_shortcut_capture','settings_save','settings_import','settings_export','settings_mcp_copy','settings_mcp_reset','settings_cleanup_preview','settings_cleanup_delete'])MAIN_METHODS.add(method);

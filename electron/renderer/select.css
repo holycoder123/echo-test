@@ -1,0 +1,98 @@
+/* Keep native selection, keyboard navigation and change events, while styling
+   Chromium's top-layer picker consistently in the workbench and toolbar. */
+@supports (appearance: base-select) {
+  select:not([multiple]):not([size]),
+  select:not([multiple]):not([size])::picker(select) {
+    appearance: base-select;
+  }
+
+  select:not([multiple]):not([size]) {
+    align-items: center;
+    gap: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  select:not([multiple]):not([size]):hover:not(:disabled) {
+    border-color: #c7ccd6;
+    background-color: #fafafb;
+  }
+
+  select:not([multiple]):not([size]):open {
+    border-color: #aeb8d2;
+    box-shadow: 0 0 0 2px #8293bc16;
+  }
+
+  select:not([multiple]):not([size])::picker-icon {
+    content: "";
+    width: 7px;
+    height: 7px;
+    flex: 0 0 7px;
+    margin: -4px 3px 0 auto;
+    border-right: 1.5px solid #858b98;
+    border-bottom: 1.5px solid #858b98;
+    transform: rotate(45deg);
+  }
+
+  select:not([multiple]):not([size])::picker(select) {
+    min-width: anchor-size(width);
+    width: max-content;
+    max-width: min(560px, calc(100vw - 24px));
+    max-height: min(420px, 60vh);
+    margin-block: 6px;
+    padding: 5px;
+    border: 1px solid #dedfe5;
+    border-radius: 11px;
+    background: #fbfbfc;
+    color: #363940;
+    box-shadow: 0 12px 32px #20242d24, 0 2px 6px #20242d14;
+    overflow: auto;
+    overscroll-behavior: contain;
+    font: 12px/1.5 "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  }
+
+  select:not([multiple]):not([size]) option {
+    min-height: 32px;
+    padding: 7px 11px;
+    gap: 10px;
+    border-radius: 6px;
+    background: transparent;
+    color: #454953;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+  }
+
+  select:not([multiple]):not([size]) option:checked {
+    background: #eef0f5;
+    color: #303947;
+    font-weight: 500;
+  }
+
+  select:not([multiple]):not([size]) option:hover,
+  select:not([multiple]):not([size]) option:focus {
+    background: #e7eaf0;
+    color: #242c38;
+    outline: none;
+  }
+
+  select:not([multiple]):not([size]) option::checkmark {
+    order: 1;
+    margin-left: auto;
+    color: #657797;
+    font-size: 12px;
+  }
+
+  select:not([multiple]):not([size]):disabled,
+  select:not([multiple]):not([size]) option:disabled {
+    color: #a1a5ae;
+    cursor: default;
+  }
+
+  select:not([multiple]):not([size]) option:disabled {
+    background: transparent;
+  }
+}

@@ -14,15 +14,15 @@ const paths = {
   text:'M4 5h16 M12 5v14 M8 19h8', sleep:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18 M12 7v5l4 2', screenshot:'M4 6h4l2-3h4l2 3h4v14H4z M12 9a4 4 0 1 0 0 8 4 4 0 0 0 0-8',
   plus:'M12 5v14 M5 12h14', play:'M8 4l12 8-12 8z', stop:'M6 6h12v12H6z', copy:'M8 8h12v12H8z M4 16V4h12', trash:'M4 6h16 M9 6V3h6v3 M6 6l1 14h10l1-14 M10 10v6 M14 10v6',
   save:'M5 3h12l3 3v15H4V3z M8 3v6h8V3 M8 14h8v7', folder:'M3 6h7l2 2h9l-3 12H3z', close:'M6 6l12 12 M18 6L6 18', more:'M5 12h.01 M12 12h.01 M19 12h.01', refresh:'M20 7v5h-5 M4 17v-5h5 M5 8a8 8 0 0 1 14-2 M19 16a8 8 0 0 1-14 2',
-  coordinate:'M12 2v4 M12 18v4 M2 12h4 M18 12h4 M12 6a6 6 0 1 0 0 12 6 6 0 0 0 0-12 M12 10v4 M10 12h4', image:'M4 4h16v16H4z M7 15l4-5 5 7 M15 8h.01', chevron:'M9 5l7 7-7 7', down:'M6 9l6 6 6-6', settings:'M12 3v2 M12 19v2 M3 12h2 M19 12h2 M5 5l2 2 M17 17l2 2 M5 19l2-2 M17 7l2-2 M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8',
+  coordinate:'M12 2v4 M12 18v4 M2 12h4 M18 12h4 M12 6a6 6 0 1 0 0 12 6 6 0 0 0 0-12 M12 10v4 M10 12h4', image:'M4 4h16v16H4z M7 15l4-5 5 7 M15 8h.01', chevron:'M9 5l7 7-7 7', down:'M6 9l6 6 6-6', settings:'M10 3h4l.5 2.5 1.6.9 2.4-.8 2 3.5-1.9 1.7v2.4l1.9 1.7-2 3.5-2.4-.8-1.6.9L14 21h-4l-.5-2.5-1.6-.9-2.4.8-2-3.5 1.9-1.7v-2.4L3.5 9.1l2-3.5 2.4.8 1.6-.9L10 3z M12 8.8a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4',
   check:'M5 12l4 4 10-10', search:'M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14 M15 15l6 6', arrow:'M4 12h16 M14 6l6 6-6 6', upload:'M12 16V3 M7 8l5-5 5 5 M4 16v5h16v-5',
   shield:'M12 3l8 4v6c0 5-8 9-8 9S4 18 4 13V7z M8 12l3 3 5-6', spark:'M12 3l2 6 6 3-6 2-2 6-2-6-6-2 6-3z'
 };
 const icon = name => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[name] || paths.click}"/></svg>`;
 const esc = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
 const clone = value => JSON.parse(JSON.stringify(value));
-const A = {click:'单击',double_click:'双击',right_click:'右键',long_press:'长按',drag:'拖动',scroll:'滚动',wait_image:'等待图片',assert_image:'图片存在',assert_absent:'图片不存在',key:'按键组合',text:'输入文本',sleep:'等待',screenshot:'保存截图',key_down:'按下按键',key_up:'松开按键',python:'Python 脚本'};
-const DEFAULTS = {double_click:{interval:.12},long_press:{duration:1},drag:{duration:1},scroll:{amount:-3,axis:'vertical'},key:{keys:'ENTER'},text:{text:''},sleep:{duration:1},key_down:{keys:'W'},key_up:{keys:'W'},python:{code:'# 可调用 game 操作当前目标应用，print 输出会进入报告\nprint("目标应用分辨率:", game.size())\n# game.click("控件名称")\n# game.key("ENTER")\n'}};
+const A = {click:'单击',double_click:'双击',right_click:'右键',long_press:'长按',drag:'拖动',scroll:'滚动',wait_image:'等待图片',assert_image:'图片存在',assert_absent:'图片不存在',key:'按键组合',text:'输入文本',sleep:'等待',screenshot:'保存截图',key_down:'按下按键',key_up:'松开按键',python:'Python 脚本',loop:'循环步骤组',end_loop:'循环结束',set_variable:'设置变量'};
+const DEFAULTS = {double_click:{interval:.12},long_press:{duration:1},drag:{duration:1},scroll:{amount:-3,axis:'vertical'},key:{keys:'ENTER'},text:{text:''},sleep:{duration:1},key_down:{keys:'W'},key_up:{keys:'W'},python:{code:'# 可调用 window 操作当前目标应用，print 输出会进入报告\nprint("目标应用分辨率:", window.size())\n# window.click("控件名称")\n# window.key("ENTER")\n'}};
 const TARGETS = new Set(['click','double_click','right_click','long_press','drag','scroll','wait_image','assert_image','assert_absent']);
 const IMAGES = new Set(['wait_image','assert_image','assert_absent']);
 const LABELS = {running:'执行中',passed:'通过',failed:'失败',stopped:'已停止'};
@@ -100,6 +100,9 @@ function currentWindow() {return S.windows.find(window=>window.handle===Number(S
 function shortFile(path) {return path.split(/[\\/]/).at(-1).replace(/\.echo\.json$|\.json$/,'');}
 function dateLabel(value) {try{return new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(value));}catch{return value;}}
 function paramsSummary(step) {
+  if(step.action==='loop'){const p=step.params||{};return `${p.variable||'i'} 从 ${p.start??2} 到 ${p.end??64} · 步长 ${p.step??1}`;}
+  if(step.action==='end_loop')return '返回循环起点，完成后继续后续步骤';
+  if(step.action==='set_variable')return `${step.params?.variable||'变量'} = ${step.params?.value??''}`;
   if(TARGETS.has(step.action)) return step.target ? step.target+(step.action==='drag'?` → ${step.end_target||'选择终点'}`:'') : '选择目标控件';
   if(step.action.startsWith('key')) return step.params?.keys||'设置按键';
   if(step.action==='text') return step.params?.text||'设置输入内容';
@@ -217,8 +220,9 @@ async function pickGameControl(kind){
 
 
 function caseView() {
+  const depths=caseStepDepths();
   return `${caseLibraryView()}<div class="page-heading"><div><h1>${input(S.project.name,'data-project-name','text','class="project-title" aria-label="用例名称"')}<i class="save-dot" data-save-dot style="display:${S.dirty?'inline-block':'none'}"></i></h1><p class="sub">把目标应用操作整理成步骤，用图片断言验证结果。</p></div><div class="heading-actions">${button('','case-menu','ghost','more',`title="更多用例操作" ${disabled()}`)}${button('保存','save','','save',disabled())}${button(S.busy==='running'?'停止':'运行用例',S.busy==='running'?'stop':'run','primary',S.busy==='running'?'stop':'play',S.busy==='recording'?'disabled':'')}</div></div>
-  <div class="case-layout"><div><div class="section-toolbar"><span>${S.project.steps.length} 个步骤</span><div class="right"><span>循环</span>${input(S.iterations,'id="iterations"','number','class="tiny-number" min="1" max="1000" aria-label="用例循环次数"')}${button('添加步骤','step-menu','ghost','plus',disabled())}</div></div><div class="step-list">${S.project.steps.length?S.project.steps.map((step,index)=>stepRow(step,index)).join(''):`<div class="empty"><div class="empty-icon">${icon('cases')}</div><strong>从第一个步骤开始</strong><p>添加一个操作，或录制你在目标应用中的动作。</p>${button('添加步骤','step-menu','quiet','plus')}${button('去录制','view-record','ghost','record')}</div>`}</div>${S.project.steps.length?`<button class="insert-step" data-act="step-menu" ${disabled()}>${icon('plus')}添加下一步</button>`:''}</div><aside class="inspector">${inspectorView()}</aside></div>`;
+  ${caseModeBar()}${S.project.mode==='python'?pythonCaseView():`<div class="case-layout"><div><div class="section-toolbar"><span>${S.project.steps.length} 个步骤</span><div class="right"><span>用例循环</span>${input(S.iterations,'id="iterations"','number','class="tiny-number" min="1" max="1000" aria-label="用例循环次数"')}${button('添加步骤','step-menu','ghost','plus',disabled())}</div></div><div class="step-list">${S.project.steps.length?S.project.steps.map((step,index)=>stepRow(step,index,depths[index])).join(''):`<div class="empty"><div class="empty-icon">${icon('cases')}</div><strong>从第一个步骤开始</strong><p>添加一个操作，或录制你在目标应用中的动作。</p>${button('添加步骤','step-menu','quiet','plus')}${button('去录制','view-record','ghost','record')}</div>`}</div>${S.project.steps.length?`<button class="insert-step" data-act="step-menu" ${disabled()}>${icon('plus')}添加下一步</button>`:''}</div><aside class="inspector">${inspectorView()}</aside></div>`}`;
 }
 function caseLibraryView(){
   const query=S.caseSearch.toLowerCase(),items=S.library.filter(item=>(item.name+' '+item.location).toLowerCase().includes(query));
@@ -226,33 +230,35 @@ function caseLibraryView(){
 }
 function setLibrary(data){if(data){S.library=data.entries;S.caseDirectory=data.directory;if(S.gameCasePath&&!S.library.some(item=>item.path===S.gameCasePath&&!item.error))S.gameCasePath='';}}
 async function refreshCases(){setLibrary(await api('case_list'));if(S.view==='cases')render();else if(S.view==='game')updateGameControls();}
-function stepRow(step,index) {
+function stepRow(step,index,depth=0) {
   const status=S.stepStatus[index];
-  return `<div class="step-row ${S.selected===index?'selected':''} ${step.enabled===false?'disabled':''}" data-step="${index}" draggable="${!S.busy}"><span class="drag-handle">⠿</span><span class="step-number">${String(index+1).padStart(2,'0')}</span><div class="step-icon">${icon(step.action)}</div><div class="step-copy"><strong>${esc(step.name)}</strong><div class="step-meta"><span>${A[step.action]}</span><span>·</span><span>${esc(paramsSummary(step))}</span>${step.repeat>1?`<span>×${step.repeat}</span>`:''}</div></div>${status?`<span class="step-state ${status}">${LABELS[status]}</span>`:''}<div class="row-tools"><button class="icon-button" data-act="copy-step" data-i="${index}" title="复制步骤" ${disabled()}>${icon('copy')}</button><button class="icon-button" data-act="delete-step" data-i="${index}" title="删除步骤" ${disabled()}>${icon('trash')}</button></div></div>`;
+  return `<div class="step-row ${S.selected===index?'selected':''} ${step.enabled===false?'disabled':''} ${['loop','end_loop'].includes(step.action)?'loop-marker':''}" style="margin-left:${Math.min(depth,8)*16}px" data-step="${index}" draggable="${!disabled()}"><span class="drag-handle">⠿</span><span class="step-number">${String(index+1).padStart(2,'0')}</span><div class="step-icon">${icon(step.action==='loop'?'refresh':step.action==='end_loop'?'chevron':step.action)}</div><div class="step-copy"><strong>${esc(step.name)}</strong><div class="step-meta"><span>${A[step.action]}</span><span>·</span><span>${esc(paramsSummary(step))}</span>${step.repeat>1?`<span>×${step.repeat}</span>`:''}</div></div>${status?`<span class="step-state ${status}">${LABELS[status]}</span>`:''}<div class="row-tools"><button class="icon-button" data-act="copy-step" data-i="${index}" title="复制步骤或整个循环组" ${disabled()}>${icon('copy')}</button><button class="icon-button" data-act="delete-step" data-i="${index}" title="删除步骤或整个循环组" ${disabled()}>${icon('trash')}</button></div></div>`;
 }
 function inspectorView() {
   const step=S.project.steps[S.selected];
   if(!step) return '<div class="empty compact"><p>选择步骤后，在这里配置。</p></div>';
   const action=step.action;
+  if(action==='end_loop')return '<div class="inspector-head">循环结束</div><p class="field-help">循环体由开始和结束标记之间的步骤组成。拖动、复制或删除任一标记会处理整个循环组。选择开始标记可设置范围和变量。</p>';
   return `<div class="inspector-head"><span>步骤设置</span><label class="check-line"><input type="checkbox" data-sfield="enabled" ${step.enabled!==false?'checked':''} ${disabled()}>启用</label></div>
   ${field('步骤名称',input(step.name,'data-sfield="name"'))}
-  ${field('操作',`<select data-sfield="action" ${disabled()}>${options(Object.entries(A),action)}</select>`)}
+  ${action==='loop'?'<div class="field-help">循环包含结束值，最多 1000 轮；禁用本组会跳过组内步骤。</div>':field('操作',`<select data-sfield="action" ${disabled()}>${options(Object.entries(A).filter(([key])=>!['loop','end_loop'].includes(key)),action)}</select>`)}
   ${TARGETS.has(action)?field('目标控件',controlChoice(step,'target')):''}
   ${action==='drag'?field('拖动终点',controlChoice(step,'end_target')):''}
   ${paramFields(step)}
-  <div class="divider"></div><div class="field-grid">${field('操作后等待 · 秒',input(step.delay??.5,'data-sfield="delay"','number','min="0" max="600" step="0.1"'))}${field('重复次数',input(step.repeat??1,'data-sfield="repeat"','number','min="1" max="1000"'))}</div>
-  <details class="details" ${action==='python'?'open':''}><summary>更多设置</summary>${field(action==='python'?'脚本执行超时 · 秒':'寻找控件超时 · 秒',input(step.timeout??5,'data-sfield="timeout"','number','min="0.1" max="600" step="0.5"'))}${step.params?.path?'<div class="field-help">已保留录制的拖动轨迹。</div>':''}</details>
+  ${action==='loop'?'':`<div class="divider"></div><div class="field-grid">${field('操作后等待 · 秒',input(step.delay??.5,'data-sfield="delay"','number','min="0" max="600" step="0.1"'))}${field('重复次数',input(step.repeat??1,'data-sfield="repeat"','number','min="1" max="1000"'))}</div><details class="details" ${action==='python'?'open':''}><summary>更多设置</summary>${field(action==='python'?'脚本执行超时 · 秒':'寻找控件超时 · 秒',input(step.timeout??5,'data-sfield="timeout"','number','min="0.1" max="600" step="0.5"'))}${step.params?.path?'<div class="field-help">已保留录制的拖动轨迹。</div>':''}</details>`}
   ${['click','double_click','right_click','long_press'].includes(action)?'<div class="inspector-tip">操作之后添加「图片存在」步骤，可以验证目标应用界面是否发生变化。</div>':''}`;
 }
 function paramFields(step) {
   const p=step.params||{}, action=step.action;
   let result='';
+  if(action==='loop')result+=field('循环变量',input(p.variable??'i','data-param="variable"'),'文本中使用 ${i} 引用当前编号。')+`<div class="field-grid">${field('起始值',input(p.start??2,'data-param="start"','number','step="1"'))}${field('结束值（包含）',input(p.end??64,'data-param="end"','number','step="1"'))}</div>`+field('步长',input(p.step??1,'data-param="step"','number','step="1"'),'递减循环使用负数步长。');
+  if(action==='set_variable')result+=field('变量名',input(p.variable??'name','data-param="variable"'))+field('变量值',input(p.value??'','data-param="value"'),'可填写文本、数字或 JSON；支持 ${变量名} 替换。');
   if(['long_press','drag','sleep'].includes(action)) result+=field(action==='sleep'?'等待时间 · 秒':action==='drag'?'拖动时间 · 秒':'按住时间 · 秒',input(p.duration??1,'data-param="duration"','number','min="0.01" max="600" step="0.1"'));
   if(action==='double_click') result+=field('双击间隔 · 秒',input(p.interval??.12,'data-param="interval"','number','min="0.01" step="0.01"'));
   if(action==='scroll') result+=`<div class="field-grid">${field('滚动方向',`<select data-param="axis" ${disabled()}>${options([['vertical','垂直'],['horizontal','水平']],p.axis||'vertical')}</select>`)}${field('滚动格数',input(p.amount??-3,'data-param="amount"','number','min="-100" max="100"'))}</div><div class="field-help">正数向上 / 向右，负数向下 / 向左。</div>`;
   if(action.startsWith('key')) result+=field('按键',input(p.keys??(action==='key'?'ENTER':'W'),'data-param="keys"'),'例如 CTRL+A、ENTER、W。F12 用于停止。');
-  if(action==='text') result+=field('文本内容',`<textarea data-param="text" ${disabled()}>${esc(p.text||'')}</textarea>`,'先点击目标应用中的输入框，再输入文本。');
-  if(action==='python')result+=field('Python 代码',`<textarea class="python-editor" data-param="code" spellcheck="false" aria-label="Python 代码" ${disabled()}>${esc(p.code||'')}</textarea>`,'使用工作台的 Python 环境与权限，代码随用例保存。')+`<div class="script-actions">${button('展开编辑','script-edit','ghost','',disabled())}${button('导入 .py','script-import','ghost','upload',disabled())}</div><div class="field-help">game.click("控件名") · game.key("ENTER") · game.sleep(1)<br>print 输出与异常保存在运行报告。</div>`;
+  if(action==='text') result+=field('文本内容',`<textarea data-param="text" ${disabled()}>${esc(p.text||'')}</textarea>`,'先点击输入框；支持 ${i} 等变量，例如 go_to_function_thread ${i}。');
+  if(action==='python')result+=field('Python 代码',`<textarea class="python-editor" data-param="code" spellcheck="false" aria-label="Python 代码" ${disabled()}>${esc(p.code||'')}</textarea>`,'使用工作台的 Python 环境与权限，代码随用例保存。')+`<div class="script-actions">${button('展开编辑','script-edit','ghost','',disabled())}${button('导入 .py','script-import','ghost','upload',disabled())}</div><div class="field-help">window.click("控件名") · window.key("ENTER") · window.sleep(1)<br>print 输出与异常保存在运行报告。</div>`;
   if(['long_press','drag'].includes(action)) result+=field('鼠标按钮',`<select data-param="button" ${disabled()}>${options([['left','左键'],['right','右键'],['middle','中键']],p.button||'left')}</select>`);
   return result;
 }
@@ -284,15 +290,16 @@ function runView() {
 function menu(anchor) {
   if(lock()) return;
   const rect=anchor.getBoundingClientRect();
-  const sections=[['鼠标操作',['click','double_click','right_click','long_press','drag','scroll']],['验证界面',['wait_image','assert_image','assert_absent']],['其他',['key','text','sleep','screenshot','python']]];
+  const sections=[['流程控制',['loop','set_variable']],['鼠标操作',['click','double_click','right_click','long_press','drag','scroll']],['验证界面',['wait_image','assert_image','assert_absent']],['其他',['key','text','sleep','screenshot','python']]];
   document.querySelector('#menu-root').innerHTML=`<div class="menu" style="left:${Math.min(rect.left,innerWidth-270)}px;top:${Math.min(rect.bottom+5,innerHeight-600)}px">${sections.map(([name,actions])=>`<div class="menu-label">${name}</div>${actions.map(action=>`<button class="menu-item" data-act="add-step" data-action="${action}">${icon(action)}${A[action]}</button>`).join('')}`).join('')}</div>`;
 }
 function addStep(action) {
   if(lock()) return;
   const target=controlSelectors().find(item=>!IMAGES.has(action)||item.kind==='image')?.name||'';if(target&&TARGETS.has(action))useControl(target);
-  const step={name:A[action],action,target,end_target:'',enabled:true,timeout:action==='python'?30:5,delay:.5,repeat:1,params:clone(DEFAULTS[action]||{})};
+  if(S.project.mode==='python')return;
+  const step={name:A[action],action,target,end_target:'',enabled:true,timeout:action==='python'?30:5,delay:action==='loop'?0:.5,repeat:1,params:clone(action==='loop'?{variable:'i',start:2,end:64,step:1}:action==='set_variable'?{variable:'name',value:''}:DEFAULTS[action]||{})};
   const index=S.project.steps.length?S.selected+1:0;
-  S.project.steps.splice(index,0,step);S.selected=index;S.stepStatus={};dirty();render();
+  S.project.steps.splice(index,0,step,...(action==='loop'?[{name:'循环结束',action:'end_loop',enabled:true,timeout:5,delay:0,repeat:1,params:{}}]:[]));S.selected=index;S.stepStatus={};dirty();render();
 }
 function showModal(data) {S.modal=data;renderModal();if(!modal.open)modal.showModal();}
 function closeModal() {modal.close();S.modal=null;if(confirmation){confirmation(false);confirmation=null;}}
@@ -328,9 +335,10 @@ function previewDetails(shot) {
 }
 function renderModal() {
   const m=S.modal;if(!m)return;
-  modal.className=m.kind==='control-picker'?'control-picker-modal':['picker','preview','screenshot'].includes(m.kind)?'picker-modal':m.kind==='script'?'script-modal':'';
+  modal.className=m.kind==='control-picker'?'control-picker-modal':['picker','preview','screenshot'].includes(m.kind)?'picker-modal':['script','python-preview'].includes(m.kind)?'script-modal':'';
+  if(m.kind==='python-preview'){modal.innerHTML=header('生成的 Python 代码')+`<div class="modal-body"><p class="field-help">预览随低代码步骤生成。创建独立副本后可自由编辑，低代码原稿保留。</p><textarea class="python-editor" id="generated-python-code" readonly spellcheck="false" aria-label="生成的 Python 代码">${esc(m.code)}</textarea></div><footer class="modal-footer">${button('关闭','close-modal')}${button('创建 Python 副本','mode-copy','primary','python',disabled())}</footer>`;return;}
   const sharedModal=sharedControlModals(m);if(sharedModal!==null){modal.innerHTML=sharedModal;return;}
-  if(m.kind==='script')modal.innerHTML=header('编辑 Python 脚本')+`<div class="modal-body">${field('Python 代码',`<textarea id="script-code" class="python-editor" spellcheck="false" aria-label="Python 脚本编辑器" ${disabled()}>${esc(m.code)}</textarea>`)}<div class="field-help">可使用 game、case_dir、report_dir、step_name 和 variables。Tab 插入四个空格，F12 停止执行。</div></div><footer class="modal-footer">${button('取消','close-modal')}${button('应用到步骤','script-apply','primary', '',disabled())}</footer>`;
+  if(m.kind==='script')modal.innerHTML=header('编辑 Python 脚本')+`<div class="modal-body">${field('Python 代码',`<textarea id="script-code" class="python-editor" spellcheck="false" aria-label="Python 脚本编辑器" ${disabled()}>${esc(m.code)}</textarea>`)}<div class="field-help">可使用 window、controls、case_dir、report_dir、step_name 和 variables。输入 window. 或按 Ctrl+Space 选择函数；Tab 缩进，F12 停止执行。</div></div><footer class="modal-footer">${button('取消','close-modal')}${button('应用到步骤','script-apply','primary', '',disabled())}</footer>`;
   if(m.kind==='confirm') modal.innerHTML=header('确认操作')+`<div class="modal-body"><p>${esc(m.message)}</p><p class="modal-message" style="margin-top:10px">${esc(m.detail)}</p></div><footer class="modal-footer">${button('取消','confirm-no')}${button('继续','confirm-yes','primary')}</footer>`;
   if(m.kind==='environment') modal.innerHTML=header('运行环境')+`<div class="modal-body"><div class="env-row"><span>测试服务权限</span><strong>${S.admin?'管理员':'普通权限'}</strong></div><div class="env-row"><span>已发现目标窗口</span><strong>${S.windows.length} 个</strong></div><div class="env-row"><span>停止快捷键</span><strong>F12</strong></div><p class="modal-message" style="margin-top:20px">软件默认请求管理员权限。若当前仍显示普通权限，请保存并关闭工作台，重新启动并确认 Windows 权限提示。</p></div><footer class="modal-footer">${button('知道了','close-modal','primary')}</footer>`;
   if(m.kind==='selector') {
@@ -382,7 +390,7 @@ function drawPick(point){const m=S.modal,shot=m.shot,image=m.returnModal.draft.k
 async function acceptPick(){const m=S.modal;if(!m.selection){toast('请先选取位置或区域');return;}const previous=m.returnModal;const t=previous.draft;if(t.kind==='image'){const image=(await api('save_template',{capture_id:m.shot.id,box:m.selection})).image;if(previous.addVariant){(t.templates||=[]).push({image,mask:''});delete previous.addVariant;}else{t.image=image;t.mask='';}await thumbnail(image);}else{t.x=t.normalized!==false?Number((m.selection[0]/(m.shot.width-1)).toFixed(6)):m.selection[0];t.y=t.normalized!==false?Number((m.selection[1]/(m.shot.height-1)).toFixed(6)):m.selection[1];}showModal(previous);}
 async function saveTarget(){return saveSharedControl();}
 
-function setProject(data){S.gameCasePath='';setLibrary(data.library);S.project=data.project;setControls(data.controls);S.path=data.path;S.recent=data.recent||S.recent;S.selected=0;S.dirty=false;S.stepStatus={};S.thumbnails={};api('dirty',{value:false,caseName:S.project.name}).catch(()=>{});render();}
+function setProject(data){S.gameCasePath='';setLibrary(data.library);S.project=data.project;setControls(data.controls);S.path=data.path;S.baseDir=data.base_dir||S.baseDir;S.recent=data.recent||S.recent;S.selected=0;S.pythonSelection=null;S.dirty=false;S.stepStatus={};S.thumbnails={};api('dirty',{value:false,caseName:S.project.name}).catch(()=>{});render();}
 async function save(asNew=false){if(lock())return;const data=await api('save_project',{project:S.project,as_new:asNew});if(data){setProject(data);toast('用例已保存','success');}}
 async function run({stayOnGame=false}={}){
   if(lock())return;if(!S.handle)throw new Error('请先连接目标窗口');
@@ -425,6 +433,7 @@ async function retryEmptyRecording(){
 async function acceptRecording(asNew){
   if(lock())return;
   const pending=S.recordPending;if(!pending)return;
+  if(!asNew&&S.project.mode==='python'){toast('Python 用例请将录制创建为新的低代码用例');return;}
   if(asNew){if(!await canReplace())return;const data=await api('new_project');setProject(data);S.project.name='录制用例 · '+new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());}
   const imported=await api('control_import',{project:pending.project,category_id:S.targetCategory==='all'?'':S.targetCategory});
   setControls(imported.controls);const generated=imported.project;
@@ -435,6 +444,7 @@ async function acceptRecording(asNew){
 
 async function handleAction(action,node){
   if(action==='close-modal'||action==='confirm-no'){closeModal();return;}
+  if(action.startsWith('mode-')){await caseModeAction(action,node);return;}
   if(action==='confirm-yes'){
     if(S.modal?.kind!=='confirm'||!confirmation||lock())return;
     const resolve=confirmation;confirmation=null;closeModal();resolve(true);return;
@@ -494,8 +504,8 @@ async function handleAction(action,node){
   }
   if(action==='refresh')return refreshGameWindows();
   if(action==='game-connect')return reconnectGame();
-  if(action==='copy-step'){if(lock())return;S.project.steps.splice(index+1,0,clone(S.project.steps[index]));S.selected=index+1;S.project.steps[S.selected].name+=' · 副本';dirty();render();return;}
-  if(action==='delete-step'){if(lock())return;S.project.steps.splice(index,1);S.selected=Math.min(index,S.project.steps.length-1);S.stepStatus={};dirty();render();return;}
+  if(action==='copy-step'){if(lock())return;const [start,end]=caseGroupBounds(S.project.steps,index),copies=clone(S.project.steps.slice(start,end+1));copies[0].name+=' · 副本';S.project.steps.splice(end+1,0,...copies);S.selected=end+1;S.stepStatus={};dirty();render();return;}
+  if(action==='delete-step'){if(lock())return;const [start,end]=caseGroupBounds(S.project.steps,index);S.project.steps.splice(start,end-start+1);S.selected=Math.min(start,S.project.steps.length-1);S.stepStatus={};dirty();render();return;}
   if(action==='new-target')return editTarget();
   if(action==='edit-target')return editTarget(index);
   if(action==='target-mode'){S.modal.draft.kind=node.dataset.mode;renderModal();return;}
@@ -528,6 +538,7 @@ document.addEventListener('click',event=>{
   const row=event.target.closest('[data-step]');if(row){S.selected=Number(row.dataset.step);render();}
 });
 document.addEventListener('input',event=>{
+  if(caseModeInput(event))return;
   if(event.target.id==='help-search'){S.helpSearch=event.target.value;document.querySelector('.help-results').innerHTML=StudioHelp.contents(S.helpSearch);return;}
   const node=event.target;
   if(node.id==='window-search'||node.id==='target-window-search'){if(!node.disabled){S.windowSearch=node.value;updateWindowChoices();}return;}
@@ -565,15 +576,16 @@ document.addEventListener('change',event=>{
 });
 document.addEventListener('dragstart',event=>{const row=event.target.closest('[data-step]');if(row&&!S.busy&&!S.mcpOperation){dragIndex=Number(row.dataset.step);event.dataTransfer.effectAllowed='move';}});
 document.addEventListener('dragover',event=>{const row=event.target.closest('[data-step]');if(row&&dragIndex!==null){event.preventDefault();document.querySelectorAll('.drop-target').forEach(node=>node.classList.remove('drop-target'));row.classList.add('drop-target');}});
-document.addEventListener('drop',event=>{const row=event.target.closest('[data-step]');if(row&&dragIndex!==null&&!S.busy&&!S.mcpOperation){event.preventDefault();const destination=Number(row.dataset.step);const [step]=S.project.steps.splice(dragIndex,1);S.project.steps.splice(destination,0,step);S.selected=destination;dragIndex=null;S.stepStatus={};dirty();render();}});
+document.addEventListener('drop',event=>{const row=event.target.closest('[data-step]');if(row&&dragIndex!==null&&!disabled()){event.preventDefault();const destination=Number(row.dataset.step);if(moveCaseGroup(dragIndex,destination)){S.stepStatus={};dirty();render();}dragIndex=null;}});
 document.addEventListener('dragend',()=>{dragIndex=null;document.querySelectorAll('.drop-target').forEach(node=>node.classList.remove('drop-target'));});
 document.addEventListener('pointerdown',event=>{if(S.modal?.kind==='picker'&&event.target.closest('#image-stage')){pickStart=pickPoint(event);drawPick(pickStart);event.target.closest('#image-stage').setPointerCapture(event.pointerId);}});
 document.addEventListener('pointermove',event=>{if(pickStart&&S.modal?.kind==='picker'&&event.buttons)drawPick(pickPoint(event));});
 document.addEventListener('pointerup',()=>{pickStart=null;});
+document.addEventListener('selectionchange',()=>{const editor=document.querySelector('#case-python-code');if(editor&&document.activeElement===editor)S.pythonSelection=[editor.selectionStart,editor.selectionEnd];});
 modal.addEventListener('cancel',event=>{event.preventDefault();closeModal();});
 document.addEventListener('keydown',event=>{
   if(event.key==='F1'&&!modal.open){event.preventDefault();handleAction('view-help',{dataset:{}}).catch(error=>toast(error.message,'error'));return;}
-  if(event.key==='Tab'&&event.target.matches?.('textarea.python-editor')&&!event.target.disabled){
+  if(event.key==='Tab'&&event.target.matches?.('textarea.python-editor')&&!event.target.disabled&&!event.target.readOnly){
     event.preventDefault();const node=event.target;node.setRangeText('    ',node.selectionStart,node.selectionEnd,'end');node.dispatchEvent(new Event('input',{bubbles:true}));return;
   }
   if(event.ctrlKey&&event.key.toLowerCase()==='s'){

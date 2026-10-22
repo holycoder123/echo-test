@@ -1,4 +1,4 @@
-"""Isolated Python step process. Game operations are performed by the runner."""
+"""Isolated Python step process. Window operations are performed by the runner."""
 import json
 from pathlib import Path
 import sys
@@ -66,12 +66,39 @@ class BinaryOutput:
         self.output.flush()
 
 
-class Game:
+class ControlRef:
+    """Serializable, lazy reference: coordinates are resolved on every API call."""
+    def __init__(self, name=None, library_id=None):
+        self.name = name
+        self.library_id = library_id
+
+    def payload(self):
+        return {'control_id': self.library_id} if self.library_id else {'control_name': self.name}
+
+
+class Controls:
+    def __init__(self, selectors):
+        self._selectors = selectors
+
+    def __getitem__(self, name):
+        matches = [s for s in self._selectors if s['name'] == name]
+        if not matches:
+            raise ValueError(f'控件不存在：{name}')
+        return ControlRef(name, matches[0].get('library_id'))
+
+    def by_id(self, library_id):
+        if not any(s.get('library_id') == library_id for s in self._selectors):
+            raise ValueError(f'控件标识不存在：{library_id}')
+        return ControlRef(library_id=library_id)
+
+
+class Window:
     def __init__(self, info):
         self.handle = info.get('handle')
         self.pid = info.get('pid')
 
     def _call(self, method, **args):
+        args = {key: value.payload() if isinstance(value, ControlRef) else value for key, value in args.items()}
         with _rpc_lock:
             send({'kind': 'call', 'method': method, 'args': args})
             response = json.loads(sys.stdin.readline())
@@ -88,8 +115,8 @@ class Game:
     def click(self, target, button='left', count=1, interval=.12, hold=0, timeout=5):
         return self._call('click', target=target, button=button, count=count, interval=interval, hold=hold, timeout=timeout)
 
-    def drag(self, start, end, duration=1, timeout=5):
-        return self._call('drag', start=start, end=end, duration=duration, timeout=timeout)
+    def drag(self, start, end, duration=1, timeout=5, path=None, button='left'):
+        return self._call('drag', start=start, end=end, duration=duration, timeout=timeout, path=path, button=button)
 
     def scroll(self, target, amount=-3, axis='vertical', timeout=5):
         return self._call('scroll', target=target, amount=amount, axis=axis, timeout=timeout)
@@ -124,6 +151,50 @@ class Game:
             return image.copy()
 
 
+def normalized_variables(value):
+    message = 'variables 必须是可 JSON 保存的字典，且不超过 48 KB'
+    if not isinstance(value, dict):
+        raise ValueError(message)
+    try:
+        encoded = json.dumps(value, ensure_ascii=True, allow_nan=False)
+    except (TypeError, ValueError, OverflowError, RecursionError) as error:
+        raise ValueError(message) from error
+    if len(encoded) > 48000:
+        raise ValueError(message)
+    return json.loads(encoded)
+
+
+def install_helpers(scope):
+    from echo_test.workflow import interpolate, assignment
+    def render(value):
+        return interpolate(value, scope['variables'])
+    def assign(name, value):
+        from echo_test.workflow import variable_name
+        variable_name(name)
+        scope['variables'][name] = assignment(value, scope['variables'])
+    def run_script(code, timeout=5, step_name=None):
+        window = scope['window']
+        window._call('begin_step', timeout=timeout)
+        try:
+            child = {key: scope[key] for key in ('__name__', '__file__', 'window', 'case_dir', 'report_dir', 'step_name', 'controls')}
+            child['game'] = child['window']
+            child['variables'] = normalized_variables(scope['variables'])
+            if step_name is not None:
+                child['step_name'] = step_name
+            install_helpers(child)
+            try:
+                exec(compile(code, '<低代码 Python 步骤>', 'exec'), child)
+            except SystemExit as error:
+                if error.code not in (None, 0):
+                    raise
+            result = normalized_variables(child['variables'])
+            scope['variables'].clear()
+            scope['variables'].update(result)
+        finally:
+            window._call('end_step')
+    scope.update(render=render, assign=assign, run_script=run_script)
+
+
 def main():
     data = json.loads(sys.stdin.readline())
     sys.stdout, sys.stderr = Output('stdout'), Output('stderr')
@@ -131,10 +202,12 @@ def main():
     sys.argv = [data['filename']]
     sys.path.insert(0, str(case_dir))
     sys.path.insert(1, str(Path(__file__).resolve().parents[1]))
+    window = Window(data.get('window', data.get('game', {})))
     scope = {'__name__': '__main__', '__file__': data['filename'],
-             'game': Game(data['game']), 'case_dir': case_dir,
+             'window': window, 'game': window, 'case_dir': case_dir,
              'report_dir': Path(data['report_dir']), 'step_name': data['step_name'],
-             'variables': data['variables']}
+             'variables': data['variables'], 'controls': Controls(data.get('selectors', []))}
+    install_helpers(scope)
     try:
         source = Path(data['filename']).read_text(encoding='utf-8')
         exec(compile(source, data['filename'], 'exec'), scope)
@@ -145,9 +218,7 @@ def main():
             return
     try:
         sys.stdout.flush(); sys.stderr.flush()
-        variables = scope['variables']
-        if not isinstance(variables, dict) or len(json.dumps(variables, ensure_ascii=True)) > 48000:
-            raise ValueError('variables 必须是可 JSON 保存的字典，且不超过 48 KB')
+        variables = normalized_variables(scope['variables'])
         send({'kind': 'done', 'variables': variables})
     except Exception as error:
         send({'kind': 'error', 'error': str(error)})

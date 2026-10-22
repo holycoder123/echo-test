@@ -34,6 +34,10 @@ npm run test:ui
 
 `script-smoke.json` 验证 Python 步骤的添加、编辑、展开编辑、Tab 缩进、导入、运行期间锁定和代码的 HTML 转义，截图为 `python-editor-preview.png`。Python 的 `test_scripting.py` 使用真实独立解释器和模拟目标应用后端，验证目标应用 API、源码与输出报告、跨步骤变量、异常行号、死循环超时、停止、输出上限、导入后另存为，以及 Windows Job Object 对脚本子进程的清理。MCP 测试验证脚本源码传递及大小校验。这些测试不操作真实目标应用。
 
+`case-modes-smoke.json` 验证循环分组、生成代码只读预览、独立 Python 副本、共享控件参数插入、编辑锁定和返回低代码原稿；截图为 `lowcode-loop-preview.png`、`python-mode-preview.png`。`test_workflow.py` 检查嵌套循环、变量、结构和工作量限制、生成代码与低代码输入等价及脚本时限；`test_dual_modes_service.py` 使用临时控件库验证复制不修改源文件、改名别名与编辑路径恢复。
+
+`python-completion-smoke.json` 验证输入 `window.` 后的函数列表、参数说明、前缀筛选、键盘与鼠标插入、Ctrl+Space、Esc，以及主编辑器、局部脚本和展开对话框。注释、字符串、只读预览和执行锁定状态不会触发编辑；预览为 `python-completion-preview.png`。Node 测试检查补全目录与运行时公开方法一致；Python 测试检查 `window` 主接口与历史 `game` 别名为同一对象。
+
 
 ## 真实目标窗口验证
 
@@ -94,3 +98,5 @@ python app.py --run --case path/to/case.echo.json --window 123456 --iterations 1
 `electron/tests/elevation.test.cjs` 和 `tests/test_mcp_startup.py` 验证默认 UAC 请求、已提权直接启动、参数引用与单实例锁释放、取消或失败停止启动，以及旧普通权限实例的预检。系统提权调用使用模拟，不弹出实际 UAC；Win32 适配器仅查询当前令牌。
 
 界面冒烟使用 `ECHO_TEST_SMOKE_TEST=1` 隔离配置，MCP 启动冒烟显式传入 `--no-admin`，避免自动检查请求管理员权限或连接实际目标应用。普通调试可显式使用 `python app.py --no-admin` 或 `scripts/start-studio.ps1 -NoAdmin`；默认入口仍请求管理员权限。
+
+编辑器界面冒烟中的可配置全局快捷键使用隔离注册适配器，不争用用户当前应用的 F6/F7 等快捷键；快捷键注册失败与回滚由 `electron/tests/settings.test.cjs` 单独覆盖。

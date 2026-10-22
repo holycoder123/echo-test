@@ -27,3 +27,53 @@ test('missing anchors and cyclic snapshots cannot hang library reference travers
   ]}),['button','title']);
   assert.deepEqual(referenced({steps:[{target:'按钮'}],selectors:[{name:'按钮',kind:'image',anchor:'已删除',library_id:'button'}]}),['button']);
 });
+
+function deletionHarness({steps=[],accept=true,entries}={}){
+  const selector={name:'按钮',kind:'image',image:'assets/button.png',library_id:'button'};
+  const state={project:{steps,selectors:[selector]},controls:{
+    entries:entries||[{id:'button',selector}],categories:[],
+  }};
+  const calls=[];
+  const context=vm.createContext({
+    S:state,clone:structuredClone,lock:()=>false,
+    confirm:async()=>{calls.push('confirm');return accept;},
+    api:async(method,args)=>{
+      calls.push({method,args:JSON.parse(JSON.stringify(args))});
+      return {...state.controls,entries:state.controls.entries.filter(entry=>entry.id!==args.id)};
+    },
+    render:()=>calls.push('render'),
+  });
+  vm.runInContext(source,context);
+  return {state,calls,remove:()=>vm.runInContext("sharedControlAction('delete-target',{dataset:{i:'0'}})",context)};
+}
+test('deleting an unused image control confirms, deletes and refreshes the library',async()=>{
+  const h=deletionHarness();
+  assert.equal(await h.remove(),true);
+  assert.deepEqual(h.calls,['confirm',{method:'control_delete',args:{id:'button',current_ids:[]}},'render']);
+  assert.equal(h.state.controls.entries.length,0);
+  assert.equal(h.state.project.selectors.length,0);
+});
+test('cancelling control deletion leaves the library and project intact',async()=>{
+  const h=deletionHarness({accept:false});
+  await h.remove();
+  assert.deepEqual(h.calls,['confirm']);
+  assert.equal(h.state.controls.entries.length,1);
+  assert.equal(h.state.project.selectors.length,1);
+});
+test('deletion checks current step references even when they change after rendering',async()=>{
+  for(const step of [{target:'按钮'},{action:'drag',end_target:'按钮'},{action:'python',enabled:true}]){
+    const h=deletionHarness();
+    h.state.project.steps.push(step);
+    await assert.rejects(h.remove(),/当前用例/);
+    assert.deepEqual(h.calls,[]);
+    assert.equal(h.state.controls.entries.length,1);
+  }
+});
+test('deletion rejects controls used as positioning anchors',async()=>{
+  const h=deletionHarness({entries:[
+    {id:'button',selector:{name:'按钮',kind:'image'}},
+    {id:'child',selector:{name:'子控件',kind:'image',anchor:'按钮'}},
+  ]});
+  await assert.rejects(h.remove(),/定位锚点/);
+  assert.deepEqual(h.calls,[]);
+});

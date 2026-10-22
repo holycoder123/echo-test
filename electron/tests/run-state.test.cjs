@@ -3,6 +3,17 @@ const assert=require('node:assert/strict');
 const {RunState}=require('../run-state.cjs');
 const project={name:'邮件测试',steps:[{name:'打开邮件',action:'click',repeat:2},{name:'禁用步骤',action:'click',enabled:false},{name:'图片断言',action:'assert_image'}]};
 
+test('Python cases expose a runnable synthetic script and loop plans count source occurrences',()=>{
+  const state=new RunState();state.start({name:'脚本',mode:'python',code:'print(1)',steps:[]});
+  assert.equal(state.snapshot().steps.length,1);assert.equal(state.snapshot().total,1);
+  state.start({name:'循环',steps:[{name:'循环',action:'loop'},{name:'输入',action:'text'},{name:'结束',action:'end_loop'}]},2);
+  state.plan({counts:{1:63},total:126});
+  assert.equal(state.snapshot().total,126);assert.equal(state.snapshot().steps[1].repeatTotal,63);
+  assert.equal(state.snapshot().steps[0].status,'skipped');
+  for(let repeat=1;repeat<=63;repeat++)state.step({index:1,repeat,iteration:1,status:'passed'});
+  assert.equal(state.snapshot().completed,63);
+});
+
 test('recording replay retains its origin and report without an editor file path',()=>{
   const state=new RunState();state.start(project,1,null,'recording');
   state.finish({status:'stopped'},'/reports/replay-123');

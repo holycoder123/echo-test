@@ -3,14 +3,23 @@ class RunState {
   constructor() { this.value = null; this.completed = new Set(); }
   start(project, iterations = 1, file = null, source = 'case') {
     this.completed.clear();
-    const steps = (project.steps || []).map((step, index) => ({
+    const sourceSteps=project.mode==='python'?[{name:'Python 主程序',action:'python'}]:project.steps||[];
+    const steps = sourceSteps.map((step, index) => ({
       index, name: step.name, action: step.action, repeatTotal: step.repeat || 1,
-      status: step.enabled === false ? 'skipped' : 'pending',
+      status: step.enabled === false || ['loop','end_loop'].includes(step.action) ? 'skipped' : 'pending',
     }));
     this.value = {case: project.name, path: file, source, status: 'running', started: Date.now(),
       iterations, steps, current: null, completed: 0, passed: 0, failed: 0, stopped: 0,
       total: steps.filter(step => step.status !== 'skipped').reduce((sum, step) => sum + step.repeatTotal, 0) * iterations,
       error: '', reportId: null};
+  }
+  plan(event){
+    if(!this.value||this.value.status!=='running')return;
+    for(const row of this.value.steps){
+      const count=Number(event.counts?.[row.index]||0);
+      row.repeatTotal=count;row.status=count?'pending':'skipped';
+    }
+    this.value.total=event.total;
   }
   step(event) {
     if (!this.value || this.value.status !== 'running') return;

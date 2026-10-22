@@ -220,7 +220,7 @@ class Service:
         enabled = [step for step in project.steps if step.enabled]
         if len(project.steps) > 10 or not enabled or sum(step.repeat for step in enabled) > 10:
             raise ValueError("探索需启用步骤，最多执行 10 步（含重复）")
-        if any(step.action == "python" for step in project.steps):
+        if project.mode == 'python' or any(step.action in {'python', 'loop', 'end_loop', 'set_variable'} for step in project.steps):
             raise ValueError("探索接口不执行 Python 脚本，请保存为正式用例后运行")
         # Inline definitions are snapshots: do not import or resolve shared controls,
         # change the editor's base directory, or create any case/report files.
@@ -422,6 +422,21 @@ class Service:
                 self.recorder = None
 
     def call(self, method, args):
+        if method in {'generate_python', 'python_copy'}:
+            self.idle()
+            from .codegen import generate_python, python_copy
+            project = self.controls.resolve_project(Project.from_dict(args['project']), self.base_dir)
+            if method == 'generate_python':
+                return {'code': generate_python(project)}
+            return {'project': python_copy(project).to_dict()}
+        if method == 'case_context':
+            self.idle()
+            self.case_path = Path(args['path']).resolve() if args.get('path') else None
+            if self.case_path:
+                self.base_dir = self.case_path.parent
+            elif args.get('base_dir'):
+                self.base_dir = Path(args['base_dir']).resolve()
+            return {'path': str(self.case_path) if self.case_path else None, 'base_dir': str(self.base_dir)}
         if method == 'game_status':
             game=self.window(args['handle']);rect=wt.RECT()
             user32.GetWindowRect(game.handle,ct.byref(rect))
@@ -572,7 +587,8 @@ class Service:
         if method == "run":
             self.idle()
             project = self.controls.resolve_project(Project.from_dict(args["project"]), self.base_dir)
-            if not any(step.enabled for step in project.steps):
+            from .workflow import operation_counts
+            if not sum(operation_counts(project).values()):
                 raise ValueError("请先添加并启用步骤")
             iterations = int(args.get("iterations", 1))
             if not 1 <= iterations <= 1000:

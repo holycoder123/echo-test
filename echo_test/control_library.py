@@ -214,7 +214,7 @@ class ControlLibrary:
         resolved = {name: entry for name, entry in resolved.items() if entry is not None}
         renamed = {name: entry['selector']['name'] for name, entry in resolved.items()}
         project.selectors = list({entry['id']: Selector(**deepcopy(entry['selector'])) for entry in resolved.values()}.values())
-        if any(step.enabled and step.action == 'python' for step in project.steps):
+        if project.mode == 'python' or any(step.enabled and step.action == 'python' for step in project.steps):
             for original_name, entry in resolved.items():
                 if original_name != entry['selector']['name'] and not any(item.name == original_name for item in project.selectors):
                     alias = Selector(**deepcopy(entry['selector'])); alias.name = original_name; project.selectors.append(alias)
@@ -255,7 +255,7 @@ class ControlLibrary:
         by_id = {entry['id']: entry for entry in self.data['entries']}
         by_name = {entry['selector']['name']: entry for entry in self.data['entries']}
         names, selectors, aliases = {}, {}, []
-        has_python = any(step.enabled and step.action == 'python' for step in project.steps)
+        has_python = project.mode == 'python' or any(step.enabled and step.action == 'python' for step in project.steps)
         for original in project.selectors:
             if not original.library_id:
                 selectors[original.name] = original

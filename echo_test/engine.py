@@ -64,6 +64,10 @@ class Runner:
             from .scripting import execute_script
             execute_script(self, step, record if record is not None else {})
             return None
+        if action == 'set_variable':
+            from .workflow import assignment
+            self.script_variables[params['variable']] = assignment(params.get('value', ''), self.script_variables)
+            return None
         point = None
         if action in {"click", "double_click", "right_click", "long_press", "scroll", "drag", "wait_image", "assert_image"}:
             point = self.resolve(step.target, step.timeout)
@@ -97,7 +101,8 @@ class Runner:
         elif action == "key_up":
             self.backend.key_up(params.get("keys", "W"))
         elif action == "text":
-            self.backend.text(params.get("text", ""))
+            from .workflow import interpolate
+            self.backend.text(interpolate(params.get("text", ""), self.script_variables))
         elif action == "sleep":
             self.backend.pause(params.get("duration", 1))
         elif action == "screenshot":
@@ -116,54 +121,58 @@ class Runner:
             self.directory.mkdir(parents=True, exist_ok=True)
         try:
             self.project.validate()
+            from .workflow import operation_counts, workflow_work, iter_operations, MAX_OPERATIONS
+            counts = operation_counts(self.project)
+            total = sum(counts.values()) * iterations
+            if workflow_work(self.project) * iterations > MAX_OPERATIONS:
+                raise ValueError('本次运行的步骤总数不能超过 100000')
+            self.message(kind='run_plan', counts=counts, total=total)
             self.backend.activate()
             for iteration in range(1, iterations + 1):
-                for index, step in enumerate(self.project.steps):
-                    if not step.enabled:
-                        continue
-                    for repetition in range(1, step.repeat + 1):
-                        self.backend.pause(0)
-                        record = {"index": index, "name": step.name, "action": ACTIONS[step.action],
-                                  "iteration": iteration, "repeat": repetition, "status": "running"}
-                        self.result["steps"].append(record)
+                for index, step, repetition, loop_variables in iter_operations(self.project, self.script_variables, lambda: self.backend.pause(0)):
+                    self.backend.pause(0)
+                    record = {"index": index, "name": step.name, "action": ACTIONS[step.action],
+                              "iteration": iteration, "repeat": repetition, "status": "running",
+                              "loop_variables": loop_variables}
+                    self.result["steps"].append(record)
+                    self.message(kind="step", **record)
+                    started = time.monotonic()
+                    self.recognition = {}
+                    self.recognition_frame = None
+                    try:
+                        shot = self.execute(step, record)
+                        self.backend.pause(step.delay)
+                        record.update(status="passed", elapsed=round(time.monotonic() - started, 3))
+                        if self.recognition:
+                            record["recognition"] = self.recognition
+                        if shot:
+                            record["screenshot"] = shot
+                    except Exception as error:
+                        record.update(status="stopped" if self.backend.cancelled() else "failed", error=str(error), elapsed=round(time.monotonic() - started, 3))
+                        if self.recognition:
+                            record["recognition"] = self.recognition
+                            if self.persist_reports and self.recognition_frame is not None:
+                                from PIL import ImageDraw
+                                diagnostic_image = self.recognition_frame.copy()
+                                draw = ImageDraw.Draw(diagnostic_image)
+                                for detail in self.recognition.values():
+                                    candidate = detail.get("candidate")
+                                    if candidate:
+                                        x, y, w, h = candidate["box"]
+                                        draw.rectangle((x, y, x+w-1, y+h-1), outline="red", width=2)
+                                diagnostic_name = f"recognition_{index + 1}_{uuid4().hex[:6]}.png"
+                                diagnostic_image.save(self.directory / diagnostic_name)
+                                record["recognition_screenshot"] = diagnostic_name
+                        if self.persist_reports:
+                            try:
+                                filename = f"failure_{index + 1}_{uuid4().hex[:6]}.png"
+                                self.backend.capture().save(self.directory / filename)
+                                record["screenshot"] = filename
+                            except Exception as capture_error:
+                                record["capture_error"] = str(capture_error)
                         self.message(kind="step", **record)
-                        started = time.monotonic()
-                        self.recognition = {}
-                        self.recognition_frame = None
-                        try:
-                            shot = self.execute(step, record)
-                            self.backend.pause(step.delay)
-                            record.update(status="passed", elapsed=round(time.monotonic() - started, 3))
-                            if self.recognition:
-                                record["recognition"] = self.recognition
-                            if shot:
-                                record["screenshot"] = shot
-                        except Exception as error:
-                            record.update(status="stopped" if self.backend.cancelled() else "failed", error=str(error), elapsed=round(time.monotonic() - started, 3))
-                            if self.recognition:
-                                record["recognition"] = self.recognition
-                                if self.persist_reports and self.recognition_frame is not None:
-                                    from PIL import ImageDraw
-                                    diagnostic_image = self.recognition_frame.copy()
-                                    draw = ImageDraw.Draw(diagnostic_image)
-                                    for detail in self.recognition.values():
-                                        candidate = detail.get("candidate")
-                                        if candidate:
-                                            x, y, w, h = candidate["box"]
-                                            draw.rectangle((x, y, x+w-1, y+h-1), outline="red", width=2)
-                                    diagnostic_name = f"recognition_{index + 1}_{uuid4().hex[:6]}.png"
-                                    diagnostic_image.save(self.directory / diagnostic_name)
-                                    record["recognition_screenshot"] = diagnostic_name
-                            if self.persist_reports:
-                                try:
-                                    filename = f"failure_{index + 1}_{uuid4().hex[:6]}.png"
-                                    self.backend.capture().save(self.directory / filename)
-                                    record["screenshot"] = filename
-                                except Exception as capture_error:
-                                    record["capture_error"] = str(capture_error)
-                            self.message(kind="step", **record)
-                            raise
-                        self.message(kind="step", **record)
+                        raise
+                    self.message(kind="step", **record)
             self.result["status"] = "passed"
         except Exception as error:
             self.result.update(status="stopped" if self.backend.cancelled() else "failed", error=str(error))
@@ -188,6 +197,10 @@ class Runner:
             image = f'<a href="{escape(step["screenshot"])}">查看截图</a>' if step.get("screenshot") else ""
             script = f'<a href="{escape(step["script"])}">脚本源码</a> · <a href="{escape(step["output_file"])}">完整输出</a>' if step.get('script') else ''
             output = f'<details><summary>脚本输出</summary><pre>{escape(step["output"])}</pre></details>' if step.get('output') else ''
+            if step.get('operations'):
+                output += '<details><summary>脚本操作记录</summary><pre>' + escape(json.dumps(step['operations'], ensure_ascii=False, indent=2)) + '</pre></details>'
+                if step.get('operations_truncated'):
+                    output += '<p>脚本操作记录已达到保存上限；后续操作仍正常执行。</p>'
             if step.get("recognition"):
                 output += '<details><summary>识别诊断</summary><pre>' + escape(json.dumps(step["recognition"], ensure_ascii=False, indent=2)) + '</pre></details>'
             if step.get("recognition_screenshot"):

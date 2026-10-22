@@ -231,10 +231,11 @@ function receive(event) {
       selectedGame=null;publishConnection();if(busy)stopCurrent().catch(error=>auditError('toolbar.pair.stop',error));
     }
   }
+  if(event.kind==='run_plan')runState.plan(event);
   if(event.kind==='step')runState.step(event);
   if(event.kind==='finished')runState.finish(event.result,event.directory);
   if(['run_error','service_error'].includes(event.kind))runState.fail(event.message);
-  if(['step','finished','run_error','service_error'].includes(event.kind))publishRun();
+  if(['run_plan','step','finished','run_error','service_error'].includes(event.kind))publishRun();
   if(['record_error','run_error'].includes(event.kind)){
     const error=new Error(event.message);error.backendTrace=event.traceback;
     auditError(event.kind,error);event={...event,message:errorMessage(error),auditId:error.auditId};
@@ -408,6 +409,10 @@ async function dispatchStudioCall(role, method, args = {}) {
     const result=await dialog.showOpenDialog(window,{title:'导入 Python 脚本',properties:['openFile'],filters:[{name:'Python 脚本',extensions:['py']}]});
     if(result.canceled)return null;
     return bridge.call('script_import',{path:result.filePaths[0]});
+  }
+  if(method==='case_context'){
+    if(busy)throw new Error('请先停止录制或执行');
+    const data=await bridge.call(method,args);currentPath=data.path;dirty=true;sendGameState();return data;
   }
   if (method === 'import_template') {
     const result = await dialog.showOpenDialog(window, {title: '导入控件模板', properties: ['openFile'], filters: [{name: '图片', extensions: ['png', 'jpg', 'jpeg', 'bmp']}]});
@@ -618,7 +623,9 @@ app.whenReady().then(async () => {
   });
   restoreWorkbenchBounds();
   for(const event of ['resize','move'])window.on(event,saveWorkbenchBounds);
-  try{shortcutRegistry=new ShortcutRegistry(globalShortcut,shortcutAction);shortcutRegistry.replace(settings.shortcuts);}catch(error){send({kind:'notice',level:'warning',message:error.message+'，可在设置中调整后重试。'});auditError('shortcuts.start',error);}
+  // Editor smoke tests use isolated settings without taking the user's global hotkeys.
+  const shortcutApi=process.env.ECHO_TEST_SMOKE_TEST==='1'?{register:()=>true,unregister:()=>{}}:globalShortcut;
+  try{shortcutRegistry=new ShortcutRegistry(shortcutApi,shortcutAction);shortcutRegistry.replace(settings.shortcuts);}catch(error){send({kind:'notice',level:'warning',message:error.message+'，可在设置中调整后重试。'});auditError('shortcuts.start',error);}
   secureWindow(window);
   window.on('blur',restoreShortcuts);
   window.on('restore',()=>{if(busy==='selecting'){startGate.cancel();bridge.call('window_pick_cancel').catch(()=>{});}});
@@ -752,6 +759,8 @@ app.whenReady().then(async () => {
           await require('./tests/smoke/exploration-smoke.cjs').verify(window);
           await require('./tests/smoke/sidebar-smoke.cjs').verify(gameWindow);
           await require('./tests/smoke/script-smoke.cjs').verify(window);
+          await require('./tests/smoke/case-modes-smoke.cjs').verify(window);
+          await require('./tests/smoke/python-completion-smoke.cjs').verify(window);
           await require('./tests/smoke/recognition-smoke.cjs').verify(window);
           await require('./tests/smoke/help-smoke.cjs').verify(window,gameWindow);
           await require('./tests/smoke/shared-controls-smoke.cjs').verify(window);

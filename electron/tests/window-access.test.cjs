@@ -3,6 +3,13 @@ const assert=require('node:assert/strict');
 const {authorize}=require('../window-access.cjs');
 function surface(page){const frame={url:`echo-test://studio/${page}`};return {isDestroyed:()=>false,webContents:{mainFrame:frame}};}
 function event(win){return {sender:win.webContents,senderFrame:win.webContents.mainFrame};}
+test('only workbench can generate or copy Python cases and change draft context',()=>{
+  const main=surface('index.html'),game=surface('game.html');
+  for(const method of ['generate_python','python_copy','case_context']){
+    assert.equal(authorize(event(main),main,game,method,{}),'main');
+    assert.throws(()=>authorize(event(game),main,game,method,{}));
+  }
+});
 test('window connections are limited to the workbench and removed embedding methods are rejected',()=>{
   const main=surface('index.html'),game=surface('game.html');
   assert.equal(authorize(event(main),main,game,'game_connect',{}),'main');

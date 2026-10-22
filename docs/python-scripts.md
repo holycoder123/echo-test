@@ -1,5 +1,35 @@
 # Python 脚本步骤
 
+## 两种用例模式
+
+测试用例页提供低代码模式和 Python 模式。已有用例默认按低代码模式打开，原有录制、步骤、控件和报告继续可用。
+
+低代码模式通过「添加步骤」添加「循环步骤组」和「设置变量」。循环开始与结束之间的步骤构成循环体；选中开始标记后添加的步骤会放入循环体。起止值均包含，步长可为负数，每组最多 1000 轮，最多嵌套 8 层。复制、删除或拖动循环标记会处理整个组；禁用循环开始会跳过组内操作。单次运行总步骤和循环控制工作量均有上限。
+
+「设置变量」填写变量名和变量值；值按 JSON 解析，不能解析时作为文本。例如 `2` 为数字，`"2"` 为字符串。输入文本和变量赋值支持 `${变量名}` 替换，未定义变量会明确报错并停止后续操作。循环变量保存在同一个 `variables` 字典中，循环结束后保留最后一次值，每次运行用例时重新初始化。
+
+「预览 Python」只读展示生成代码；「创建 Python 副本」生成独立编辑内容，保存时使用新用例路径，原文件不会被覆盖。低代码原稿（包括未保存修改）保留在本次编辑中，可用「返回低代码原稿」恢复。Python 编辑后的任意逻辑不自动转换回低代码；返回原稿前仍会按通常流程提示保存当前修改。
+
+「新建 Python 用例」可直接编写整个用例的主程序，支持导入 UTF-8 `.py` 文件、Tab 缩进、用例循环和 0.1～600 秒执行超时。右侧可搜索共享控件、查看预览并在光标处插入引用。控件引用使用稳定 ID，改名后继续引用当前配置；每次操作重新定位，不缓存第一次识别到的坐标。引用既可传给 `window`，也可传给自定义函数：
+
+```python
+button = controls["执行按钮"]
+
+def submit(target, command):
+    window.text(command)
+    window.click(target)
+
+for i in range(2, 65):
+    submit(button, f"go_to_function_thread {i}")
+    window.sleep(3)
+```
+
+编辑器插入的形式为 `controls.by_id("控件ID")`。`controls["名称"]` 也返回引用；直接使用 `window.click("名称")` 保持兼容。Python API 调用和结果记录在运行报告中，最多保留 1000 条且限制总大小，超限会标注截断。生成代码中的 `render(text)`、`assign(name, value)`、`run_script(code, timeout=...)` 由运行环境提供，分别保持低代码变量替换、变量赋值和局部脚本的行为。
+
+## 低代码中的 Python 步骤
+
+Python 主编辑器、步骤代码框和展开编辑窗口均支持 `window` 函数补全。输入 `window.` 显示可用函数，继续输入名称可筛选；列表展示完整参数签名和中文说明。使用上下键选择、Enter / Tab 插入、Esc 关闭，或用鼠标选择；`Ctrl+Space` 可重新唤起提示。插入函数后光标停留在参数位置，无参数函数则停在调用末尾。注释、字符串和只读预览中不显示补全。
+
 在测试用例页点击「添加步骤」→「Python 脚本」。右侧可以直接输入代码、展开编辑，或导入 UTF-8 编码的 `.py` 文件。导入会复制文件内容到用例中，不会执行文件；保存或另存为后，代码仍包含在 JSON 用例内。外部模块和数据文件需要随用例另行携带。
 
 脚本按步骤顺序执行，支持启用、重复和用例循环。默认执行超时为 30 秒，可在步骤的「更多设置」中设为 0.1～600 秒。停止按钮与 F12 可停止脚本，包括普通 `time.sleep()` 和死循环；每个步骤结束时会清理脚本进程及其启动的子进程。脚本在独立进程中运行，使用与工作台后端相同的 Python 解释器、依赖和 Windows 权限，可按这些权限访问文件和网络。
@@ -10,7 +40,9 @@
 
 | 对象 | 用途 |
 |---|---|
-| `game` | 操作当前连接的目标应用；控件名称使用当前用例的控件库 |
+| `window` | 操作当前连接的目标应用；控件名称使用当前用例的控件库 |
+| `game` | 旧脚本兼容别名，与 `window` 为同一个对象；新脚本使用 `window` |
+| `controls` | `controls["控件名称"]` 或 `controls.by_id("ID")` 获取可传参的控件引用 |
 | `case_dir` | 用例目录的 `pathlib.Path`；也是脚本工作目录和本地模块搜索路径 |
 | `report_dir` | 本次运行报告目录的 `pathlib.Path` |
 | `step_name` | 当前步骤名称 |
@@ -24,29 +56,29 @@
 
 | 调用 | 功能 |
 |---|---|
-| `game.size()` | 返回客户区 `(width, height)` |
-| `game.locate("按钮", timeout=5)` | 定位坐标或图片控件，返回 `(x, y)` |
-| `game.click("按钮")` | 单击控件；支持 `button`、`count`、`interval`、`hold`、`timeout` |
-| `game.click((100, 200), count=2)` | 双击客户区位置 |
-| `game.drag("起点", "终点", duration=1)` | 拖动，起终点也可使用像素坐标 |
-| `game.scroll("列表", amount=-3, axis="vertical")` | 滚动；`horizontal` 为水平方向 |
-| `game.key("CTRL+A")` | 按键或组合键 |
-| `game.key_down("W")` / `game.key_up("W")` | 按住、松开按键；运行结束会释放工具持有的按键 |
-| `game.text("测试文本")` | 输入文本 |
-| `game.sleep(1)` | 可停止的等待 |
-| `game.assert_image("完成提示", timeout=5)` | 等待并断言图片控件存在 |
-| `game.assert_absent("加载提示", timeout=5)` | 在等待期间断言图片控件持续不存在 |
-| `game.screenshot()` | 保存 PNG 到报告目录，返回路径 `Path` |
-| `game.capture()` | 保存截图并返回 `PIL.Image.Image`，可用于自定义识别 |
+| `window.size()` | 返回客户区 `(width, height)` |
+| `window.locate("按钮", timeout=5)` | 定位坐标或图片控件，返回 `(x, y)` |
+| `window.click("按钮")` | 单击控件；支持 `button`、`count`、`interval`、`hold`、`timeout` |
+| `window.click((100, 200), count=2)` | 双击客户区位置 |
+| `window.drag("起点", "终点", duration=1)` | 拖动，起终点也可使用像素坐标 |
+| `window.scroll("列表", amount=-3, axis="vertical")` | 滚动；`horizontal` 为水平方向 |
+| `window.key("CTRL+A")` | 按键或组合键 |
+| `window.key_down("W")` / `window.key_up("W")` | 按住、松开按键；运行结束会释放工具持有的按键 |
+| `window.text("测试文本")` | 输入文本 |
+| `window.sleep(1)` | 可停止的等待 |
+| `window.assert_image("完成提示", timeout=5)` | 等待并断言图片控件存在 |
+| `window.assert_absent("加载提示", timeout=5)` | 在等待期间断言图片控件持续不存在 |
+| `window.screenshot()` | 保存 PNG 到报告目录，返回路径 `Path` |
+| `window.capture()` | 保存截图并返回 `PIL.Image.Image`，可用于自定义识别 |
 
-`game` 操作通过工作台原有的定位和输入流程执行，使用当前连接窗口，并响应停止按钮和 F12。导入标准库或已安装第三方库即可扩展逻辑。
+`window` 操作通过工作台原有的定位和输入流程执行，使用当前连接窗口，并响应停止按钮和 F12。导入标准库或已安装第三方库即可扩展逻辑。
 
 ```python
-print("目标应用尺寸：", game.size())
-game.click("任务按钮")
-game.assert_image("任务面板", timeout=5)
+print("目标应用尺寸：", window.size())
+window.click("任务按钮")
+window.assert_image("任务面板", timeout=5)
 variables["任务面板已打开"] = True
-game.screenshot()
+window.screenshot()
 ```
 
 可在空白用例中新增 Python 步骤，按上方 API 示例编写逻辑；仓库不附带预置用例。

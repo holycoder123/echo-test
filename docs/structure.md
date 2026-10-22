@@ -6,6 +6,7 @@ JSON 用例包含版本、控件和步骤，也可保存显式添加的 Python �
 |---|---|
 | electron/main.cjs、preload.cjs | 桌面窗口、文件对话框、受限 IPC、Python 进程通信 |
 | electron/renderer/app.js | 工作台页面、表单、截图选择器、录制预览 |
+| electron/renderer/case-modes.js、python-completion.js | 双模式编辑、循环组、控件参数插入及窗口 API 函数补全 |
 | electron/renderer/game.html、game.js、game.css | 目标应用原生窗口旁的浮动工具栏 |
 | electron/window-access.cjs | 按工作台与工具栏限制 IPC 权限 |
 | echo_test/native_windows.py | 原生窗口查询、位置与 Win32 事件声明 |
@@ -18,6 +19,7 @@ JSON 用例包含版本、控件和步骤，也可保存显式添加的 Python �
 | echo_test/recording.py | 将原始事件转换为控件和可编辑步骤 |
 | echo_test/models.py、vision.py | 数据校验、保存和图片定位 |
 | echo_test/backend.py、engine.py | Windows 输入、取消与释放、顺序执行和报告 |
+| echo_test/workflow.py、codegen.py | 循环执行计划、变量替换与低代码生成独立 Python 副本 |
 | echo_test/scripting.py、script_worker.py、script_process.py | 脚本导入、独立进程执行、目标应用操作通信、超时和停止、子进程清理 |
 
 界面关闭 Node 集成，启用上下文隔离和沙箱；只允许本地页面通过白名单调用后端。参考 [Electron 安全指南](https://www.electronjs.org/docs/latest/tutorial/security) 与 [Windows SetWindowsHookEx 文档](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowshookexw)。

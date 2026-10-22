@@ -3,7 +3,7 @@ const SHARED_CONTROL_ACTIONS=new Set(['choose-control','picker-category','picker
 
 function projectControlIds(){
   const names=new Set(S.project.steps.flatMap(step=>[step.target,step.end_target]).filter(Boolean));
-  const all=S.project.steps.some(step=>step.enabled!==false&&step.action==='python');
+  const all=S.project.mode==='python'||S.project.steps.some(step=>step.enabled!==false&&step.action==='python');
   const queue=[...names];
   while(queue.length){const name=queue.pop(),target=S.project.selectors.find(item=>item.name===name);if(target?.kind==='image'&&target.anchor&&!names.has(target.anchor)){names.add(target.anchor);queue.push(target.anchor);}}
   return S.project.selectors.filter(target=>all||names.has(target.name)).map(target=>target.library_id).filter(Boolean);
@@ -21,7 +21,7 @@ function syncProjectControls(){
   const previous=JSON.stringify(S.project);
   const byId=new Map(S.controls.entries.map(entry=>[entry.id,entry.selector]));
   const names=new Map(),selectors=new Map(),aliases=[];
-  const hasPython=S.project.steps.some(step=>step.enabled!==false&&step.action==='python');
+  const hasPython=S.project.mode==='python'||S.project.steps.some(step=>step.enabled!==false&&step.action==='python');
   for(const original of S.project.selectors){
     const shared=byId.get(original.library_id);
     if(!shared){selectors.set(original.name,clone(original));continue;}
@@ -210,7 +210,7 @@ async function sharedControlAction(action,node){
     const entry=S.controls.entries[index];
     if(!entry)throw new Error('控件已不存在，请刷新');
     if(S.controls.entries.some(row=>row.id!==entry.id&&row.selector.anchor===entry.selector.name))throw new Error('这个控件仍被用作定位锚点');
-    const used=usedIds.has(entry.id);
+    const used=projectControlIds().includes(entry.id);
     if(used)throw new Error('这个控件仍被当前用例使用，请先移除对应引用');
     if(await confirm(`删除通用控件「${entry.selector.name}」？`,'已被用例或定位锚点引用的控件无法删除。')){
       setControls(await api('control_delete',{id:entry.id,current_ids:projectControlIds()}));S.project.selectors=S.project.selectors.filter(item=>item.library_id!==entry.id);render();

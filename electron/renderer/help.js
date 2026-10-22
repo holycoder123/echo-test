@@ -44,6 +44,7 @@ window.StudioHelp = (() => {
       <p>便携版已内置本地中英文 OCR 模型和 64 位 Python。可运行 <code>verify_portable.cmd</code> 检查环境；若缺少文件，重新解压完整便携包。源码目录可联网运行 <code>install_dependencies.cmd</code> 准备私有环境。UI 缩放、皮肤或分辨率变化后，需要重新校准。</p>`},
     {id:'steps',title:'编排步骤与验证结果',keywords:'添加步骤 拖动 排序 双击 长按 等待 断言',body:`
       <p>在「测试用例」页点击「添加步骤」，选择操作并在右侧编辑目标控件和参数。可拖动排序、复制、删除、启用／禁用步骤，以及设置重复次数、超时和步骤后等待。</p>
+      <p>低代码模式可添加「循环步骤组」和「设置变量」。循环包含结束值，支持负数步长和嵌套；开始与结束标记之间是循环体，拖动、复制、删除标记会处理整组。文本可用 <code>变量占位符</code> 引用已设置的变量，格式是在美元符号后用花括号包住变量名，例如 i。</p>
       <table><thead><tr><th>类型</th><th>常用步骤</th></tr></thead><tbody>
       <tr><td>鼠标</td><td>单击、双击、右键、长按、拖动、滚动；拖动需设置起点与终点控件。</td></tr>
       <tr><td>键盘与文字</td><td>按键组合，如 <code>CTRL+A</code>、<code>ENTER</code>；按下／松开按键；输入文本前先聚焦输入框。</td></tr>
@@ -56,14 +57,16 @@ window.StudioHelp = (() => {
       <p>运行区域显示实际用例名称、当前步骤、轮次、耗时、进度以及通过／失败数量。独立工具栏的步骤结果默认展开，长名称和错误详情可以滚动查看。</p>
       <p>失败会停止后续步骤。点击「停止执行」或按 <kbd>F12</kbd> 中止；运行结束会释放工具持有的按键和鼠标。运行期间不要切换目标应用焦点、最小化目标应用或切换显示模式。</p>
       <p>完成后在「运行记录」查看结果并打开本地 HTML 报告。执行日志和历史报告可逐条勾选或全选当前列表后删除，删除前会确认，报告截图及脚本输出会一并删除。报告位于 <code>reports/&lt;运行编号&gt;</code>，包含步骤状态、耗时、错误和截图；识别失败时还有候选框及诊断。</p>`},
-    {id:'scripts',title:'Python 脚本步骤',keywords:'自定义 代码 导入 print variables game API',body:`
+    {id:'scripts',title:'Python 模式与脚本步骤',keywords:'自定义 代码 导入 print variables window API 双模式 控件参数 生成代码',body:`
+      <p>测试用例顶部可预览低代码生成的 Python，或创建可独立编辑的 Python 副本。副本保存为新用例，低代码原稿保留，可点击「返回低代码原稿」恢复。自由编辑的 Python 不自动转换回步骤。</p>
+      <p>Python 模式右侧可搜索、预览共享控件，点击「插入控件引用」在光标处插入 <code>controls.by_id("ID")</code>，可作为 <code>window.click</code> 或自定义函数的参数。<code>controls["控件名称"]</code> 也返回引用，每次操作重新定位。</p>
       <p>选择「添加步骤 → Python 脚本」，可直接编写、展开编辑或导入 UTF-8 编码的 <code>.py</code> 文件。导入复制代码到用例中，点击运行才执行。代码会随 JSON 用例保存。</p>
       <p>默认超时 30 秒，更多设置中可调整；输出和异常行号进入报告，F12 可以停止。脚本使用工作台后端的 Python 环境和权限，外部模块与数据文件需要另行携带。</p>
-      <pre><code>print("目标应用尺寸：", game.size())
-game.click("任务按钮")
-game.assert_image("任务列表标题", timeout=5)
-game.screenshot()</code></pre>
-      <p>将示例中的控件名称替换成当前控件库中的名称。常用调用：<code>game.key("ENTER")</code>、<code>game.text("测试文本")</code>、<code>game.sleep(1)</code>。</p>
+      <pre><code>print("目标应用尺寸：", window.size())
+window.click("任务按钮")
+window.assert_image("任务列表标题", timeout=5)
+window.screenshot()</code></pre>
+      <p>将示例中的控件名称替换成当前控件库中的名称。常用调用：<code>window.key("ENTER")</code>、<code>window.text("测试文本")</code>、<code>window.sleep(1)</code>。</p>
       <p>内置对象包括 <code>case_dir</code>、<code>report_dir</code>、<code>step_name</code> 和 <code>variables</code>。每个脚本步骤使用独立进程；跨步骤数据放入可 JSON 保存的 <code>variables</code> 字典。</p>`},
     {id:'files',title:'保存、设置与快捷键',keywords:'文件 目录 assets 另存为 Ctrl+S F1 日志',body:`
       <p>表单修改先保留在当前编辑内容中，点击「保存」写入磁盘。未保存修改会显示圆点或「未保存」提示。</p>

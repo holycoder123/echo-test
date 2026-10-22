@@ -50,14 +50,18 @@ const selectorSchema = z.object({
   if (value.kind === 'coordinate' && value.normalized && (value.x > 1 || value.y > 1)) ctx.addIssue({code:'custom',message:'Normalized coordinates must be in 0..1'});
 });
 const actionNames = ['click','double_click','right_click','long_press','drag','scroll','wait_image','assert_image','assert_absent',
-  'key','text','sleep','screenshot','key_down','key_up','python'];
+  'key','text','sleep','screenshot','key_down','key_up','python','loop','end_loop','set_variable'];
+const pythonCode=z.string().max(256*1024).refine(value=>Buffer.byteLength(value,'utf8')<=256*1024,'Python source exceeds 256 KB');
 const paramsSchema = z.object({
   duration: finite.min(.01).max(600).optional(), interval: finite.min(.01).max(600).optional(),
   amount: z.int().min(-100).max(100).refine(value => value !== 0).optional(),
   axis: z.enum(['vertical','horizontal']).optional(), keys: keys.optional(), text: z.string().max(4000).optional(),
   path: z.array(z.tuple([finite.min(0).max(1),finite.min(0).max(1)])).max(5000).optional(),
   button: z.enum(['left','right','middle']).optional(),
-  code: z.string().max(256*1024).refine(value=>Buffer.byteLength(value,'utf8')<=256*1024,'Python source exceeds 256 KB').optional(),
+  code: pythonCode.optional(),
+  variable:z.string().min(1).max(100).regex(/^[\p{L}_][\p{L}\p{N}_]*$/u).optional(),
+  value:z.string().max(4000).optional(),start:z.int().min(-1e12).max(1e12).optional(),
+  end:z.int().min(-1e12).max(1e12).optional(),step:z.int().min(-1e12).max(1e12).optional(),
 }).strict();
 const stepSchema = z.object({
   name: label.default('单击控件'), action: z.enum(actionNames).default('click'),
@@ -71,8 +75,27 @@ const stepSchema = z.object({
 const targetActions = new Set(['click','double_click','right_click','long_press','drag','scroll','wait_image','assert_image','assert_absent']);
 const imageActions = new Set(['wait_image','assert_image','assert_absent']);
 const projectSchema = z.object({name:label.default('目标应用测试用例'), schema_version:z.literal(1).default(1),
+  mode:z.enum(['lowcode','python']).default('lowcode'),code:pythonCode.default(''),script_timeout:finite.min(.1).max(600).default(600),
   selectors:z.array(selectorSchema).max(5000).default([]), steps:z.array(stepSchema).max(10000).default([]),
 }).strict().superRefine((value, ctx) => {
+  if(value.mode==='python'&&!value.code.trim())ctx.addIssue({code:'custom',path:['code'],message:'Python case code must not be blank'});
+  const stack=[];let multiplier=1,total=0,work=0;
+  for(const [index,row] of value.steps.entries()){
+    if(value.mode==='python')break;
+    if(row.action==='loop'){
+      const {start=1,end=10,step=1}=row.params;
+      const count=step&&Math.sign(end-start)*Math.sign(step)>=0?Math.floor(Math.abs(end-start)/Math.abs(step))+1:0;
+      if(!count||count>1000)ctx.addIssue({code:'custom',path:['steps',index,'params'],message:'Loop needs a nonzero stride in range direction and at most 1000 iterations'});
+      stack.push(multiplier);if(stack.length>8)ctx.addIssue({code:'custom',path:['steps',index],message:'Loops support at most 8 nesting levels'});
+      multiplier*=row.enabled?count:0;work+=multiplier;
+    }else if(row.action==='end_loop'){
+      if(!stack.length)ctx.addIssue({code:'custom',path:['steps',index],message:'Loop end has no start'});
+      multiplier=stack.pop()??1;
+    }else if(row.enabled){total+=multiplier*row.repeat;work+=multiplier*row.repeat;}
+    if(row.action==='set_variable'&&!row.params.variable)ctx.addIssue({code:'custom',path:['steps',index,'params','variable'],message:'Assignment needs a variable name'});
+  }
+  if(stack.length)ctx.addIssue({code:'custom',path:['steps'],message:'Loop start has no end'});
+  if(total>100000||work>100000)ctx.addIssue({code:'custom',path:['steps'],message:'Expanded execution exceeds 100000 operations'});
   const selectors = new Map();
   for (const [index, selector] of value.selectors.entries()) {
     if (selectors.has(selector.name)) ctx.addIssue({code:'custom',path:['selectors',index,'name'],message:'Duplicate selector name'});
@@ -89,7 +112,7 @@ const projectSchema = z.object({name:label.default('目标应用测试用例'), 
     }
   }
   for (const [index, step] of value.steps.entries()) {
-    if (!step.enabled) continue;
+    if (!step.enabled||value.mode==='python') continue;
     if (targetActions.has(step.action) && !selectors.has(step.target)) ctx.addIssue({code:'custom',path:['steps',index,'target'],message:'Target selector does not exist'});
     if (step.action === 'drag' && !selectors.has(step.end_target)) ctx.addIssue({code:'custom',path:['steps',index,'end_target'],message:'Drag end selector does not exist'});
     if (imageActions.has(step.action) && selectors.get(step.target)?.kind !== 'image') ctx.addIssue({code:'custom',path:['steps',index,'target'],message:'Image action needs an image selector'});
@@ -97,10 +120,10 @@ const projectSchema = z.object({name:label.default('目标应用测试用例'), 
 });
 // Exploration shares the case model, but runs a bounded fragment without saving it.
 const explorationStepSchema=stepSchema.safeExtend({
-  action:z.enum(actionNames.filter(action=>action!=='python')).default('click'),
+  action:z.enum(actionNames.filter(action=>!['python','loop','end_loop','set_variable'].includes(action))).default('click'),
   repeat:z.int().min(1).max(10).default(1),
 });
-const explorationProjectSchema=projectSchema.safeExtend({steps:z.array(explorationStepSchema).min(1).max(10)});
+const explorationProjectSchema=projectSchema.safeExtend({mode:z.literal('lowcode').default('lowcode'),steps:z.array(explorationStepSchema).min(1).max(10)});
 const explorationSchema = z.object({project:explorationProjectSchema,timeout:finite.min(1).max(30).default(15)}).strict().superRefine((value,ctx)=>{
   const steps=value.project.steps;
   if(steps.filter(step=>step.enabled).reduce((count,step)=>count+step.repeat,0)>10)

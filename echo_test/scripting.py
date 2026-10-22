@@ -55,6 +55,7 @@ def execute_script(runner, step, record):
                                stderr=subprocess.PIPE, text=True, encoding='utf-8', errors='replace',
                                creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     deadline = time.monotonic() + step.timeout
+    scope_deadlines = []
     messages = queue.Queue(maxsize=256)
     reading_done = threading.Event()
     readers = []
@@ -94,6 +95,8 @@ def execute_script(runner, step, record):
             log_file.write('\n[脚本输出超过 256 KB，后续输出已省略]\n'); log_file.flush()
     def check():
         runner.backend.pause(0)
+        if scope_deadlines and time.monotonic() >= min(scope_deadlines):
+            raise TimeoutError('低代码 Python 步骤超过设定超时，已终止')
         if time.monotonic() >= deadline:
             raise TimeoutError(f'Python 脚本超过 {step.timeout:g} 秒，已终止')
     def reply(message):
@@ -107,7 +110,8 @@ def execute_script(runner, step, record):
             window = getattr(runner.backend, 'window', None)
             reply({'filename': str(source.resolve()), 'case_dir': str(base_dir), 'report_dir': str(runner.directory.resolve()),
                    'step_name': step.name, 'variables': runner.script_variables,
-                   'game': {'handle': getattr(window, 'handle', None), 'pid': getattr(window, 'pid', None)}})
+                   'selectors': [{'name': s.name, 'library_id': s.library_id} for s in runner.project.selectors],
+                   'window': {'handle': getattr(window, 'handle', None), 'pid': getattr(window, 'pid', None)}})
             ended = set()
             while True:
                 check()
@@ -141,14 +145,40 @@ def execute_script(runner, step, record):
                     variables = event.get('variables')
                     if not isinstance(variables, dict):
                         raise RuntimeError('Python 脚本返回了无效的 variables')
-                    runner.script_variables = variables
+                    runner.script_variables.clear()
+                    runner.script_variables.update(variables)
                     return
                 elif kind == 'call':
+                    if event.get('method') == 'begin_step':
+                        from .models import number
+                        timeout = event.get('args', {}).get('timeout')
+                        number(timeout, 'Python 步骤超时', .1, 600)
+                        if len(scope_deadlines) >= 8:
+                            raise ValueError('Python 步骤最多嵌套 8 层')
+                        scope_deadlines.append(time.monotonic()+timeout)
+                        reply({'ok': True})
+                        continue
+                    if event.get('method') == 'end_step':
+                        if not scope_deadlines:
+                            raise ValueError('Python 步骤超时作用域无效')
+                        scope_deadlines.pop()
+                        reply({'ok': True})
+                        continue
+                    operation = {'method': event.get('method'), 'args': event.get('args'), 'status': 'running'}
+                    operations = record.setdefault('operations', [])
+                    operation_size = len(json.dumps(operation, ensure_ascii=True))
+                    if len(operations) < 1000 and record.get('operations_size', 0)+operation_size <= MAX_OUTPUT:
+                        operations.append(operation)
+                        record['operations_size'] = record.get('operations_size', 0)+operation_size
+                    else:
+                        record['operations_truncated'] = True
                     try:
-                        value = game_call(runner, event.get('method'), event.get('args'), deadline)
+                        value = game_call(runner, event.get('method'), event.get('args'), min([deadline]+scope_deadlines))
                         check()
+                        operation['status'] = 'passed'
                         reply({'ok': True, 'value': value})
                     except Exception as error:
+                        operation.update(status='stopped' if runner.backend.cancelled() else 'failed', error=str(error))
                         check()  # Cancellation and step deadline cannot be caught by user code.
                         reply({'ok': False, 'error': str(error)})
                 else:
@@ -185,6 +215,7 @@ def game_call(runner, method, args, deadline):
             raise TimeoutError('目标应用操作所需时间超过脚本剩余时间')
         return value
     def target(value):
+        value = target_name(value)
         if isinstance(value, str):
             if value not in runner.targets:
                 raise ValueError(f'控件不存在：{value}')
@@ -196,6 +227,21 @@ def game_call(runner, method, args, deadline):
                 number(coordinate_value, '坐标', 0, 100000)
             return coordinate(Selector('脚本坐标', normalized=False, x=value[0], y=value[1]), backend.size())
         raise ValueError('目标需要控件名称或客户区像素坐标 (x, y)')
+    def target_name(value):
+        if isinstance(value, dict):
+            if set(value) == {'control_id'}:
+                from dataclasses import asdict
+                matches = [s for s in runner.targets.values() if s.library_id == value['control_id']]
+                # The control library appends historical-name aliases after the
+                # current definition. Equivalent aliases refer to one control.
+                definitions = [{key: item for key, item in asdict(s).items() if key != 'name'} for s in matches]
+                if not matches or any(item != definitions[0] for item in definitions[1:]):
+                    raise ValueError(f'控件标识不存在或不唯一：{value["control_id"]}')
+                return matches[0].name
+            if set(value) == {'control_name'} and isinstance(value['control_name'], str):
+                return value['control_name']
+            raise ValueError('控件引用无效')
+        return value
     if method == 'size':
         return backend.size()
     if method == 'locate':
@@ -214,7 +260,25 @@ def game_call(runner, method, args, deadline):
         backend.click(point, count=count, button=button, interval=interval, hold=hold)
     elif method == 'drag':
         start, end = target(args.get('start')), target(args.get('end'))
-        backend.drag(start, end, duration(args.get('duration', 1)))
+        start = target(args.get('start'))
+        extra = {}
+        path = args.get('path')
+        if path:
+            if not isinstance(path, list) or len(path) > 5000:
+                raise ValueError('无效的拖动轨迹')
+            for point in path:
+                if not isinstance(point, (list, tuple)) or len(point) != 2:
+                    raise ValueError('拖动轨迹点必须是 [x,y]')
+                for value in point:
+                    number(value, '轨迹比例', 0, 1)
+            width, height = backend.size()
+            extra['path'] = [(round(x*(width-1)), round(y*(height-1))) for x, y in path]
+        button = args.get('button', 'left')
+        if button not in {'left', 'right', 'middle'}:
+            raise ValueError('不支持的鼠标按钮')
+        if button != 'left':
+            extra['button'] = button
+        backend.drag(start, end, duration(args.get('duration', 1)), **extra)
     elif method == 'scroll':
         amount, axis = args.get('amount', -3), args.get('axis', 'vertical')
         if type(amount) is not int or not -100 <= amount <= 100 or amount == 0 or axis not in {'vertical', 'horizontal'}:
@@ -228,7 +292,7 @@ def game_call(runner, method, args, deadline):
     elif method == 'sleep':
         backend.pause(duration(args.get('seconds', 0)))
     elif method in {'assert_image', 'assert_absent'}:
-        name = args.get('target')
+        name = target_name(args.get('target'))
         if name not in runner.targets or runner.targets[name].kind != 'image':
             raise ValueError('图片断言需要图片控件名称')
         timeout = args.get('timeout', 5)

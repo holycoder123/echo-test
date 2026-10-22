@@ -2,6 +2,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -192,6 +193,84 @@ time.sleep(100)
         result = self.run_code('try:\n    game.locate("不存在")\nexcept RuntimeError as error:\n    print("已处理", error)\n')
         self.assertEqual(result['status'], 'passed')
         self.assertIn('控件不存在', result['steps'][0]['output'])
+
+    def test_controls_are_lazy_function_arguments_and_operations_are_recorded(self):
+        code = '''
+def click_twice(control):
+    game.click(control)
+    game.click(control)
+click_twice(controls["按钮"])
+'''
+        result = self.run_code(code)
+        self.assertEqual(result['status'], 'passed', result.get('error'))
+        self.assertEqual([operation['status'] for operation in result['steps'][0]['operations']], ['passed', 'passed'])
+        self.assertEqual(result['steps'][0]['operations'][0]['args']['target'], {'control_name': '按钮'})
+
+    def test_stable_control_id_survives_rename_and_failed_operation_is_traced(self):
+        project = Project(mode='python', code='''
+ref = controls.by_id("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+game.click(ref)
+try:
+    game.click("不存在")
+except RuntimeError:
+    pass
+''', selectors=[Selector('改名后', x=10, y=20, normalized=False, library_id='a'*32)])
+        runner = Runner(self.backend, project, self.root, self.root/'reports')
+        result = runner.run()
+        self.assertEqual(result['status'], 'passed', result.get('error'))
+        self.assertEqual([operation['status'] for operation in result['steps'][0]['operations']], ['passed', 'failed'])
+        self.assertIn('控件不存在', result['steps'][0]['operations'][1]['error'])
+
+    def test_script_operation_trace_has_size_and_count_limits(self):
+        result = self.run_code('for i in range(1100):\n    game.text("x" * 1000)\n', timeout=10)
+        self.assertEqual(result['status'], 'passed', result.get('error'))
+        record = result['steps'][0]
+        self.assertTrue(record['operations_truncated'])
+        self.assertLessEqual(len(record['operations']), 1000)
+        self.assertLessEqual(record['operations_size'], 256*1024)
+        self.assertEqual(sum(c[0] == 'text' for c in self.backend.calls), 1100)
+
+    def test_stable_id_accepts_current_name_and_retained_rename_alias(self):
+        project = Project(mode='python', code='''
+game.click(controls.by_id("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
+game.click(controls["旧名称"])
+game.click(controls["新名称"])
+''', selectors=[Selector(name, x=31, y=47, normalized=False, library_id='a'*32)
+                for name in ['新名称', '旧名称']])
+        runner = Runner(self.backend, project, self.root, self.root/'reports')
+        result = runner.run()
+        self.assertEqual(result['status'], 'passed', result.get('error'))
+        self.assertEqual([c[1] for c in self.backend.calls if c[0] == 'click'], [(31, 47)]*3)
+
+    def test_window_is_primary_api_and_legacy_game_is_same_instance(self):
+        result = self.run_code('''
+assert window is game
+assert type(window).__name__ == "Window"
+assert window.size() == (200, 120)
+def submit(target, value):
+    window.click(target)
+    window.text(value)
+submit(controls["按钮"], "窗口主接口")
+run_script('assert window is game; window.key("ENTER")', step_name="局部脚本")
+''')
+        self.assertEqual(result['status'], 'passed', result.get('error'))
+        self.assertIn(('text', '窗口主接口'), self.backend.calls)
+        self.assertIn(('key', 'ENTER'), self.backend.calls)
+
+    def test_worker_accepts_window_metadata_and_legacy_game_metadata(self):
+        source = self.root/'metadata.py'
+        source.write_text('assert window is game\nassert window.handle == 17\nassert window.pid == 29\nvariables["ok"] = True', encoding='utf-8')
+        for metadata_key in ['window', 'game']:
+            with self.subTest(metadata_key=metadata_key):
+                data = {'filename': str(source), 'case_dir': str(self.root), 'report_dir': str(self.root),
+                        'step_name': '元数据', 'variables': {}, metadata_key: {'handle': 17, 'pid': 29}}
+                process = subprocess.Popen([sys.executable, '-X', 'utf8', str(Path(scripting.__file__).with_name('script_worker.py'))],
+                                           stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8',
+                                           creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+                output, error = process.communicate(json.dumps(data)+'\n', timeout=5)
+                self.assertEqual(process.returncode, 0, error)
+                events = [json.loads(line) for line in output.splitlines()]
+                self.assertEqual(events[-1], {'kind': 'done', 'variables': {'ok': True}}, output)
 
 
 if __name__ == '__main__':

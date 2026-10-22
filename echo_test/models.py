@@ -15,6 +15,7 @@ ACTIONS = {
     "text": "输入文本", "sleep": "等待", "screenshot": "保存截图",
     "key_down": "按下按键", "key_up": "松开按键",
     "python": "Python 脚本",
+    "loop": "循环开始", "end_loop": "循环结束", "set_variable": "设置变量",
 }
 PARAMETERS = {
     "click": [], "double_click": [("interval", "双击间隔（秒）", .12)],
@@ -27,6 +28,8 @@ PARAMETERS = {
     "screenshot": [],
     "key_down": [("keys", "按键", "W")], "key_up": [("keys", "按键", "W")],
     "python": [("code", "Python 代码", "")],
+    "loop": [("variable", "循环变量", "i"), ("start", "起始值", 1), ("end", "结束值（包含）", 10), ("step", "步长", 1)],
+    "end_loop": [], "set_variable": [("variable", "变量名", "value"), ("value", "值（文本或 JSON）", "")],
 }
 TARGET_ACTIONS = {"click", "double_click", "right_click", "long_press", "drag", "scroll", "wait_image", "assert_image", "assert_absent"}
 IMAGE_ACTIONS = {"wait_image", "assert_image", "assert_absent"}
@@ -134,6 +137,12 @@ class Step:
         if self.action == 'python':
             from .scripting import validate_code
             validate_code(self.params.get('code'))
+        if self.action == 'loop':
+            from .workflow import loop_values
+            loop_values(self)
+        if self.action == 'set_variable':
+            from .workflow import variable_name
+            variable_name(self.params.get('variable'))
         number(self.timeout, "定位超时", .1, 600)
         number(self.delay, "步骤后等待", 0, 600)
         if type(self.repeat) is not int or not 1 <= self.repeat <= 1000:
@@ -146,6 +155,8 @@ class Step:
             raise ValueError("图片等待 / 断言需要截图识别控件")
         for key, _, default in PARAMETERS[self.action]:
             value = self.params.get(key, default)
+            if self.action == 'loop' and key in {'start', 'end', 'step'}:
+                continue
             if isinstance(default, (int, float)):
                 number(value, key, -100 if key == "amount" else .01, 600 if key != "amount" else 100)
                 if key == "amount" and (int(value) != value or value == 0):
@@ -172,10 +183,21 @@ class Project:
     selectors: list[Selector] = field(default_factory=list)
     steps: list[Step] = field(default_factory=list)
     schema_version: int = 1
+    mode: str = 'lowcode'
+    code: str = ''
+    script_timeout: float = 600
 
     def validate(self):
         if self.schema_version != 1:
             raise ValueError("不支持的用例版本")
+        if self.mode not in {'lowcode', 'python'}:
+            raise ValueError('用例模式必须为 lowcode 或 python')
+        number(self.script_timeout, 'Python 主程序超时', .1, 600)
+        if not isinstance(self.code, str):
+            raise ValueError('Python 主程序必须是文本')
+        if self.mode == 'python':
+            from .scripting import validate_code
+            validate_code(self.code)
         if len(self.selectors) > 5000 or len(self.steps) > 10000:
             raise ValueError("用例规模超出限制")
         mapping = {}
@@ -196,13 +218,15 @@ class Project:
                 current = mapping[current.anchor]
                 if len(seen) > 32:
                     raise ValueError("锚点引用最多 32 层")
-        for step in self.steps:
+        for step in self.steps if self.mode == 'lowcode' else []:
             if step.action not in ACTIONS:
                 raise ValueError(f"未知事件：{step.action}")
             if type(step.enabled) is not bool:
                 raise ValueError("步骤启用状态必须是布尔值")
             if step.enabled:
                 step.validate(mapping)
+        from .workflow import operation_counts
+        operation_counts(self)
 
     def to_dict(self):
         return asdict(self)
@@ -212,6 +236,7 @@ class Project:
         if not isinstance(data, dict):
             raise ValueError("用例应为 JSON 对象")
         result = cls(name=data.get("name", "目标应用测试用例"), schema_version=data.get("schema_version", 1),
+                     mode=data.get('mode', 'lowcode'), code=data.get('code', ''), script_timeout=data.get('script_timeout', 600),
                      selectors=[Selector(**v) for v in data.get("selectors", [])],
                      steps=[Step(**v) for v in data.get("steps", [])])
         result.validate()
@@ -219,7 +244,7 @@ class Project:
 
 
 def referenced_selector_names(project: Project):
-    if any(step.enabled and step.action == 'python' for step in project.steps):
+    if project.mode == 'python' or any(step.enabled and step.action == 'python' for step in project.steps):
         return {selector.name for selector in project.selectors}
     names = {name for step in project.steps for name in (step.target, step.end_target) if name}
     mapping = {selector.name: selector for selector in project.selectors}
