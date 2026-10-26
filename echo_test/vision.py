@@ -53,6 +53,8 @@ class Vision:
 
     def match(self, screen: Image.Image, selector: Selector, selectors=None, _seen=()) -> Match | None:
         selector.validate()
+        if selector.kind == 'android_ui':
+            raise ValueError('安卓 UI 控件需要安卓设备控件树，不能使用图片识别执行')
         if selector.name in _seen or len(_seen) >= 32:
             raise ValueError("锚点引用循环或层数超过限制")
         self.last_diagnostic = {"matched": False, "target": selector.name, "threshold": selector.threshold,

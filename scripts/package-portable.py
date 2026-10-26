@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 import shutil
 import zipfile
+import subprocess
+from scripts.release_output import prepare_latest
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -13,6 +15,10 @@ def excluded(directory, names):
 
 
 def main():
+    subprocess.run([str(ROOT/'runtime/python/python.exe'), '-X', 'utf8', str(ROOT/'scripts/vendor-adb.py')], cwd=ROOT, check=True)
+    subprocess.run([str(ROOT/'runtime/python/python.exe'), '-X', 'utf8', str(ROOT/'scripts/vendor-scrcpy.py')], cwd=ROOT, check=True)
+    node = ROOT/'runtime/node/node.exe'
+    subprocess.run([str(node) if node.exists() else 'node', str(ROOT/'scripts/build-editor.cjs')], cwd=ROOT, check=True)
     # Every path is a fixed child of the workspace; user case/report directories are never removed.
     stage = ROOT/'.runtime'/'portable-build'/'echo-test'
     if stage.exists():
@@ -29,9 +35,8 @@ def main():
             shutil.copy2(source, stage/source.name)
     note = 'Offline bundle for Windows 10/11 x64. Unzip to a writable folder and run start.cmd.\nDefault starts request Windows administrator permission. Confirm the UAC prompt; cancellation stops startup.\nDo not copy .runtime, reports or recordings from a running workbench.\nNode, Python, Electron, libraries and OCR models are included.\n'
     (stage/'PORTABLE-README.txt').write_text(note, encoding='utf-8')
-    output = ROOT/'dist'
-    output.mkdir(exist_ok=True)
-    archive = output/'echo-test-win-x64.zip'
+    version = json.loads((ROOT/'package.json').read_text(encoding='utf-8'))['version']
+    archive = stage.parent / f'echo-test-{version}-portable-x64.zip'
     print('Compressing portable application...', flush=True)
     with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=6) as bundle:
         for source in sorted(stage.rglob('*')):
@@ -39,7 +44,9 @@ def main():
                 bundle.write(source, source.relative_to(stage.parent).as_posix())
     with archive.open('rb') as stream:
         digest = hashlib.file_digest(stream, 'sha256').hexdigest()
-    (output/'echo-test-win-x64.sha256').write_text(digest+'  '+archive.name+'\n', encoding='ascii')
+    output = prepare_latest(ROOT, version)
+    archive = archive.rename(output / archive.name)
+    archive.with_name(archive.name+'.sha256').write_text(digest+'  '+archive.name+'\n', encoding='ascii')
     print(json.dumps({'archive': str(archive), 'bytes': archive.stat().st_size, 'sha256': digest, 'stage': str(stage)}), flush=True)
 
 

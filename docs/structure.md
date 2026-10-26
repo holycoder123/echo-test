@@ -19,6 +19,9 @@ JSON 用例包含版本、控件和步骤，也可保存显式添加的 Python �
 | echo_test/recording.py | 将原始事件转换为控件和可编辑步骤 |
 | echo_test/models.py、vision.py | 数据校验、保存和图片定位 |
 | echo_test/backend.py、engine.py | Windows 输入、取消与释放、顺序执行和报告 |
+| echo_test/android.py、android_service.py | ADB 设备发现、触控、预览录制和安卓 RPC，复用执行器与报告 |
+| electron/renderer/android.js、android.css | 安卓设备页、画面刷新、缩放坐标转换、无线配对和应用启动 |
+| electron/android-stream.cjs、renderer/android-video.js | ADB 视频隧道、帧协议解析、背压控制、WebCodecs 解码与截图回退 |
 | echo_test/workflow.py、codegen.py | 循环执行计划、变量替换与低代码生成独立 Python 副本 |
 | echo_test/scripting.py、script_worker.py、script_process.py | 脚本导入、独立进程执行、目标应用操作通信、超时和停止、子进程清理 |
 

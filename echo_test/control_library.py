@@ -154,7 +154,8 @@ class ControlLibrary:
                 continue
             selector = entry['selector']
             text = ' '.join([selector['name'], names.get(entry['category_id'], '未分类'), selector.get('text', ''),
-                             '坐标 coordinate' if selector['kind'] == 'coordinate' else '图片 image OCR 模板 template'])
+                             ' '.join(str(value) for value in selector.get('ui', {}).values()),
+                             '安卓 UI android_ui' if selector['kind'] == 'android_ui' else '坐标 coordinate' if selector['kind'] == 'coordinate' else '图片 image OCR 模板 template'])
             if not all(word in text.casefold() for word in query.strip().casefold().split()):
                 continue
             entries.append(deepcopy(entry))

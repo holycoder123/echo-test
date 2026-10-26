@@ -1,5 +1,7 @@
 'use strict';
 const paths = {
+  android_back:'M16 4L5 12l11 8z',android_home:'M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16',android_tasks:'M5 5h14v14H5z',
+  android:'M7 2h10v20H7z M10 5h4 M11 19h2',
   help:'M4 4h6l2 2 2-2h6v16h-6l-2 2-2-2H4z M12 6v16 M7 9h2 M15 9h2 M7 13h2 M15 13h2',
   python:'M8 6L2 12l6 6 M16 6l6 6-6 6 M14 3l-4 18',
   diagnostics:'M5 3h14v18H5z M8 7h8 M8 11h8 M8 15h5',
@@ -18,15 +20,17 @@ const paths = {
   check:'M5 12l4 4 10-10', search:'M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14 M15 15l6 6', arrow:'M4 12h16 M14 6l6 6-6 6', upload:'M12 16V3 M7 8l5-5 5 5 M4 16v5h16v-5',
   shield:'M12 3l8 4v6c0 5-8 9-8 9S4 18 4 13V7z M8 12l3 3 5-6', spark:'M12 3l2 6 6 3-6 2-2 6-2-6-6-2 6-3z'
 };
+paths.android_ui=paths.android;paths.wait_ui=paths.wait_image;paths.assert_ui=paths.assert_image;paths.assert_ui_absent=paths.assert_absent;
 const icon = name => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[name] || paths.click}"/></svg>`;
 const esc = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
 const clone = value => JSON.parse(JSON.stringify(value));
-const A = {click:'单击',double_click:'双击',right_click:'右键',long_press:'长按',drag:'拖动',scroll:'滚动',wait_image:'等待图片',assert_image:'图片存在',assert_absent:'图片不存在',key:'按键组合',text:'输入文本',sleep:'等待',screenshot:'保存截图',key_down:'按下按键',key_up:'松开按键',python:'Python 脚本',loop:'循环步骤组',end_loop:'循环结束',set_variable:'设置变量'};
+const A = {wait_ui:'等待安卓控件',assert_ui:'安卓控件存在',assert_ui_absent:'安卓控件不存在',click:'单击',double_click:'双击',right_click:'右键',long_press:'长按',drag:'拖动',scroll:'滚动',wait_image:'等待图片',assert_image:'图片存在',assert_absent:'图片不存在',key:'按键组合',text:'输入文本',sleep:'等待',screenshot:'保存截图',key_down:'按下按键',key_up:'松开按键',python:'Python 脚本',loop:'循环步骤组',end_loop:'循环结束',set_variable:'设置变量'};
 const DEFAULTS = {double_click:{interval:.12},long_press:{duration:1},drag:{duration:1},scroll:{amount:-3,axis:'vertical'},key:{keys:'ENTER'},text:{text:''},sleep:{duration:1},key_down:{keys:'W'},key_up:{keys:'W'},python:{code:'# 可调用 window 操作当前目标应用，print 输出会进入报告\nprint("目标应用分辨率:", window.size())\n# window.click("控件名称")\n# window.key("ENTER")\n'}};
-const TARGETS = new Set(['click','double_click','right_click','long_press','drag','scroll','wait_image','assert_image','assert_absent']);
+const UI_ACTIONS = new Set(['wait_ui','assert_ui','assert_ui_absent']);
+const TARGETS = new Set(['click','double_click','right_click','long_press','drag','scroll','wait_image','assert_image','assert_absent','wait_ui','assert_ui','assert_ui_absent']);
 const IMAGES = new Set(['wait_image','assert_image','assert_absent']);
 const LABELS = {running:'执行中',passed:'通过',failed:'失败',stopped:'已停止'};
-const S = {view:'cases',project:{name:'未命名用例',schema_version:1,steps:[],selectors:[]},selected:0,windows:[],handle:null,path:null,dirty:false,busy:'',admin:false,recent:[],reports:[],logs:[],stepStatus:{},modal:null,recordPending:null,recordCount:0,recordStart:0,recordEvents:[],targetSearch:'',thumbnails:{},lastResult:null};
+const S = {view:'select-window',project:{name:'未命名用例',schema_version:1,steps:[],selectors:[]},selected:0,windows:[],handle:null,path:null,dirty:false,busy:'',admin:false,recent:[],reports:[],logs:[],stepStatus:{},modal:null,recordPending:null,recordCount:0,recordStart:0,recordEvents:[],targetSearch:'',thumbnails:{},lastResult:null};
 S.library=[];S.caseDirectory='';S.caseSearch='';S.libraryOpen=true;
 S.helpSearch='';
 S.gameCasePath='';S.gameRunStarting=false;S.runState=null;
@@ -34,6 +38,7 @@ S.iterations = 1;S.recordStarting=false;S.auditEntries=[];S.auditLevel='';S.audi
 S.mcpOperation='';
 S.recordReplaying=false;S.recordReplayRun=null;
 S.connection=null;S.connecting=false;S.windowSearch='';S.targetWindowMode='pick';S.windowPicking=false;
+initializeAndroid();
 let windowRefreshPromise=null;
 const windowDiscovery={
   timer:null,enabled:false,
@@ -84,6 +89,7 @@ function windowChoices(){
 function windowConnectLabel(){return S.connecting?'连接中…':S.connection&&matchingWindows().some(window=>window.handle===S.connection.handle)?'重新连接':'连接';}
 function windowConnectDisabled(){return !!(S.connecting||disabled()||!matchingWindows().length);}
 function windowConnectionControls(){
+  if(S.android.connection||S.view==='android')return `<div class="target-header-status"><i class="status-dot ${S.android.connection?'green':''}"></i><span>${S.android.connection?esc(S.android.connection.model)+' · 安卓':'安卓设备'}</span>${button('设备画面','view-android','ghost')}${button('桌面窗口','view-select-window','ghost')}</div>`;
   if(S.view==='select-window')return `<div class="target-header-status"><i class="status-dot ${S.connection?'green':''}"></i><span>${S.connection?'当前目标':'尚未连接目标窗口'}</span>${S.connection?`<span title="${esc(S.connection.title)}">${esc(S.connection.title)}</span>`:''}</div>`;
   const locked=S.connecting?'disabled':disabled();
   return `<i class="status-dot ${S.connection?'green':''}"></i><div class="search window-search"><input type="search" id="window-search" placeholder="搜索标题 / 进程 / PID" aria-label="搜索目标窗口" value="${esc(S.windowSearch)}" autocomplete="off" ${locked}>${icon('search')}<button type="button" class="icon-button" data-act="window-search-clear" aria-label="清除窗口搜索" title="清除搜索" ${S.windowSearch?'':'hidden'} ${locked}>${icon('close')}</button></div><select class="connection-select" id="connection" aria-label="选择目标窗口" ${locked}>${windowChoices()}</select>${button(windowConnectLabel(),'game-connect','','',`id="window-connect" ${windowConnectDisabled()?'disabled':''}`)}<button class="icon-button" data-act="refresh" title="刷新目标窗口">${icon('refresh')}</button>`;
@@ -96,7 +102,7 @@ function updateWindowChoices({preserveSelection=false}={}){
   const button=document.querySelector('#window-connect');button.textContent=windowConnectLabel();button.disabled=windowConnectDisabled();
   document.querySelector('[data-act="window-search-clear"]').hidden=!S.windowSearch;
 }
-function currentWindow() {return S.windows.find(window=>window.handle===Number(S.handle));}
+function currentWindow() {return S.android.connection?{title:S.android.connection.model}:S.windows.find(window=>window.handle===Number(S.handle));}
 function shortFile(path) {return path.split(/[\\/]/).at(-1).replace(/\.echo\.json$|\.json$/,'');}
 function dateLabel(value) {try{return new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(value));}catch{return value;}}
 function paramsSummary(step) {
@@ -112,7 +118,9 @@ function paramsSummary(step) {
 }
 
 function render() {
-  const titles={'select-window':'选择目标窗口',cases:'测试用例',targets:'通用控件库',record:'录制',runs:'运行记录',diagnostics:'错误日志',help:'使用说明',settings:'设置'};
+  if(S.android?.pointer)cancelAndroidGesture();
+  window.PythonIde?.detach(root);
+  const titles={'select-window':'选择目标窗口',android:'安卓设备',cases:'测试用例',targets:'通用控件库',record:'录制',runs:'运行记录',diagnostics:'错误日志',help:'使用说明',settings:'设置'};
   root.innerHTML=`<div class="shell"><aside class="sidebar">
     <div class="brand"><div class="brand-icon"><img src="brand/mark.svg" alt=""></div><div><strong>EchoTest</strong><span>桌面自动化测试工作台</span></div></div>
     ${Object.entries(titles).map(([view,title])=>`<button class="nav-button ${S.view===view?'active':''}" data-act="view-${view}">${icon(view==='runs'?'history':view==='select-window'?'game':view)}<span>${title}</span>${view==='record'&&S.busy==='recording'?'<span class="count"><i class="status-dot red"></i></span>':''}</button>`).join('')}
@@ -120,12 +128,13 @@ function render() {
     ${S.recent.length?'<div class="nav-label">最近使用</div>'+S.recent.slice(0,5).map((path,index)=>`<button class="recent-case" data-act="recent" data-i="${index}" title="${esc(path)}">${esc(shortFile(path))}</button>`).join(''):''}
     <div class="sidebar-bottom"><i class="status-dot ${S.admin?'green':''}"></i><span>${S.admin?'管理员权限':'普通权限'}</span><button data-act="view-settings" title="设置">${icon('settings')}</button></div>
   </aside><main class="workspace"><header class="topbar"><div class="breadcrumb"><span>工作区</span><span>/</span><strong>${esc(titles[S.view]||'目标窗口')}</strong></div><div class="topbar-right">${windowConnectionControls()}</div></header>
-    <section class="content ${S.view==='game'?'game-content':''}" id="content">${S.view==='select-window'?targetWindowSelectionView():S.view==='game'?gameView():S.view==='cases'?caseView():S.view==='targets'?targetView():S.view==='record'?recordView():S.view==='diagnostics'?diagnosticsView():S.view==='help'?StudioHelp.render(S.helpSearch):S.view==='settings'?settingsView():runView()}</section>
-    <footer class="subtle-footer"><i class="status-dot ${S.busy?'green':''}"></i><span>${S.busy==='recording'?'正在录制目标应用操作':S.busy==='running'?'用例执行中 · F12 停止':'就绪'}</span><span class="right file-location" title="${esc(S.path||'')}" >${S.path?esc(shortFile(S.path)):'尚未保存'}${S.dirty?' · 未保存':''}</span></footer>
+    <section class="content ${S.view==='game'?'game-content':''}" id="content">${S.view==='select-window'?targetWindowSelectionView():S.view==='android'?androidView():S.view==='game'?gameView():S.view==='cases'?caseView():S.view==='targets'?targetView():S.view==='record'?recordView():S.view==='diagnostics'?diagnosticsView():S.view==='help'?StudioHelp.render(S.helpSearch):S.view==='settings'?settingsView():runView()}</section>
   </main></div>`;
   updateHistorySelection();
   if(S.view==='select-window')updateTargetWindowResults();
   if(S.view==='runs') document.querySelector('.log-lines')?.scrollTo(0,1e8);
+  window.PythonIde?.mount(root);
+  syncAndroidPreview();
 }
 
 function gameCaseControls(){
@@ -141,7 +150,6 @@ function updateGameControls(){
   const node=document.querySelector('#game-case-controls');if(node)node.innerHTML=gameCaseControls();
   const text=S.recordStarting?'正在启动录制监听…':S.busy==='running'?'用例执行中 · F12 停止':S.busy==='recording'?`正在录制 · ${S.recordCount} 个事件 · F12 停止`:'就绪';
   const status=document.querySelector('.game-status span');if(status)status.textContent=text;
-  const footer=document.querySelector('.subtle-footer>span');if(footer)footer.textContent=S.busy?text:'就绪';
 }
 function receiveRunState(run){
   S.runState=run;
@@ -151,6 +159,7 @@ function receiveRunState(run){
     else RunPanel.update(document.querySelector('#record-replay-results'),run);
   }
   RunPanel.update(document.querySelector('#game-run-results'),run);
+  RunPanel.update(document.querySelector('#android-run-results'),run);
 }
 async function runGameCase(file=S.gameCasePath,iterations=S.iterations){
   if(lock()||S.gameRunStarting)return;
@@ -214,14 +223,14 @@ async function reconnectGame(){
 async function pickGameControl(kind){
   if(lock())return;
   const draft=defaultSelector();draft.kind=kind;draft.name=kind==='image'?'新图片控件':'新坐标控件';
-  const shot=await api('capture',{handle:S.handle});
+  const shot=await api('capture',targetArgs());
   showModal({kind:'picker',shot,returnModal:{kind:'selector',index:null,draft},selection:null});
 }
 
 
 function caseView() {
   const depths=caseStepDepths();
-  return `${caseLibraryView()}<div class="page-heading"><div><h1>${input(S.project.name,'data-project-name','text','class="project-title" aria-label="用例名称"')}<i class="save-dot" data-save-dot style="display:${S.dirty?'inline-block':'none'}"></i></h1><p class="sub">把目标应用操作整理成步骤，用图片断言验证结果。</p></div><div class="heading-actions">${button('','case-menu','ghost','more',`title="更多用例操作" ${disabled()}`)}${button('保存','save','','save',disabled())}${button(S.busy==='running'?'停止':'运行用例',S.busy==='running'?'stop':'run','primary',S.busy==='running'?'stop':'play',S.busy==='recording'?'disabled':'')}</div></div>
+  return `${caseLibraryView()}<div class="page-heading"><div class="case-name">${input(S.project.name,'data-project-name','text','class="project-title" aria-label="用例名称"')}<i class="save-dot" data-save-dot style="display:${S.dirty?'inline-block':'none'}"></i></div><div class="heading-actions">${button('','case-menu','ghost','more',`title="更多用例操作" ${disabled()}`)}${button('保存','save','','save',disabled())}${button(S.busy==='running'?'停止':'运行用例',S.busy==='running'?'stop':'run','primary',S.busy==='running'?'stop':'play',S.busy==='recording'?'disabled':'')}</div></div>
   ${caseModeBar()}${S.project.mode==='python'?pythonCaseView():`<div class="case-layout"><div><div class="section-toolbar"><span>${S.project.steps.length} 个步骤</span><div class="right"><span>用例循环</span>${input(S.iterations,'id="iterations"','number','class="tiny-number" min="1" max="1000" aria-label="用例循环次数"')}${button('添加步骤','step-menu','ghost','plus',disabled())}</div></div><div class="step-list">${S.project.steps.length?S.project.steps.map((step,index)=>stepRow(step,index,depths[index])).join(''):`<div class="empty"><div class="empty-icon">${icon('cases')}</div><strong>从第一个步骤开始</strong><p>添加一个操作，或录制你在目标应用中的动作。</p>${button('添加步骤','step-menu','quiet','plus')}${button('去录制','view-record','ghost','record')}</div>`}</div>${S.project.steps.length?`<button class="insert-step" data-act="step-menu" ${disabled()}>${icon('plus')}添加下一步</button>`:''}</div><aside class="inspector">${inspectorView()}</aside></div>`}`;
 }
 function caseLibraryView(){
@@ -256,8 +265,8 @@ function paramFields(step) {
   if(['long_press','drag','sleep'].includes(action)) result+=field(action==='sleep'?'等待时间 · 秒':action==='drag'?'拖动时间 · 秒':'按住时间 · 秒',input(p.duration??1,'data-param="duration"','number','min="0.01" max="600" step="0.1"'));
   if(action==='double_click') result+=field('双击间隔 · 秒',input(p.interval??.12,'data-param="interval"','number','min="0.01" step="0.01"'));
   if(action==='scroll') result+=`<div class="field-grid">${field('滚动方向',`<select data-param="axis" ${disabled()}>${options([['vertical','垂直'],['horizontal','水平']],p.axis||'vertical')}</select>`)}${field('滚动格数',input(p.amount??-3,'data-param="amount"','number','min="-100" max="100"'))}</div><div class="field-help">正数向上 / 向右，负数向下 / 向左。</div>`;
-  if(action.startsWith('key')) result+=field('按键',input(p.keys??(action==='key'?'ENTER':'W'),'data-param="keys"'),'例如 CTRL+A、ENTER、W。F12 用于停止。');
-  if(action==='text') result+=field('文本内容',`<textarea data-param="text" ${disabled()}>${esc(p.text||'')}</textarea>`,'先点击输入框；支持 ${i} 等变量，例如 go_to_function_thread ${i}。');
+  if(action.startsWith('key')) result+=field(S.android.connection?'安卓按键':'按键',input(p.keys??(action==='key'?'ENTER':'W'),'data-param="keys"'),S.android.connection?'支持 BACK、HOME、APP_SWITCH、ENTER 等单个按键。F12 用于停止。':'例如 CTRL+A、ENTER、W。F12 用于停止。');
+  if(action==='text') result+=field('文本内容',`<textarea data-param="text" ${disabled()}>${esc(p.text||'')}</textarea>`,S.android.connection?'先点击输入框；安卓首版支持 ASCII 可打印字符和 ${i} 等变量。':'先点击输入框；支持 ${i} 等变量，例如 go_to_function_thread ${i}。');
   if(action==='python')result+=field('Python 代码',`<textarea class="python-editor" data-param="code" spellcheck="false" aria-label="Python 代码" ${disabled()}>${esc(p.code||'')}</textarea>`,'使用工作台的 Python 环境与权限，代码随用例保存。')+`<div class="script-actions">${button('展开编辑','script-edit','ghost','',disabled())}${button('导入 .py','script-import','ghost','upload',disabled())}</div><div class="field-help">window.click("控件名") · window.key("ENTER") · window.sleep(1)<br>print 输出与异常保存在运行报告。</div>`;
   if(['long_press','drag'].includes(action)) result+=field('鼠标按钮',`<select data-param="button" ${disabled()}>${options([['left','左键'],['right','右键'],['middle','中键']],p.button||'left')}</select>`);
   return result;
@@ -268,21 +277,21 @@ function recordChoices(pending){
   const replaying=S.recordReplaying&&S.busy==='running';
   const playable=pending.project.steps.some(step=>step.enabled!==false);
   const locked=blocked?'disabled':'';
-  return `<div class="record-choice">${button(replaying?'停止重放 · F12':'重放录制',replaying?'stop':'record-replay','',replaying?'stop':'play',replaying?'':blocked||!S.handle||!playable?'disabled':'')}${pending.raw_count===0?button('重新录制','record-retry','primary','record',locked):''}${button('追加到当前用例','record-append','primary','plus',blocked||!pending.project.steps.length?'disabled':'')}${button('创建新用例','record-new','','cases',blocked||!pending.project.steps.length?'disabled':'')}${button('丢弃','record-discard','ghost','',locked)}</div>${S.recordReplayRun?`<section id="record-replay-results" class="game-run-results" aria-label="录制重放结果">${RunPanel.html(S.recordReplayRun)}</section>${S.recordReplayRun.reportId?button('查看重放报告','open-report','ghost','',`data-id="${esc(S.recordReplayRun.reportId)}"`):''}`:''}`;
+  return `<div class="record-choice">${button(replaying?'停止重放 · F12':'重放录制',replaying?'stop':'record-replay','',replaying?'stop':'play',replaying?'':blocked||!hasTarget()||!playable?'disabled':'')}${pending.raw_count===0?button('重新录制','record-retry','primary','record',locked):''}${button('追加到当前用例','record-append','primary','plus',blocked||!pending.project.steps.length?'disabled':'')}${button('创建新用例','record-new','','cases',blocked||!pending.project.steps.length?'disabled':'')}${button('丢弃','record-discard','ghost','',locked)}</div>${S.recordReplayRun?`<section id="record-replay-results" class="game-run-results" aria-label="录制重放结果">${RunPanel.html(S.recordReplayRun)}</section>${S.recordReplayRun.reportId?button('查看重放报告','open-report','ghost','',`data-id="${esc(S.recordReplayRun.reportId)}"`):''}`:''}`;
 }
 function recordView() {
   const pending=S.recordPending;
   const recording=S.busy==='recording';
-  return `<div class="page-heading"><div><h1>录制</h1><p class="sub">手动操作目标应用，自动整理为可编辑的测试步骤。</p></div><div class="heading-actions">${recording?button('停止录制','stop','record','stop'):button('开始录制','record-start','record','record',S.busy||pending?'disabled':'')}</div></div>
-  <div class="record-flow"><div class="flow-stage"><span class="flow-number">1</span>连接目标应用</div>${icon('chevron')}<div class="flow-stage"><span class="flow-number">2</span>手动操作</div>${icon('chevron')}<div class="flow-stage"><span class="flow-number">3</span>编辑测试用例</div></div>
-  <div class="record-layout"><div class="record-card">${recording?`<div class="record-live"><i class="status-dot red"></i>${S.recordStarting?'正在启动录制监听…':'正在记录目标应用操作'}</div><div class="record-time" id="record-clock">${elapsed()}</div><p>在目标应用中完成要测试的操作，按 F12 结束录制。</p><div class="record-preview" id="live-events">${liveEvents()}</div>${button('停止录制 · F12','stop','record','stop',S.recordStarting?'disabled':'style="margin-top:24px"')}`:pending?`<div class="record-symbol">${icon('check')}</div><h2>${pending.project.steps.length?'录制已完成':'未录到操作'}</h2><p>可先重放本次录制，再加入用例。你可以继续修改位置、等待时间和验证条件。</p><div class="stats-row"><div class="stat"><strong>${pending.project.steps.length}</strong><span>个测试步骤</span></div><div class="stat"><strong>${pending.project.selectors.length}</strong><span>个定位控件</span></div><div class="stat"><strong>${pending.duration}</strong><span>秒录制时长</span></div></div><div class="record-preview">${pending.project.steps.map(step=>`<div class="record-preview-row">${icon(step.action)}<span>${esc(step.name)}</span><small>${esc(paramsSummary(step))}</small></div>`).join('')||`<div class="empty compact">${esc(pending.hint||'没有采集到目标应用操作。请在所选目标应用画面内完成点击或按键，详情见错误日志。')}</div>`}</div>${recordChoices(pending)}`:`<div class="record-symbol">${icon('record')}</div><h2>像平常一样操作目标应用</h2><p>在目标应用画面上方的工具栏点击开始录制，再像平常一样操作目标应用。点击、拖动、滚轮和键盘操作会被转换成测试步骤。</p><div class="record-connection"><i class="status-dot ${S.handle?'green':''}"></i>${esc(serverTitle(currentWindow()))}</div>${button('开始录制','record-start','record','record',S.busy?'disabled':'')}<div class="tag-line"><span>仅录制所选目标窗口</span><span>F12 停止</span></div>`}</div>
+  if(S.android.connection&&!pending)return `<div class="empty"><strong>${recording?'正在录制安卓操作':'准备录制安卓操作'}</strong><p>首版录制工作台预览中的操作。手机上直接触摸的操作不会被采集。</p>${button(recording?'返回设备画面':'开始录制',recording?'view-android':'record-start','primary','record')}</div>`;
+  return `<div class="record-flow"><div class="flow-stage"><span class="flow-number">1</span>连接目标应用</div>${icon('chevron')}<div class="flow-stage"><span class="flow-number">2</span>手动操作</div>${icon('chevron')}<div class="flow-stage"><span class="flow-number">3</span>编辑测试用例</div></div>
+  <div class="record-layout"><div class="record-card">${recording?`<div class="record-live"><i class="status-dot red"></i>${S.recordStarting?'正在启动录制监听…':'正在记录目标应用操作'}</div><div class="record-time" id="record-clock">${elapsed()}</div><p>在目标应用中完成要测试的操作，按 F12 结束录制。</p><div class="record-preview" id="live-events">${liveEvents()}</div>${button('停止录制 · F12','stop','record','stop',S.recordStarting?'disabled':'style="margin-top:24px"')}`:pending?`<div class="record-symbol">${icon('check')}</div><h2>${pending.project.steps.length?'录制已完成':'未录到操作'}</h2><p>可先重放本次录制，再加入用例。你可以继续修改位置、等待时间和验证条件。</p><div class="stats-row"><div class="stat"><strong>${pending.project.steps.length}</strong><span>个测试步骤</span></div><div class="stat"><strong>${pending.project.selectors.length}</strong><span>个定位控件</span></div><div class="stat"><strong>${pending.duration}</strong><span>秒录制时长</span></div></div><div class="record-preview">${pending.project.steps.map(step=>`<div class="record-preview-row">${icon(step.action)}<span>${esc(step.name)}</span><small>${esc(paramsSummary(step))}</small></div>`).join('')||`<div class="empty compact">${esc(pending.hint||'没有采集到目标应用操作。请在所选目标应用画面内完成点击或按键，详情见错误日志。')}</div>`}</div>${recordChoices(pending)}`:`<div class="record-symbol">${icon('record')}</div><h2>人工录制操作路径以快速形成用例雏形</h2><p>在目标应用画面上方的工具栏点击开始录制，再像平常一样操作目标应用。点击、拖动、滚轮和键盘操作会被转换成测试步骤。</p><div class="record-connection"><i class="status-dot ${S.handle?'green':''}"></i>${esc(serverTitle(currentWindow()))}</div>${button('开始录制','record-start','record','record',S.busy?'disabled':'')}<div class="tag-line"><span>仅录制所选目标窗口</span><span>F12 停止</span></div>`}</div>
   <aside class="record-note"><h3>录制后可以做什么</h3><div class="item">${icon('cases')}<span>为步骤和控件改名，整理操作顺序。</span></div><div class="item">${icon('image')}<span>把录制的位置切换为图片定位，提高定位稳定性。</span></div><div class="item">${icon('check')}<span>添加图片断言，验证界面变化和操作结果。</span></div><div class="divider"></div><span class="small">中文输入建议录制后添加「输入文本」步骤。复杂同时操作可在用例中调整。</span></aside></div>`;
 }
 function elapsed(){const seconds=S.recordStart?Math.floor((Date.now()-S.recordStart)/1000):0;return `${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;}
-function rawLabel(event){if(event.kind==='key'){const name={13:'ENTER',16:'SHIFT',17:'CTRL',18:'ALT',27:'ESC',32:'SPACE',160:'左 SHIFT',161:'右 SHIFT',162:'左 CTRL',163:'右 CTRL'}[event.vk]||(event.vk>=48&&event.vk<=90?String.fromCharCode(event.vk):`按键 ${event.vk}`);return `${event.event==='down'?'按下':'松开'} ${name}`;}return {down:'鼠标按下',up:'鼠标松开',move:'拖动',wheel:'滚轮'}[event.event]||'操作';}
+function rawLabel(event){if(event.kind==='android')return {tap:'点击屏幕',long_press:'长按屏幕',swipe:'滑动屏幕',key:'安卓按键',text:'输入文本'}[event.event]||'安卓操作';if(event.kind==='key'){const name={13:'ENTER',16:'SHIFT',17:'CTRL',18:'ALT',27:'ESC',32:'SPACE',160:'左 SHIFT',161:'右 SHIFT',162:'左 CTRL',163:'右 CTRL'}[event.vk]||(event.vk>=48&&event.vk<=90?String.fromCharCode(event.vk):`按键 ${event.vk}`);return `${event.event==='down'?'按下':'松开'} ${name}`;}return {down:'鼠标按下',up:'鼠标松开',move:'拖动',wheel:'滚轮'}[event.event]||'操作';}
 function liveEvents(){return S.recordEvents.slice(-8).map(event=>`<div class="record-preview-row">${icon(event.kind==='key'?'key':event.event==='wheel'?'scroll':'click')}<span>${rawLabel(event)}</span><small>${event.t.toFixed(1)}s</small></div>`).join('')||'<div class="empty compact">等待目标应用操作…</div>';}
 function runView() {
-  return `<div class="page-heading"><div><h1>运行记录</h1><p class="sub">查看步骤结果、失败原因和截图报告。</p></div><div class="heading-actions">${S.busy==='running'?button('停止执行','stop','primary','stop'):button('刷新记录','refresh-reports','','refresh')}</div></div>
+  return `<div class="page-heading"><div class="heading-actions">${S.busy==='running'?button('停止执行','stop','primary','stop'):button('刷新记录','refresh-reports','','refresh')}</div></div>
   ${S.logs.length?`<section class="run-current"><div class="run-current-header"><strong>${S.busy==='running'?'正在执行':S.lastResult?`本次执行 · ${LABELS[S.lastResult.status]||'结束'}`:'执行日志'}</strong>${S.lastResult?`<span class="badge ${S.lastResult.status}">${LABELS[S.lastResult.status]}</span>`:''}<div class="right">${S.lastResult?.id?button('查看报告','open-report','ghost','',`data-id="${esc(S.lastResult.id)}"`):''}</div></div>${historySelectionBar('logs')}<div class="log-lines">${historyRows('logs').map(row=>`<div class="log-line ${row.type||''}">${historyCheckbox('logs',row.id)}<span class="log-time">${row.time}</span><span>${esc(row.message)}</span></div>`).join('')}</div></section>`:''}
   <div class="section-toolbar"><span>历史运行 · ${S.reports.length}</span></div>${S.reports.length?`${historySelectionBar('reports')}<table class="report-table"><thead><tr><th class="history-check-cell">${historyCheckbox('reports')}</th><th>测试用例</th><th>运行时间</th><th>结果</th><th>步骤数</th><th></th></tr></thead><tbody>${S.reports.map(report=>`<tr><td class="history-check-cell">${historyCheckbox('reports',report.id)}</td><td>${esc(report.case)}</td><td>${esc(dateLabel(report.started))}</td><td><span class="badge ${report.status}">${LABELS[report.status]||report.status}</span></td><td>${report.steps.length}</td><td>${button('查看报告','open-report','ghost','',`data-id="${esc(report.id)}"`)}</td></tr>`).join('')}</tbody></table>`:`<div class="empty"><div class="empty-icon">${icon('history')}</div><strong>还没有运行记录</strong><p>运行一个用例，结果会显示在这里。</p>${button('返回用例','view-cases','quiet','cases')}</div>`}`;
 }
@@ -290,29 +299,34 @@ function runView() {
 function menu(anchor) {
   if(lock()) return;
   const rect=anchor.getBoundingClientRect();
-  const sections=[['流程控制',['loop','set_variable']],['鼠标操作',['click','double_click','right_click','long_press','drag','scroll']],['验证界面',['wait_image','assert_image','assert_absent']],['其他',['key','text','sleep','screenshot','python']]];
+  const sections=[['流程控制',['loop','set_variable']],['鼠标操作',['click','double_click','right_click','long_press','drag','scroll']],['验证界面',['wait_image','assert_image','assert_absent']],['安卓控件',['wait_ui','assert_ui','assert_ui_absent']],['其他',['key','text','sleep','screenshot','python']]];
   document.querySelector('#menu-root').innerHTML=`<div class="menu" style="left:${Math.min(rect.left,innerWidth-270)}px;top:${Math.min(rect.bottom+5,innerHeight-600)}px">${sections.map(([name,actions])=>`<div class="menu-label">${name}</div>${actions.map(action=>`<button class="menu-item" data-act="add-step" data-action="${action}">${icon(action)}${A[action]}</button>`).join('')}`).join('')}</div>`;
 }
 function addStep(action) {
   if(lock()) return;
-  const target=controlSelectors().find(item=>!IMAGES.has(action)||item.kind==='image')?.name||'';if(target&&TARGETS.has(action))useControl(target);
+  const target=controlSelectors().find(item=>(!IMAGES.has(action)||item.kind==='image')&&(!UI_ACTIONS.has(action)||item.kind==='android_ui'))?.name||'';if(target&&TARGETS.has(action))useControl(target);
   if(S.project.mode==='python')return;
-  const step={name:A[action],action,target,end_target:'',enabled:true,timeout:action==='python'?30:5,delay:action==='loop'?0:.5,repeat:1,params:clone(action==='loop'?{variable:'i',start:2,end:64,step:1}:action==='set_variable'?{variable:'name',value:''}:DEFAULTS[action]||{})};
+  const step={name:A[action],action,target,end_target:'',enabled:true,timeout:action==='python'?30:controlSelectors().find(t=>t.name===target)?.kind==='android_ui'?15:5,delay:action==='loop'?0:.5,repeat:1,params:clone(action==='loop'?{variable:'i',start:2,end:64,step:1}:action==='set_variable'?{variable:'name',value:''}:DEFAULTS[action]||{})};
   const index=S.project.steps.length?S.selected+1:0;
   S.project.steps.splice(index,0,step,...(action==='loop'?[{name:'循环结束',action:'end_loop',enabled:true,timeout:5,delay:0,repeat:1,params:{}}]:[]));S.selected=index;S.stepStatus={};dirty();render();
 }
 function showModal(data) {S.modal=data;renderModal();if(!modal.open)modal.showModal();}
-function closeModal() {modal.close();S.modal=null;if(confirmation){confirmation(false);confirmation=null;}}
+function closeModal() {if(['variant-preview','variant-rename'].includes(S.modal?.kind)){showModal(S.modal.returnModal);return;}window.PythonIde?.detach(modal);modal.close();S.modal=null;if(confirmation){confirmation(false);confirmation=null;}}
 function confirm(message,detail='') {return new Promise(resolve=>{confirmation=resolve;showModal({kind:'confirm',message,detail});});}
 async function canReplace(){return !S.dirty || await confirm('当前用例有未保存的修改。','继续会替换编辑器中的内容。你也可以先保存用例。');}
 function header(title){return `<div class="modal-header"><h2>${title}</h2><button class="icon-button" data-act="close-modal" title="关闭">${icon('close')}</button></div>`;}
+function variantName(item){return item.name||item.image.split(/[\\/]/).pop();}
+function variantRow(item,index){
+  const attributes=`data-variant="${index}"`,name=variantName(item);
+  return `<div class="template-variant"><button class="template-variant-thumb" data-act="preview-variant" ${attributes} title="预览图片">${controlImageSlot(item.image,name)}</button><div class="template-variant-copy"><strong title="${esc(name)}">${esc(name)}</strong><small>${esc(item.image)}</small></div><div class="template-variant-actions">${button('重命名','rename-variant','ghost','',attributes)}${button('预览图片','preview-variant','ghost','',attributes)}${button('导入遮罩','import-mask','ghost','',attributes)}${item.mask?`<span class="template-variant-mask">${esc(item.mask)}</span>${button('清除遮罩','clear-mask','ghost','',attributes)}`:''}${button('移除','remove-variant','ghost','',attributes)}</div></div>`;
+}
 function recognitionFields(t) {
   const ocr=t.recognition==='ocr';
   const anchors=controlSelectors().filter(item=>item.kind==='image'&&item.name!==t.name);
   const variants=t.templates||[];
   return `${field('识别方式',`<select data-dfield="recognition"><option value="template" ${ocr?'':'selected'}>图片模板</option><option value="ocr" ${ocr?'selected':''}>OCR 文字</option></select>`)}
   ${ocr?`${field('目标文字',input(t.text||'','data-dfield="text"'),'识别中英文；忽略大小写和空白。')}${field('文字匹配',`<select data-dfield="text_match"><option value="exact" ${t.text_match!=='contains'?'selected':''}>整行一致</option><option value="contains" ${t.text_match==='contains'?'selected':''}>包含目标文字</option></select>`,'点击识别到的整行中心；可通过点击偏移校准。')}`:`<div class="template-placeholder">${t.image&&S.thumbnails[t.image]?`<img src="${S.thumbnails[t.image]}" alt="控件模板">`:esc(t.image||'框选控件截图作为模板')}</div><div class="modal-actions">${button('从目标应用截图框选','pick-target','','screenshot')}${button('导入图片','import-image','ghost','upload')}</div>
-  <div class="template-variants">${t.image?`<div>主模板 ${button('导入遮罩','import-mask','ghost','', 'data-variant="-1"')}${t.mask?`${esc(t.mask)} ${button('清除遮罩','clear-mask','ghost','','data-variant="-1"')}`:''}</div>`:''}${variants.map((item,index)=>`<div class="template-variant"><span>${esc(item.image)}</span>${button('导入遮罩','import-mask','ghost','',`data-variant="${index}"`)}${item.mask?`${esc(item.mask)} ${button('清除遮罩','clear-mask','ghost','',`data-variant="${index}"`)}`:''}${button('移除','remove-variant','ghost','',`data-variant="${index}"`)}</div>`).join('')}</div><div class="modal-actions">${button('框选附加模板','pick-variant','quiet')}${button('导入附加模板','import-variant','ghost')}</div><div class="field-help">附加模板最多 10 张，可保存悬停、选中等状态。遮罩与对应模板尺寸一致：白色参与匹配，黑色忽略。</div>
+  <div class="template-variants">${t.image?`<div>主模板 ${button('导入遮罩','import-mask','ghost','', 'data-variant="-1"')}${t.mask?`${esc(t.mask)} ${button('清除遮罩','clear-mask','ghost','','data-variant="-1"')}`:''}</div>`:''}${variants.map(variantRow).join('')}</div><div class="modal-actions">${button('框选附加模板','pick-variant','quiet')}${button('导入附加模板','import-variant','ghost')}</div><div class="field-help">附加模板最多 10 张，可保存悬停、选中等状态。遮罩与对应模板尺寸一致：白色参与匹配，黑色忽略。</div>
   ${field('颜色容差',input(t.color_tolerance??'','data-dfield="color_tolerance"','number','min="0" max="255" step="1"'),'留空关闭；0 最严格，255 最宽松。可从 40 开始校准。')}
   ${field('缩放倍率',input((t.scales||[1]).join(', '),'data-dfield="scales"'),'多个倍率用逗号分隔，例如 0.9, 1, 1.1')}`}
   ${field(ocr?'OCR 置信度阈值':'匹配阈值',input(t.threshold??.86,'data-dfield="threshold"','number','min="0.5" max="1" step="0.01"'),'越高越严格。默认 0.86；分数不代表定位正确的概率。')}
@@ -326,6 +340,7 @@ function previewOverlay(shot) {
 function previewHint(shot) {
   const d=shot.diagnostic,c=d?.candidate;
   if(!d)return `坐标 (${shot.point?.join(', ')})`;
+  if(d.method==='android_ui')return `${d.matched?'已匹配':'未命中'} · ${d.reason} · 匹配 ${d.count} 个节点`;
   return `${d.matched?'已匹配':'未命中'} · ${d.reason}${c?` · 分数 ${c.score.toFixed(3)} · 倍率 ${c.scale} · ${c.text||c.image}${c.color_difference==null?'':` · 颜色差异 ${c.color_difference.toFixed(1)}`}`:''}`;
 }
 function previewDetails(shot) {
@@ -334,8 +349,12 @@ function previewDetails(shot) {
   return `<div class="field-help">${d.roi?`搜索区域 ${esc(d.roi.join(', '))}`:''}${anchor?`<br>锚点 ${esc(anchor.target)}：${esc(anchor.reason)}${anchor.candidate?` · 分数 ${anchor.candidate.score.toFixed(3)}`:''}`:''}${d.recognized?.length?`<br>识别到的文字：${d.recognized.map(item=>`${esc(item.text)} (${item.score.toFixed(3)})`).join('；')}`:''}</div>`;
 }
 function renderModal() {
+  window.PythonIde?.detach(modal);
   const m=S.modal;if(!m)return;
-  modal.className=m.kind==='control-picker'?'control-picker-modal':['picker','preview','screenshot'].includes(m.kind)?'picker-modal':['script','python-preview'].includes(m.kind)?'script-modal':'';
+  modal.className=m.kind==='control-picker'?'control-picker-modal':['picker','preview','screenshot','variant-preview'].includes(m.kind)?'picker-modal':['script','python-preview'].includes(m.kind)?'script-modal':'';
+  if(m.kind==='android-ui'){modal.className='picker-modal';modal.innerHTML=androidUiModal(m);return;}
+  if(m.kind==='variant-preview'){modal.innerHTML=header('附加模板预览')+`<div class="modal-body"><p class="variant-preview-name">${esc(variantName(m.item))}</p><div class="image-stage-wrap"><img class="variant-preview-image" src="${esc(m.image)}" alt="${esc(variantName(m.item))}"></div><p class="field-help">${esc(m.item.image)}</p></div><footer class="modal-footer">${button('返回编辑','close-modal','primary')}</footer>`;return;}
+  if(m.kind==='variant-rename'){modal.innerHTML=header('重命名附加模板')+`<div class="modal-body">${field('模板名称',input(m.name,'id="variant-name"','text','maxlength="200"'))}</div><footer class="modal-footer">${button('取消','close-modal')}${button('保存名称','save-variant-name','primary')}</footer>`;return;}
   if(m.kind==='python-preview'){modal.innerHTML=header('生成的 Python 代码')+`<div class="modal-body"><p class="field-help">预览随低代码步骤生成。创建独立副本后可自由编辑，低代码原稿保留。</p><textarea class="python-editor" id="generated-python-code" readonly spellcheck="false" aria-label="生成的 Python 代码">${esc(m.code)}</textarea></div><footer class="modal-footer">${button('关闭','close-modal')}${button('创建 Python 副本','mode-copy','primary','python',disabled())}</footer>`;return;}
   const sharedModal=sharedControlModals(m);if(sharedModal!==null){modal.innerHTML=sharedModal;return;}
   if(m.kind==='script')modal.innerHTML=header('编辑 Python 脚本')+`<div class="modal-body">${field('Python 代码',`<textarea id="script-code" class="python-editor" spellcheck="false" aria-label="Python 脚本编辑器" ${disabled()}>${esc(m.code)}</textarea>`)}<div class="field-help">可使用 window、controls、case_dir、report_dir、step_name 和 variables。输入 window. 或按 Ctrl+Space 选择函数；Tab 缩进，F12 停止执行。</div></div><footer class="modal-footer">${button('取消','close-modal')}${button('应用到步骤','script-apply','primary', '',disabled())}</footer>`;
@@ -343,8 +362,8 @@ function renderModal() {
   if(m.kind==='environment') modal.innerHTML=header('运行环境')+`<div class="modal-body"><div class="env-row"><span>测试服务权限</span><strong>${S.admin?'管理员':'普通权限'}</strong></div><div class="env-row"><span>已发现目标窗口</span><strong>${S.windows.length} 个</strong></div><div class="env-row"><span>停止快捷键</span><strong>F12</strong></div><p class="modal-message" style="margin-top:20px">软件默认请求管理员权限。若当前仍显示普通权限，请保存并关闭工作台，重新启动并确认 Windows 权限提示。</p></div><footer class="modal-footer">${button('知道了','close-modal','primary')}</footer>`;
   if(m.kind==='selector') {
     const t=m.draft, image=t.kind==='image';
-    modal.innerHTML=header(m.index===null?'新增控件':'编辑控件')+`<div class="modal-body">${field('控件名称',input(t.name,'data-dfield="name"'))}${field('分类',`<select id="control-category-choice"><option value="">未分类</option>${options(S.controls.categories.map(category=>[category.id,category.name]),m.categoryId||'')}</select>`)}<p class="field-help">保存到通用控件库，所有引用此控件的用例都会使用新配置。</p><div class="segmented"><button data-act="target-mode" data-mode="coordinate" class="${image?'':'active'}">${icon('coordinate')} 坐标定位</button><button data-act="target-mode" data-mode="image" class="${image?'active':''}">${icon('image')} 图片定位</button></div>
-    ${image?recognitionFields(t):`<div class="field-grid">${field('X 坐标',input(t.x??.5,'data-dfield="x"','number','step="0.001"'))}${field('Y 坐标',input(t.y??.5,'data-dfield="y"','number','step="0.001"'))}</div><label class="check-line"><input type="checkbox" data-dfield="normalized" ${t.normalized!==false?'checked':''}>使用比例坐标 · 0 到 1</label><div class="field-help" style="margin:10px 0 17px">以目标应用客户区左上角为原点，不包含标题栏。</div>${button('从目标应用截图取点','pick-target','quiet wide','coordinate')}`}
+    modal.innerHTML=header(m.index===null?'新增控件':'编辑控件')+`<div class="modal-body">${field('控件名称',input(t.name,'data-dfield="name"'))}${field('分类',`<select id="control-category-choice"><option value="">未分类</option>${options(S.controls.categories.map(category=>[category.id,category.name]),m.categoryId||'')}</select>`)}<p class="field-help">保存到通用控件库，所有引用此控件的用例都会使用新配置。</p><div class="segmented"><button data-act="target-mode" data-mode="coordinate" class="${t.kind==='coordinate'?'active':''}">${icon('coordinate')} 坐标定位</button><button data-act="target-mode" data-mode="image" class="${image?'active':''}">${icon('image')} 图片定位</button><button data-act="target-mode" data-mode="android_ui" class="${t.kind==='android_ui'?'active':''}">${icon('android')} 安卓 UI</button></div>
+    ${t.kind==='android_ui'?androidUiFields(t):image?recognitionFields(t):`<div class="field-grid">${field('X 坐标',input(t.x??.5,'data-dfield="x"','number','step="0.001"'))}${field('Y 坐标',input(t.y??.5,'data-dfield="y"','number','step="0.001"'))}</div><label class="check-line"><input type="checkbox" data-dfield="normalized" ${t.normalized!==false?'checked':''}>使用比例坐标 · 0 到 1</label><div class="field-help" style="margin:10px 0 17px">以目标应用客户区左上角为原点，不包含标题栏。</div>${button('从目标应用截图取点','pick-target','quiet wide','coordinate')}`}
     <details class="details"><summary>点击偏移</summary><div class="field-grid">${field('X 偏移 · 像素',input(t.offset_x||0,'data-dfield="offset_x"','number'))}${field('Y 偏移 · 像素',input(t.offset_y||0,'data-dfield="offset_y"','number'))}</div></details></div><footer class="modal-footer">${button('取消','close-modal')}${button('保存控件','save-target','primary')}</footer>`;
   }
   if(m.kind==='screenshot')modal.innerHTML=header('目标窗口截图')+`<div class="modal-body"><div class="image-stage-wrap"><img src="${m.shot.image}" alt="目标窗口截图" style="max-width:100%;max-height:60vh"></div><p class="field-help">${m.shot.width} × ${m.shot.height}</p></div><footer class="modal-footer">${button('关闭','close-modal','primary')}</footer>`;
@@ -353,7 +372,7 @@ function renderModal() {
     modal.innerHTML=header(preview?'定位预览':'从目标应用截图选取')+`<div class="modal-body"><div class="image-stage-wrap"><div class="image-stage" id="image-stage"><img src="${shot.image}" alt="目标应用客户区截图"><div id="selection-overlay">${preview?previewOverlay(shot):''}</div></div></div><div class="capture-hint"><span id="pick-hint">${preview?esc(previewHint(shot)):m.returnModal.draft.kind==='image'?'拖动框选控件模板':'点击目标位置'}</span><span>${shot.width} × ${shot.height}</span></div>${preview?previewDetails(shot):''}</div><footer class="modal-footer">${button(preview?'关闭':'取消',preview?'close-modal':'cancel-pick')}${preview?'':button('使用此位置 / 区域','accept-pick','primary')}</footer>`;
   }
 }
-function defaultSelector(){return {name:'新控件',kind:'coordinate',x:.5,y:.5,normalized:true,image:'',threshold:.86,scales:[1],roi:null,offset_x:0,offset_y:0,recognition:'template',templates:[],mask:'',anchor:'',text:'',text_match:'exact',color_tolerance:null,library_id:''};}
+function defaultSelector(){return {name:'新控件',kind:'coordinate',x:.5,y:.5,normalized:true,image:'',threshold:.86,scales:[1],roi:null,offset_x:0,offset_y:0,recognition:'template',templates:[],mask:'',anchor:'',text:'',text_match:'exact',color_tolerance:null,library_id:'',ui:{}};}
 async function editTarget(index=null){return editSharedControl(index);}
 const thumbnailRequests=new Map(),thumbnailFailures=new Set(),thumbnailQueue=[];
 let thumbnailActive=0;
@@ -377,11 +396,11 @@ async function thumbnail(image,refresh=false){
   thumbnailRequests.set(image,request);pumpThumbnails();return request;
 }
 async function captureTarget(){
-  if(!S.handle){toast('先连接目标窗口');return;}
+  if(!hasTarget()){toast('先连接目标窗口');return;}
   const previous=clone(S.modal);delete S.modal.addVariant;
   toast('正在截取目标应用画面…');
   try{
-    const shot=await api('capture',{handle:S.handle});
+    const shot=await api('capture',targetArgs());
     showModal({kind:'picker',shot,returnModal:previous,selection:null});
   }catch(error){showModal(previous);throw error;}
 }
@@ -393,24 +412,26 @@ async function saveTarget(){return saveSharedControl();}
 function setProject(data){S.gameCasePath='';setLibrary(data.library);S.project=data.project;setControls(data.controls);S.path=data.path;S.baseDir=data.base_dir||S.baseDir;S.recent=data.recent||S.recent;S.selected=0;S.pythonSelection=null;S.dirty=false;S.stepStatus={};S.thumbnails={};api('dirty',{value:false,caseName:S.project.name}).catch(()=>{});render();}
 async function save(asNew=false){if(lock())return;const data=await api('save_project',{project:S.project,as_new:asNew});if(data){setProject(data);toast('用例已保存','success');}}
 async function run({stayOnGame=false}={}){
-  if(lock())return;if(!S.handle)throw new Error('请先连接目标窗口');
+  if(lock())return;if(!hasTarget())throw new Error('请先连接目标窗口');
   const iterations=S.iterations;
   if(!Number.isInteger(iterations)||iterations<1||iterations>1000)throw new Error('循环次数需在 1 ~ 1000 之间');
-  S.busy='running';S.logs=[];S.lastResult=null;S.stepStatus={};if(!stayOnGame)S.view='runs';render();
-  try{await api('run',{project:S.project,handle:S.handle,iterations});log('开始执行 '+S.project.name);}catch(error){S.busy='';render();throw error;}
+  S.busy='running';S.logs=[];S.lastResult=null;S.stepStatus={};if(S.android.connection)S.view='android';else if(!stayOnGame)S.view='runs';render();
+  try{await api('run',{project:S.project,...targetArgs(),iterations});log('开始执行 '+S.project.name);}catch(error){S.busy='';render();throw error;}
 }
 async function replayRecording(){
   if(lock())return;
   const pending=S.recordPending;
   if(!pending||!pending.project.steps.some(step=>step.enabled!==false))return;
-  if(!S.handle)throw new Error('请先连接目标窗口');
+  if(!hasTarget())throw new Error('请先连接目标窗口');
+  if(pending.target?.platform==='android'&&pending.target.serial!==S.android.connection?.serial)throw new Error('请先连接本段录制使用的安卓设备');
+  if(!pending.target&&S.android.connection)throw new Error('这是一段桌面录制，请先连接对应桌面窗口');
   const project=clone(pending.project);project.name='录制重放 · '+project.name;
-  S.recordReplaying=true;S.recordReplayRun=null;S.busy='running';S.logs=[];S.lastResult=null;render();
+  S.recordReplaying=true;S.recordReplayRun=null;S.busy='running';S.logs=[];S.lastResult=null;if(S.android.connection)S.view='android';render();
   try{
-    await api('run',{project,handle:S.handle,iterations:1,source:'recording'});
+    await api('run',{project,...targetArgs(),iterations:1,source:'recording'});
     log('开始重放本次录制');
   }catch(error){
-    S.recordReplaying=false;S.busy='';S.view='record';render();
+    S.recordReplaying=false;S.busy='';S.view=S.android.connection?'android':'record';render();
     await api('workbench_show').catch(()=>{});throw error;
   }
 }
@@ -418,11 +439,12 @@ function log(message,type=''){S.logs.push({id:'run-log-'+(++logSequence),message
 async function reports(){S.reports=await api('reports');if(S.view==='runs')render();}
 async function startRecord(){
   if(S.recordPending){S.view='record';render();toast('请先将上一段录制加入用例，或丢弃后重新录制');return;}
-  if(lock())return;if(!S.handle)throw new Error('请先连接目标窗口');
+  if(lock())return;if(!hasTarget())throw new Error('请先连接目标窗口');
   S.recordReplayRun=null;S.recordReplaying=false;
   S.recordStart=0;S.recordCount=0;S.recordEvents=[];S.recordStarting=true;S.busy='recording';S.view='record';
+  if(S.android.connection)S.view='android';
   if(S.view==='game')updateGameControls();else render();
-  try{await api('record_start',{handle:S.handle});}catch(error){S.busy='';throw error;}finally{S.recordStarting=false;if(S.view==='game')updateGameControls();else render();}
+  try{await api('record_start',targetArgs());}catch(error){S.busy='';throw error;}finally{S.recordStarting=false;if(S.view==='game')updateGameControls();else render();}
 }
 async function retryEmptyRecording(){
   if(lock()||!S.recordPending||S.recordPending.raw_count!==0)return;
@@ -443,6 +465,7 @@ async function acceptRecording(asNew){
 }
 
 async function handleAction(action,node){
+  if(action==='view-android'||action.startsWith('android-'))return androidAction(action,node);
   if(action==='close-modal'||action==='confirm-no'){closeModal();return;}
   if(action.startsWith('mode-')){await caseModeAction(action,node);return;}
   if(action==='confirm-yes'){
@@ -511,7 +534,14 @@ async function handleAction(action,node){
   if(action==='target-mode'){S.modal.draft.kind=node.dataset.mode;renderModal();return;}
   if(action==='pick-target')return captureTarget();
   if(action==='pick-variant'){if((S.modal.draft.templates||[]).length>=10)throw new Error('附加模板最多 10 张');S.modal.addVariant=true;return captureTarget();}
-  if(action==='import-variant'){const t=S.modal.draft;if((t.templates||[]).length>=10)throw new Error('附加模板最多 10 张');const result=await api('import_template');if(result){(t.templates||=[]).push({image:result.image,mask:''});renderModal();}return;}
+  if(action==='import-variant'){const m=S.modal,t=m.draft;if((t.templates||[]).length>=10)throw new Error('附加模板最多 10 张');const result=await api('import_template');if(result){(t.templates||=[]).push({image:result.image,mask:''});if(S.modal===m)renderModal();await thumbnail(result.image);}return;}
+  if(action==='rename-variant'||action==='preview-variant'){
+    const previous=S.modal,item=previous.draft.templates[Number(node.dataset.variant)];
+    if(action==='rename-variant'){showModal({kind:'variant-rename',returnModal:previous,item,name:variantName(item)});const input=modal.querySelector('#variant-name');input.focus();input.select();}
+    else{const result=await api('template_preview',{image:item.image,full_size:true});if(S.modal===previous)showModal({kind:'variant-preview',returnModal:previous,item,image:result.image});}
+    return;
+  }
+  if(action==='save-variant-name'){const m=S.modal,name=modal.querySelector('#variant-name').value.trim();if(!name||name.length>200)throw new Error('请填写 1 ~ 200 字的模板名称');m.item.name=name;showModal(m.returnModal);return;}
   if(action==='remove-variant'){S.modal.draft.templates.splice(Number(node.dataset.variant),1);renderModal();return;}
   if(action==='import-mask'||action==='clear-mask'){const index=Number(node.dataset.variant),t=S.modal.draft,owner=index<0?t:t.templates[index];if(action==='clear-mask')owner.mask='';else{const result=await api('import_template');if(result)owner.mask=result.image;}renderModal();return;}
   if(action==='cancel-pick'){showModal(S.modal.returnModal);return;}
@@ -545,6 +575,7 @@ document.addEventListener('input',event=>{
   if(node.id==='control-picker-search'&&S.modal?.kind==='control-picker'){S.modal.search=node.value;renderControlPickerResults();return;}
   if(node.id==='target-search'){S.targetSearch=node.value;const start=node.selectionStart;render();const field=document.querySelector('#target-search');field.focus();field.setSelectionRange(start,start);return;}
   if(node.hasAttribute('data-category-name')&&S.modal?.kind==='category-editor'){S.modal.name=node.value;return;}
+  if(node.id==='variant-name'&&S.modal?.kind==='variant-rename'){S.modal.name=node.value;return;}
   if((S.busy||S.gameRunStarting||S.mcpOperation||S.windowPicking)&&node.closest('#app'))return;
   if(node.id==='game-iterations'){S.iterations=Number(node.value);return;}
   if(node.id==='iterations'){S.iterations=Number(node.value);return;}
@@ -569,6 +600,7 @@ document.addEventListener('change',event=>{
   if(node.dataset.sfield==='action'){
     const step=S.project.steps[S.selected];step.action=node.value;step.name=A[node.value];step.params=clone(DEFAULTS[node.value]||{});
     if(step.action==='python')step.timeout=30;
+    if(UI_ACTIONS.has(step.action)&&!controlSelectors().some(t=>t.name===step.target&&t.kind==='android_ui'))step.target=controlSelectors().find(t=>t.kind==='android_ui')?.name||'';
     if(IMAGES.has(step.action)&&!controlSelectors().some(t=>t.name===step.target&&t.kind==='image'))step.target=controlSelectors().find(t=>t.kind==='image')?.name||'';
     if(TARGETS.has(step.action)&&step.target)useControl(step.target);
     dirty();render();
@@ -584,6 +616,7 @@ document.addEventListener('pointerup',()=>{pickStart=null;});
 document.addEventListener('selectionchange',()=>{const editor=document.querySelector('#case-python-code');if(editor&&document.activeElement===editor)S.pythonSelection=[editor.selectionStart,editor.selectionEnd];});
 modal.addEventListener('cancel',event=>{event.preventDefault();closeModal();});
 document.addEventListener('keydown',event=>{
+  if(event.defaultPrevented)return;
   if(event.key==='F1'&&!modal.open){event.preventDefault();handleAction('view-help',{dataset:{}}).catch(error=>toast(error.message,'error'));return;}
   if(event.key==='Tab'&&event.target.matches?.('textarea.python-editor')&&!event.target.disabled&&!event.target.readOnly){
     event.preventDefault();const node=event.target;node.setRangeText('    ',node.selectionStart,node.selectionEnd,'end');node.dispatchEvent(new Event('input',{bubbles:true}));return;
@@ -596,6 +629,8 @@ document.addEventListener('keydown',event=>{
 });
 
 window.studio.onEvent(event=>{
+  if(event.kind==='android_video'||event.kind==='android_video_state'){AndroidVideo.handle(event);return;}
+  if(event.kind==='python_diagnostics')return;
   if(event.kind==='settings_changed'){applySettingsConfig(event.settings);if(S.view==='settings')render();return;}
   if(event.kind==='shortcut_action'){handleShortcutAction(event.action).catch(error=>toast(error.message,'error'));return;}
   if(event.kind==='workbench_state'){
@@ -609,22 +644,24 @@ window.studio.onEvent(event=>{
     return;
   }
   if(event.kind==='game_connection'){S.connection=event.connection;S.handle=S.connection?.handle||null;render();return;}
+  if(event.kind==='android_connection'){S.android.connection=event.connection;S.android.frame=null;S.android.pointer=null;S.android.previewError='';render();return;}
   if(event.kind==='run_state'){receiveRunState(event.run);return;}
   if(event.kind==='game_action'){(event.action==='run'?runGameCase(event.casePath,event.iterations??S.iterations):handleAction(event.action,{dataset:{}})).catch(error=>{toast(error.message,'error');api('renderer_error',{message:error.message,stack:error.stack,action:event.action}).catch(()=>{});});return;}
   if(event.kind==='step'){if(!['recording','exploration'].includes(S.runState?.source))S.stepStatus[event.index]=event.status;log(`${event.status==='running'?'执行':'完成'}步骤 ${event.index+1} · ${event.name}${event.error?' · '+event.error:''}`,event.status==='failed'?'error':event.status==='passed'?'success':'');}
   if(event.kind==='notice')toast(event.message,event.level==='error'?'error':'');
   if(['log','match','notice'].includes(event.kind))log(event.message,event.kind==='log'?'error':'');
-  if(event.kind==='finished'){S.busy='';if(S.recordReplaying){S.recordReplaying=false;S.view='record';api('workbench_show').catch(()=>{});}S.lastResult={...event.result,id:(event.directory||'').split(/[\\/]/).at(-1)};log(`执行结束 · ${LABELS[event.result.status]}`,event.result.status==='failed'?'error':'success');if(event.directory)reports().catch(()=>{});}
+  if(event.kind==='finished'){S.busy='';if(S.recordReplaying){S.recordReplaying=false;S.view=S.android.connection?'android':'record';api('workbench_show').catch(()=>{});}S.lastResult={...event.result,id:(event.directory||'').split(/[\\/]/).at(-1)};log(`执行结束 · ${LABELS[event.result.status]}`,event.result.status==='failed'?'error':'success');if(event.directory)reports().catch(()=>{});}
   if(event.kind==='service_error')windowDiscovery.stop();
-  if(['run_error','service_error'].includes(event.kind)){S.recordStarting=false;S.busy='';if(S.recordReplaying){S.recordReplaying=false;S.view='record';api('workbench_show').catch(()=>{});}log(event.message,'error');toast(event.message,'error');}
+  if(['run_error','service_error'].includes(event.kind)){S.recordStarting=false;S.busy='';if(S.recordReplaying){S.recordReplaying=false;S.view=S.android.connection?'android':'record';api('workbench_show').catch(()=>{});}log(event.message,'error');toast(event.message,'error');}
   if(event.kind==='record_started'){S.recordStarting=false;S.busy='recording';S.recordStart=Date.now();S.recordCount=0;S.recordEvents=[];}
+  if(event.kind==='record_event'&&S.view==='android'){const status=document.querySelector('.android-record-status');if(status)status.textContent=`正在录制预览中的操作 · ${event.count} 个操作 · 仅录制通过本工作台发出的操作`;}
   if(event.kind==='record_event'){S.recordCount=event.count;S.recordEvents.push(event.event);if(S.recordEvents.length>50)S.recordEvents.shift();if(S.view==='record'&&document.querySelector('#live-events'))document.querySelector('#live-events').innerHTML=liveEvents();const status=document.querySelector('.game-status span');if(status)status.textContent=`正在录制 · ${S.recordCount} 个事件`;return;}
   if(event.kind==='record_stopped'){S.busy='';S.recordReplaying=false;S.recordReplayRun=null;S.recordPending=event;S.view='record';}
   if(event.kind==='record_error'){S.recordStarting=false;S.busy='';toast(event.message,'error');}
   if(S.view==='game'&&['step','finished','log','match','notice','run_error','service_error','record_started','record_error'].includes(event.kind)){updateGameControls();return;}
   render();
 });
-setInterval(()=>{RunPanel.tick(document.querySelector('#game-run-results'),S.runState);RunPanel.tick(document.querySelector('#record-replay-results'),S.recordReplayRun);const clock=document.querySelector('#record-clock');if(clock&&S.busy==='recording')clock.textContent=elapsed();},500);
+setInterval(()=>{RunPanel.tick(document.querySelector('#android-run-results'),S.runState);RunPanel.tick(document.querySelector('#game-run-results'),S.runState);RunPanel.tick(document.querySelector('#record-replay-results'),S.recordReplayRun);const clock=document.querySelector('#record-clock');if(clock&&S.busy==='recording')clock.textContent=elapsed();},500);
 async function bootstrap(){
   try{const data=await api('bootstrap');if(data.settings){applySettingsConfig(data.settings);S.settingsDraft=clone(data.settings.values);}S.windows=data.windows;S.admin=data.admin;const candidate=data.windows.find(w=>w.handle===data.preferredHandle);S.handle=null;setProject(data);await reports();if(data.autoConnect&&candidate){try{await connectGame(candidate.handle);}catch(error){toast(error.message,'error');}}window.__studioReady=true;windowDiscovery.start();}
   catch(error){window.__studioErrors.push(error.message);root.innerHTML=`<div class="loading"><div class="empty"><strong>测试服务未能启动</strong><p>${esc(error.message)}</p><p>请确认 Python 和依赖已安装，再重新打开工作台。</p></div></div>`;toast(error.message,'error');}
@@ -635,7 +672,7 @@ let auditTimer;
 async function refreshAudit(){const focused=document.activeElement?.id,caret=document.activeElement?.selectionStart;const data=await api('audit_list',{level:S.auditLevel,search:S.auditSearch});S.auditEntries=data.entries;S.auditDirectory=data.directory;if(S.auditSelected&&!S.auditEntries.some(row=>row.id===S.auditSelected.id))S.auditSelected=null;if(S.view==='diagnostics'){render();if(focused==='audit-search'){const input=document.querySelector('#audit-search');input?.focus();input?.setSelectionRange(caret,caret);}}}
 function diagnosticsView(){
  const selected=S.auditSelected;
- return `<div class="page-heading"><div><h1>错误日志</h1><p class="sub">连接、录制、采集、执行和窗口切换的诊断记录，重启后仍保留。</p></div><div class="heading-actions">${button('刷新','audit-refresh','','refresh')}${button('打开日志目录','audit-folder','','folder')}${button('导出日志','audit-export','primary','upload')}</div></div>
+ return `<div class="page-heading"><div class="heading-actions">${button('刷新','audit-refresh','','refresh')}${button('打开日志目录','audit-folder','','folder')}${button('导出日志','audit-export','primary','upload')}</div></div>
  <div class="audit-filters"><select id="audit-level" aria-label="日志等级">${options([['','全部等级'],['error','错误'],['warning','提醒'],['info','操作记录']],S.auditLevel)}</select><input id="audit-search" placeholder="搜索功能、错误原因或日志编号" value="${esc(S.auditSearch)}"><span class="small">最近 ${S.auditEntries.length} 条 · 导出最多 1000 条</span></div>
  <div class="audit-layout"><div>${historySelectionBar('audit')}<table class="report-table"><thead><tr><th class="history-check-cell">${historyCheckbox('audit')}</th><th>时间</th><th>等级</th><th>功能 / 阶段</th><th>原因</th><th></th></tr></thead><tbody>${S.auditEntries.map(entry=>`<tr><td class="history-check-cell">${historyCheckbox('audit',entry.id)}</td><td>${esc(new Date(entry.time).toLocaleString('zh-CN',{hour12:false}))}</td><td><span class="badge ${entry.level==='error'?'failed':entry.level==='warning'?'stopped':'passed'}">${{error:'错误',warning:'提醒',info:'记录'}[entry.level]}</span></td><td>${esc(entry.operation)}<br><span class="small">${esc(entry.stage)}</span></td><td>${esc(entry.message||'—')}</td><td>${button('详情','audit-detail','ghost','',`data-id="${esc(entry.id)}"`)}</td></tr>`).join('')}</tbody></table>${!S.auditEntries.length?'<div class="empty compact">没有匹配的日志</div>':''}</div>${selected?`<aside class="audit-detail"><strong>日志 #${esc(selected.id)}</strong><pre>${esc(JSON.stringify(selected,null,2))}</pre></aside>`:''}</div><p class="small audit-path">${esc(S.auditDirectory)}</p>`;
 }
@@ -660,7 +697,7 @@ async function handleShortcutAction(action){
   if(action==='record')return startRecord();
   if(action==='pick')return chooseTargetWindow();
   if(action==='screenshot'){
-    if(lock())return;if(!S.handle)throw new Error('请先连接目标窗口');
-    const shot=await api('capture',{handle:S.handle});await api('workbench_show');showModal({kind:'screenshot',shot});
+    if(lock())return;if(!hasTarget())throw new Error('请先连接目标窗口');
+    const shot=await api('capture',targetArgs());await api('workbench_show');showModal({kind:'screenshot',shot});
   }
 }

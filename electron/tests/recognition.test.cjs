@@ -7,7 +7,9 @@ test('OCR selectors need text while template selectors need at least one image',
   assert.equal(selectorSchema.parse({name:'文字',kind:'image',recognition:'ocr',text:'完成任务'}).image,'');
   assert.throws(()=>selectorSchema.parse({name:'文字',kind:'image',recognition:'ocr'}));
   assert.throws(()=>selectorSchema.parse({name:'图片',kind:'image'}));
-  const parsed=selectorSchema.parse({name:'悬停',kind:'image',templates:[{image:'assets/hover.png',mask:'assets/mask.png'}],color_tolerance:30});
+  const parsed=selectorSchema.parse({name:'悬停',kind:'image',templates:[{image:'assets/hover.png',mask:'assets/mask.png',name:'悬停状态'}],color_tolerance:30});
+  assert.equal(parsed.templates[0].name,'悬停状态');
+  for(const name of ['', '   ', 123, '名'.repeat(201)])assert.throws(()=>selectorSchema.parse({name:'按钮',kind:'image',templates:[{image:'assets/hover.png',name}]}));
   assert.equal(parsed.templates[0].mask,'assets/mask.png');
   assert.equal(parsed.color_tolerance,30);
   assert.throws(()=>selectorSchema.parse({name:'越界',kind:'image',image:'assets/a.png',templates:[{image:'../outside.png'}]}));
@@ -43,4 +45,16 @@ test('shared control IDs survive project validation and malformed references are
   const id='a'.repeat(32);
   assert.equal(projectSchema.parse({selectors:[{name:'共享',library_id:id}],steps:[{action:'click',target:'共享'}]}).selectors[0].library_id,id);
   assert.throws(()=>selectorSchema.parse({name:'共享',library_id:'../bad'}));
+});
+
+
+test('native UI selectors survive schema round trips and require Android UI controls for assertions',()=>{
+  const selector={name:'登录',kind:'android_ui',ui:{resource_id:'example:id/login',package:'example'}};
+  const parsed=selectorSchema.parse(selector);assert.deepEqual(parsed.ui,selector.ui);
+  assert.deepEqual(selectorSchema.parse({name:'坐标'}).ui,{});
+  for(const ui of [{},{index:1},{resource_id:'id',index:0},{resource_id:'id',enabled:'true'},{resource_id:'id',xpath:'//*'}])assert.throws(()=>selectorSchema.parse({...selector,ui}));
+  for(const action of ['wait_ui','assert_ui','assert_ui_absent']){
+    assert.equal(projectSchema.parse({selectors:[selector],steps:[{action,target:'登录'}]}).steps[0].action,action);
+    assert.throws(()=>projectSchema.parse({selectors:[{name:'登录'}],steps:[{action,target:'登录'}]}));
+  }
 });

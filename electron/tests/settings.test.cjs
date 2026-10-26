@@ -14,8 +14,8 @@ test('settings normalize accelerators and reject aliases, reserved keys and inva
 });
 test('settings save atomically and survive reload; corrupt input preserves source and uses defaults',t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'echo-settings-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
-  const store=new SettingsStore(root);assert.deepEqual(store.value,DEFAULTS);
-  const next=clone(DEFAULTS);next.startup.admin=false;next.mcp.enabled=false;
+  const store=new SettingsStore(root);assert.deepEqual(store.value,DEFAULTS);assert.equal(store.value.mcp.enabled,false);
+  const next=clone(DEFAULTS);next.startup.admin=false;next.mcp.enabled=true;
   store.save(next);assert.deepEqual(new SettingsStore(root).value,next);
   const before=fs.readFileSync(store.file);assert.throws(()=>store.save({mcp:{explorationTimeout:-2}}));assert.deepEqual(fs.readFileSync(store.file),before);
   fs.writeFileSync(store.file,'broken');const corrupt=new SettingsStore(root);assert.deepEqual(corrupt.value,DEFAULTS);assert.ok(corrupt.warning);assert.equal(fs.readFileSync(store.file,'utf8'),'broken');
@@ -34,4 +34,19 @@ test('window bounds recover across changed monitor layouts and reject malformed 
   assert.equal(visibleBounds({x:0,y:0,width:-1,height:1000},displays),null);
   assert.deepEqual(visibleBounds({x:1800,y:0,width:1440,height:1000},displays),null);
   assert.deepEqual(visibleBounds({x:1500,y:500,width:1440,height:1000},displays),{x:480,y:80,width:1440,height:1000});
+});
+
+test('environment settings migrate legacy ADB configuration and an explicit automatic choice wins on reload',t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'echo-env-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const file=path.join(root,'android.json'),legacy=JSON.stringify({adb_path:'C:/Android/platform-tools/adb.exe'});fs.writeFileSync(file,legacy);
+  const store=new SettingsStore(root);assert.equal(store.value.environment.adbPath,'C:/Android/platform-tools/adb.exe');assert.equal(fs.readFileSync(file,'utf8'),legacy);
+  store.save({...store.value,environment:{...store.value.environment,adbPath:'',androidMaxFps:60,androidMaxSize:1920,androidBitRate:8}});
+  const next=new SettingsStore(root);assert.equal(next.value.environment.adbPath,'');assert.equal(next.value.environment.androidMaxFps,60);
+  assert.equal(fs.readFileSync(file,'utf8'),legacy);
+});
+
+test('environment settings reject malformed paths and unsupported stream parameters',()=>{
+  for(const environment of [{adbPath:'a\0b'},{adbPath:'x'.repeat(4097)},{androidMaxFps:120},{androidMaxSize:0},{androidBitRate:5},{androidPreviewMode:'anything'}])assert.throws(()=>validateSettings({environment}));
+  assert.deepEqual(validateSettings({startup:{admin:false}}).environment,DEFAULTS.environment);
+  for(const androidPreviewMode of ['stream','screenshot']){const parsed=validateSettings({environment:{androidPreviewMode,androidMaxFps:60}});assert.equal(parsed.environment.androidMaxFps,60);assert.equal(Object.hasOwn(parsed.environment,'androidPreviewMode'),false);}
 });

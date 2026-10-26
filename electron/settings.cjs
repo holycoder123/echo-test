@@ -4,8 +4,9 @@ const {randomUUID}=require('node:crypto');
 
 const DEFAULTS={
   shortcuts:{run:'F6',record:'F7',screenshot:'F8',pick:'Ctrl+Alt+W',show:'Ctrl+Alt+E',stop:'F12'},
-  mcp:{enabled:true,explorationTimeout:15},
+  mcp:{enabled:false,explorationTimeout:15},
   startup:{admin:true,rememberBounds:true,closeAction:'exit'},
+  environment:{adbPath:'',androidMaxFps:30,androidMaxSize:1280,androidBitRate:4},
   target:{refreshSeconds:3,defaultMode:'pick',autoToolbar:true,linkToolbar:true,filter:''},
   history:{retentionDays:30},
 };
@@ -26,6 +27,7 @@ function validateSettings(value){
   for(const [section,fields] of Object.entries(value)){
     if(!Object.hasOwn(DEFAULTS,section)||!fields||typeof fields!=='object'||Array.isArray(fields))throw new Error('未知的设置分组');
     for(const [key,item] of Object.entries(fields)){
+      if(section==='environment'&&key==='androidPreviewMode'){if(!['stream','screenshot'].includes(item))throw new Error('无效的旧版安卓预览方式');continue;}
       if(!Object.hasOwn(DEFAULTS[section],key))throw new Error('未知的设置项');
       const expected=DEFAULTS[section][key];
       if(typeof item!==typeof expected)throw new Error('设置值类型无效');
@@ -45,11 +47,21 @@ function validateSettings(value){
   if(!['pick','search'].includes(result.target.defaultMode))throw new Error('无效的窗口选择模式');
   if(result.target.filter.length>200)throw new Error('窗口搜索条件最多 200 个字符');
   if(![7,30,90,180,365].includes(result.history.retentionDays))throw new Error('无效的历史保留天数');
+  const environment=result.environment;
+  if(environment.adbPath.length>4096||/[\x00-\x1f]/.test(environment.adbPath))throw new Error('无效的 ADB 路径');
+  if(![15,30,60].includes(environment.androidMaxFps))throw new Error('安卓帧率需为 15、30 或 60');
+  if(![720,1080,1280,1920].includes(environment.androidMaxSize))throw new Error('无效的安卓预览尺寸');
+  if(![2,4,8,12].includes(environment.androidBitRate))throw new Error('无效的安卓视频码率');
   return result;
 }
 class SettingsStore{
   constructor(directory){this.file=path.join(directory,'settings.json');this.value=clone(DEFAULTS);this.warning='';
-    try{this.value=validateSettings(JSON.parse(fs.readFileSync(this.file,'utf8')));}catch(error){if(error.code!=='ENOENT')this.warning='设置文件读取失败，已使用默认值：'+error.message;}
+    let saved={};
+    try{saved=JSON.parse(fs.readFileSync(this.file,'utf8'));this.value=validateSettings(saved);}catch(error){if(error.code!=='ENOENT')this.warning='设置文件读取失败，已使用默认值：'+error.message;}
+    // Preserve the previous Android-only configuration until settings are explicitly saved.
+    if(!saved?.environment||!Object.hasOwn(saved.environment,'adbPath')){
+      try{const legacy=JSON.parse(fs.readFileSync(path.join(directory,'android.json'),'utf8'));if(typeof legacy.adb_path==='string')this.value=validateSettings({...this.value,environment:{...this.value.environment,adbPath:legacy.adb_path}});}catch{}
+    }
   }
   save(value){const next=validateSettings(value);fs.mkdirSync(path.dirname(this.file),{recursive:true});const temporary=this.file+'.'+randomUUID()+'.tmp';
     try{fs.writeFileSync(temporary,JSON.stringify(next,null,2)+'\n',{encoding:'utf8',flag:'wx'});fs.renameSync(temporary,this.file);this.value=next;this.warning='';}

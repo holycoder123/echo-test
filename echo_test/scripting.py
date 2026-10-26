@@ -291,13 +291,14 @@ def game_call(runner, method, args, deadline):
         getattr(backend, method)(value)
     elif method == 'sleep':
         backend.pause(duration(args.get('seconds', 0)))
-    elif method in {'assert_image', 'assert_absent'}:
+    elif method in {'assert_image', 'assert_absent', 'wait_ui', 'assert_ui', 'assert_ui_absent'}:
         name = target_name(args.get('target'))
-        if name not in runner.targets or runner.targets[name].kind != 'image':
-            raise ValueError('图片断言需要图片控件名称')
+        native = method in {'wait_ui', 'assert_ui', 'assert_ui_absent'}
+        if name not in runner.targets or runner.targets[name].kind != ('android_ui' if native else 'image'):
+            raise ValueError('安卓控件等待 / 断言需要安卓 UI 控件名称' if native else '图片断言需要图片控件名称')
         timeout = args.get('timeout', 5)
         number(timeout, '控件定位超时', .1, 600)
-        return runner.resolve(name, min(timeout, max(.001, deadline-time.monotonic())), absent=method == 'assert_absent')
+        return runner.resolve(name, min(timeout, max(.001, deadline-time.monotonic())), absent=method in {'assert_absent', 'assert_ui_absent'})
     elif method == 'screenshot':
         path = runner.directory / ('script_screen_' + uuid4().hex[:8] + '.png')
         backend.capture().save(path)

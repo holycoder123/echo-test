@@ -34,6 +34,27 @@ class Runner:
         selector = self.targets[name]
         if selector.kind == "coordinate":
             return coordinate(selector, self.backend.size())
+        if selector.kind == 'android_ui':
+            if not hasattr(self.backend, 'find_ui'):
+                raise ValueError('安卓 UI 控件仅支持安卓设备，请先连接安卓目标')
+            deadline = time.monotonic() + timeout
+            while True:
+                self.backend.pause(0)
+                try:
+                    point = self.backend.find_ui(selector, timeout=max(.001, deadline-time.monotonic()))
+                finally:
+                    self.recognition[name] = getattr(self.backend, 'last_ui_diagnostic', {'method':'android_ui','matched':False,'reason':'读取控件树失败'})
+                if absent:
+                    if point is None:
+                        return None
+                    if time.monotonic() >= deadline:
+                        raise AssertionError(f'安卓 UI 控件 {name} 仍存在')
+                elif point is not None:
+                    self.message(kind='match', message=f'{name} 已找到安卓 UI 控件，中心 {point}')
+                    return point
+                elif time.monotonic() >= deadline:
+                    raise TimeoutError(f'{timeout:g} 秒内未找到安卓 UI 控件：{name}')
+                self.backend.pause(min(.2, max(0, deadline-time.monotonic())))
         deadline = time.monotonic() + timeout
         while True:
             self.backend.pause(0)
@@ -69,7 +90,7 @@ class Runner:
             self.script_variables[params['variable']] = assignment(params.get('value', ''), self.script_variables)
             return None
         point = None
-        if action in {"click", "double_click", "right_click", "long_press", "scroll", "drag", "wait_image", "assert_image"}:
+        if action in {"click", "double_click", "right_click", "long_press", "scroll", "drag", "wait_image", "assert_image", "wait_ui", "assert_ui"}:
             point = self.resolve(step.target, step.timeout)
         if action == "click":
             self.backend.click(point)
@@ -92,7 +113,7 @@ class Runner:
             if params.get("button"):
                 extra["button"] = params["button"]
             self.backend.drag(point, end, params.get("duration", 1), **extra)
-        elif action == "assert_absent":
+        elif action in {"assert_absent", "assert_ui_absent"}:
             self.resolve(step.target, step.timeout, absent=True)
         elif action == "key":
             self.backend.key(params.get("keys", "ENTER"))
@@ -121,6 +142,10 @@ class Runner:
             self.directory.mkdir(parents=True, exist_ok=True)
         try:
             self.project.validate()
+            from .models import referenced_selector_names
+            used = referenced_selector_names(self.project)
+            if not hasattr(self.backend, 'find_ui') and any(s.kind == 'android_ui' and s.name in used for s in self.project.selectors):
+                raise ValueError('安卓 UI 控件仅支持安卓设备，请先连接安卓目标')
             from .workflow import operation_counts, workflow_work, iter_operations, MAX_OPERATIONS
             counts = operation_counts(self.project)
             total = sum(counts.values()) * iterations

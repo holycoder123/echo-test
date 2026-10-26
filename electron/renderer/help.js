@@ -94,7 +94,7 @@ window.screenshot()</code></pre>
     return `<div class="help-layout"><nav class="help-toc" aria-label="使用说明目录"><span>说明目录${words.length?' · '+rows.length+' 项':''}</span>${rows.map(row=>`<button data-act="help-section" data-section="${row.id}">${row.title}</button>`).join('')}</nav><div class="help-articles">${rows.map(row=>`<article class="help-article" id="guide-${row.id}" aria-labelledby="guide-title-${row.id}"><h2 id="guide-title-${row.id}">${row.title}</h2>${row.body}</article>`).join('')}</div></div>`;
   }
   function render(query='') {
-    return `<div class="page-heading help-heading"><div><h1>使用说明</h1><p class="sub">从连接目标应用到查看执行结果 · 内置文档，离线可用</p></div><label class="help-search"><span>搜索说明</span><input id="help-search" type="search" placeholder="搜索录制、OCR、锚点…" value="${escape(query)}" aria-label="搜索使用说明"></label></div><div class="help-results">${contents(query)}</div>`;
+    return `<div class="page-heading help-heading"><label class="help-search"><input id="help-search" type="search" placeholder="搜索录制、OCR、锚点…" value="${escape(query)}" aria-label="搜索使用说明"></label></div><div class="help-results">${contents(query)}</div>`;
   }
   return {render,contents};
 })();

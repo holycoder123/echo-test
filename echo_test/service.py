@@ -90,6 +90,23 @@ class Service:
         return found[0]
 
     @property
+    def android(self):
+        if not hasattr(self, '_android'):
+            from .android_service import AndroidService
+            self._android = AndroidService(self, ROOT)
+        return self._android
+
+    def target_backend(self, args, stop=None):
+        target = args.get('target')
+        if target is not None:
+            if not isinstance(target, dict) or target.get('platform') != 'android':
+                raise ValueError('不支持的测试目标平台')
+            return self.android.backend(target, stop)
+        game = self.window(args['handle'])
+        self.verify_game_pid(game, args.get('expected_pid'))
+        return WindowsBackend(game, stop) if stop else WindowsBackend(game)
+
+    @property
     def controls(self):
         if not hasattr(self, '_controls_library'):
             self._controls_library = ControlLibrary(os.environ.get('ECHO_TEST_CONTROL_LIBRARY_ROOT') or ROOT)
@@ -109,9 +126,9 @@ class Service:
         return {**self.project_response(project, self.case_path),
                 "admin": is_admin(), "windows": [asdict(w) for w in windows]}
 
-    def capture(self, handle):
+    def capture(self, handle, target=None):
         self.idle()
-        backend = WindowsBackend(self.window(handle))
+        backend = self.target_backend({'handle':handle, **({'target':target} if target is not None else {})})
         backend.activate(require_input=False)
         screen = backend.capture()
         self.capture_image, self.capture_id = screen, uuid4().hex
@@ -373,6 +390,8 @@ class Service:
     def automation_preview(self, handle, selector, expected_pid=None, selectors=None):
         self.idle()
         parsed, mapping = self.preview_selectors(selector, selectors)
+        if parsed.kind == 'android_ui':
+            raise ValueError('安卓 UI 控件仅支持安卓设备')
         for item in mapping.values():
             self.automation_selector_asset(item)
         shot = self.automation_capture(handle, expected_pid)
@@ -406,12 +425,15 @@ class Service:
             recorder = self.recorder
             try:
                 raw = recorder.stop()
-                project = convert_events(raw)
+                from .android import AndroidRecorder
+                project = recorder.project if isinstance(recorder, AndroidRecorder) else convert_events(raw)
                 folder = ROOT / "recordings"
                 folder.mkdir(exist_ok=True)
                 path = folder / (uuid4().hex[:12] + ".json")
                 path.write_text(json.dumps({"events": raw, "project": project.to_dict()}, ensure_ascii=False, indent=2), encoding="utf-8")
                 self.pending_recording = {"project": project.to_dict(), "duration": round(time.monotonic()-recorder.start_time, 2), "raw_count": len(raw), "path": str(path), "diagnostics": recorder.diagnostics()}
+                if isinstance(recorder, AndroidRecorder):
+                    self.pending_recording['target'] = {'platform':'android', 'serial':recorder.serial}
                 self.recorder = None
                 self.emit({"kind": "record_stopped", **self.pending_recording})
                 return self.pending_recording
@@ -422,6 +444,11 @@ class Service:
                 self.recorder = None
 
     def call(self, method, args):
+        if method == 'environment_info':
+            from .environment import runtime_info
+            return runtime_info(ROOT, self.android.adb)
+        if method.startswith('android_'):
+            return self.android.call(method, args)
         if method in {'generate_python', 'python_copy'}:
             self.idle()
             from .codegen import generate_python, python_copy
@@ -531,7 +558,7 @@ class Service:
             self.case_path, self.base_dir = path, path.parent
             return self.project_response(project, path)
         if method == "capture":
-            return self.capture(args["handle"])
+            return self.capture(args.get("handle"), args.get('target'))
         if method == "automation_explore":
             return self.automation_explore(args)
         if method == "automation_capture":
@@ -573,11 +600,26 @@ class Service:
             from PIL import Image
             path = self.controls.asset_path(args["image"])
             with Image.open(path) as image:
-                image.thumbnail((400, 240))
+                if not args.get("full_size", False):
+                    image.thumbnail((400, 240))
                 return {"image": png(image.convert("RGB"))}
         if method == "preview":
             selector, mapping = self.preview_selectors(args["selector"], args.get("selectors"))
-            shot = self.capture(args["handle"])
+            if selector.kind == 'android_ui':
+                self.idle()
+                if (args.get('target') or {}).get('platform') != 'android':
+                    raise ValueError('安卓 UI 控件仅支持安卓设备，请先连接安卓目标')
+                backend = self.android.backend(args['target'])
+                point = backend.find_ui(selector)
+                size = backend.size()
+                shot = self.capture(args.get('handle'), args.get('target'))
+                if self.capture_image.size != size:
+                    raise ValueError('手机方向或尺寸已变化，请重新预览定位')
+                detail = backend.last_ui_diagnostic
+                shot.update(point=point, score=None, matched=point is not None, diagnostic=detail,
+                            box=(detail.get('candidate') or {}).get('box'))
+                return shot
+            shot = self.capture(args.get("handle"), args.get('target'))
             if selector.kind == "coordinate":
                 point = coordinate(selector, self.capture_image.size)
                 shot.update(point=point, score=None)
@@ -593,11 +635,13 @@ class Service:
             iterations = int(args.get("iterations", 1))
             if not 1 <= iterations <= 1000:
                 raise ValueError("循环次数需在 1 ~ 1000 之间")
-            game = self.window(args["handle"])
-            self.verify_game_pid(game, args.get("expected_pid"))
+            backend = self.target_backend(args, self.stop_event.is_set)
+            if args.get('target'):
+                backend.validate_project(project)
             self.stop_event.clear()
-            backend = WindowsBackend(game, self.stop_event.is_set)
             runner = Runner(backend, project, self.base_dir, ROOT / "reports", self.emit)
+            if args.get('target'):
+                runner.result['target'] = {**args['target']}
             self.running = True
             def work():
                 try:
@@ -618,6 +662,14 @@ class Service:
             return self.recorder.diagnostics() if self.recorder else {"listening": False}
         if method == "record_start":
             self.idle()
+            if args.get('target'):
+                from .android import AndroidRecorder
+                backend = self.target_backend(args)
+                backend.adb.require_device(backend.serial)
+                self.pending_recording = None
+                self.recorder = AndroidRecorder(backend.serial, self.record_emit)
+                self.emit({'kind':'record_started', 'diagnostics':self.recorder.diagnostics()})
+                return {'started':True}
             game = self.window(args["handle"])
             self.verify_game_pid(game, args.get("expected_pid"))
             recorder = Recorder(game, self.record_emit)

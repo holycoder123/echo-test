@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <strong>面向 Windows 桌面应用的低代码自动化测试工作台</strong><br>
+  <strong>面向 Windows 桌面应用与安卓设备的自动化测试工作台</strong><br>
   录制真实操作，复用识别控件，让每一次回归都有可追溯的结果。
 </p>
 
@@ -61,6 +61,7 @@ EchoTest 将窗口连接、操作录制、步骤编辑、控件识别和执行�
 | **窗口 API 与代码补全** | 输入 `window.` 选择函数，查看参数说明，将共享控件作为函数参数 |
 | **本地执行报告** | 查看运行历史、步骤状态、截图、脚本输出与错误详情 |
 | **MCP 接入** | 通过工作台截图和探索少量步骤，验证后再保存为正式用例 |
+| **安卓设备自动化** | USB / 无线调试连接，实时视频与触控，录制重放，原生 UI / 图片 / OCR 控件定位 |
 | **离线运行** | 发行包捆绑 Node.js、Python、Electron、识别依赖及中英文 OCR 模型 |
 
 ## 开始使用
@@ -74,7 +75,7 @@ EchoTest 将窗口连接、操作录制、步骤编辑、控件识别和执行�
 | **Windows 安装版** | 运行 `echo-test-<版本>-setup-x64.exe`，按中文向导安装，从桌面或开始菜单启动 |
 | **Windows 便携版** | 将 `echo-test-<版本>-portable-x64.zip` 完整解压到可写目录，双击 `start.cmd` |
 
-支持 **Windows 10/11 x64**。发行包无需另装 Node.js 或 Python；默认启动会请求 Windows 管理员权限并开启 MCP。下载后可用同版本 SHA256 文件校验完整性，详见 [安装版](docs/installer.md) 与 [便携版](docs/portable.md) 文档。
+支持 **Windows 10/11 x64**。发行包无需另装 Node.js、Python 或 ADB；默认启动会请求 Windows 管理员权限，MCP 默认关闭，可在「设置 → MCP」中开启。下载后可用同版本 SHA256 文件校验完整性，详见 [安装版](docs/installer.md) 与 [便携版](docs/portable.md) 文档。
 
 > 本页展示当前源码的品牌与界面；已发布发行包以对应版本标签为准。
 
@@ -110,6 +111,7 @@ Electron 负责桌面界面，Python / OpenCV / Win32 负责识别、录制与�
 | 想了解什么 | 从这里开始 |
 | --- | --- |
 | 连接、录制、控件识别、断言与报告 | [使用指南](docs/user-guide.md) |
+| 安卓真机 / 模拟器连接、预览操作与录制 | [安卓设备接入（首版）](docs/android.md) |
 | 运行环境、共享控件及本地数据管理 | [工作区详解](docs/workspace.md) |
 | 安装、升级、卸载与离线分发 | [Windows 安装版](docs/installer.md) · [便携运行包](docs/portable.md) |
 | 接入支持 MCP 的客户端 | [MCP 接入](docs/mcp.md) |

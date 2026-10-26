@@ -2,6 +2,8 @@
 
 以下命令在项目根目录运行。Node 测试保存在 `electron/tests`，Python 测试保存在 `tests`。
 
+Python 编辑器使用 `npm run build:editor` 构建本地 Monaco、中文语言包与 worker；`npm start`、`npm run test:ui` 和打包流程会自动调用。`electron/tests/python-language-service.test.cjs` 使用真实 Pyright/Ruff 验证补全、悬浮、参数提示、定义/引用、错误行号映射、future import 和格式化；`electron/tests/smoke/python-ide-smoke.cjs` 验证真实 Monaco 的补全撤销、查找、格式化撤销、问题定位、切页状态保留、控件插入、脚本弹窗和只读锁，不执行目标窗口输入。
+
 ```powershell
 npm start
 npm run check
@@ -22,6 +24,12 @@ MCP 回归覆盖标准 SDK 握手和工具模式、认证与文件边界、启�
 
 ## 界面冒烟
 
+实时安卓视频的无设备回归覆盖协议分片、帧大小限制、队列背压、关键帧恢复、会话切换、旋转坐标和解码失败回退，位于 `electron/tests/android-stream.test.cjs` 与 `android-video.test.cjs`。`electron/tools/android-video-probe.cjs --serial=<已授权设备序列号>` 可由 Electron 运行被动实机验证：只读取屏幕，不发送触控，报告保存为 `artifacts/smoke/android-live-video.json`。安装包和便携包内的 scrcpy 服务及许可文件由固定 SHA-256 校验，运行时不联网下载。
+
+实时控制回归验证视频 dummy 字节之后才连接第二条控制通道、DOWN/MOVE/UP 编码和顺序、过期会话与坐标拒绝、取消 / 停止 / 旋转释放触点、文本按 300 字节分包，以及手势结束只记录一次而不重放。Python 回归验证连接不截图、兼容触控只截图一次、实时录制不执行 ADB 并保留比例坐标和时间。界面冒烟验证流畅模式连接不请求截图、按下 / 移动立即转发、松开不调用旧的滑动 RPC，以及 Esc 和重绘取消触控。实机被动探针从空画面直接启动视频，并报告 `controlReady` 与首个解码帧耗时。
+
+安卓首版回归：`tests/test_android.py` 覆盖 ADB 设备状态、进程停止 / 超时、截图、触控、录制、目标绑定、屏幕旋转和真实执行器的图片 / OCR 识别；`artifacts/smoke/android-smoke.json` 检查设备页和预览坐标映射。测试使用模拟设备，不向真实手机发送输入。接入和实机验收步骤见 [安卓设备接入](android.md)。
+
 ```powershell
 npm run test:ui
 ```
@@ -41,7 +49,7 @@ npm run test:ui
 
 ## 真实目标窗口验证
 
-`scripts/smoke-mcp-startup.cjs` 使用独立工作台配置验证默认 MCP 启动、带随机凭证的 SDK 握手、显式关闭和正常退出后的凭证清理，不连接目标应用或发送输入。已有工作台状态或 MCP 凭证时会拒绝覆盖；可以在安装测试的隔离目录中运行。结果为 `artifacts/mcp-startup-smoke.json`。
+`scripts/smoke-mcp-startup.cjs` 使用独立工作台配置验证 MCP 默认关闭、显式开启后的随机凭证 SDK 握手、显式关闭优先于强制开启和正常退出后的凭证清理，不连接目标应用或发送输入。已有工作台状态或 MCP 凭证时会拒绝覆盖；可以在安装测试的隔离目录中运行。结果为 `artifacts/mcp-startup-smoke.json`。
 
 `help-smoke.json` 验证内置使用说明的导航、关键词搜索、目录跳转、F1、无目标应用连接时从工具栏打开，以及未保存用例和录制结果保留；同时检查搜索文本不会作为 HTML 执行。页面预览为 `help-preview.png`，文档在本地静态加载，无需联网。
 

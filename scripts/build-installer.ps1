@@ -5,8 +5,8 @@ $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 Set-Location -LiteralPath $projectRoot
 $cache = Join-Path $projectRoot '.runtime\installer-build'
 New-Item -ItemType Directory -Force -Path $cache | Out-Null
-if (!(Test-Path -LiteralPath (Join-Path $projectRoot 'dist\echo-test-win-x64.zip'))) {
-    & (Join-Path $PSScriptRoot 'build-portable.ps1')
+if (!(Test-Path -LiteralPath (Join-Path $projectRoot 'runtime\python\python.exe')) -or !(Test-Path -LiteralPath (Join-Path $projectRoot 'runtime\node\node.exe')) -or !(Test-Path -LiteralPath (Join-Path $projectRoot 'node_modules\electron\dist\electron.exe'))) {
+    & (Join-Path $PSScriptRoot 'build-portable.ps1') -SkipArchive
     if ($LASTEXITCODE -ne 0) { throw 'Portable build failed' }
 }
 if (!$Compiler) {
@@ -23,16 +23,29 @@ if (!$Compiler) {
     }
 }
 if (!(Test-Path -LiteralPath $Compiler)) { throw 'NSIS compiler is missing' }
+& (Join-Path $PSScriptRoot 'build-installer-ui.ps1') -Compiler $Compiler
+if ($LASTEXITCODE -ne 0) { throw 'Installer UI build failed' }
 $python = Join-Path $projectRoot 'runtime\python\python.exe'
 & $python -X utf8 (Join-Path $PSScriptRoot 'package-portable.py')
 if ($LASTEXITCODE -ne 0) { throw 'Refreshing portable payload failed' }
 & $python -X utf8 (Join-Path $PSScriptRoot 'prepare-installer.py')
 if ($LASTEXITCODE -ne 0) { throw 'Installer payload preparation failed' }
 $version = (Get-Content -LiteralPath (Join-Path $projectRoot 'package.json') -Raw | ConvertFrom-Json).version
-$output = Join-Path $projectRoot "dist\echo-test-$version-setup-x64.exe"
-$payload = Join-Path $cache 'payload\echo-test'
-& $Compiler '/V3' '/INPUTCHARSET' 'UTF8' "/DPRODUCT_VERSION=$version" "/DPROJECT_ROOT=$projectRoot" "/DPAYLOAD_ROOT=$payload" "/DOUTPUT_EXE=$output" (Join-Path $PSScriptRoot 'installer.nsi')
-if ($LASTEXITCODE -ne 0) { throw "NSIS compilation failed: $LASTEXITCODE" }
+$output = Join-Path $projectRoot "dist\latest\echo-test-$version-setup-x64.exe"
+# NSIS cannot read some paths beyond MAX_PATH. Keep the source and payload
+# addresses short even when the checkout lives inside a deeply nested folder.
+$drive = @('Z:','Y:','X:','W:','V:','U:') | Where-Object { !(Test-Path -LiteralPath ($_+'\')) } | Select-Object -First 1
+if (!$drive) { throw 'No temporary build drive is available' }
+& subst $drive $projectRoot
+if ($LASTEXITCODE -ne 0) { throw 'Could not create a temporary short build path' }
+try {
+    $shortRoot = $drive+'\.'
+    $payload = Join-Path $shortRoot '.runtime\installer-build\payload\echo-test'
+    & $Compiler '/V3' '/INPUTCHARSET' 'UTF8' "/DPRODUCT_VERSION=$version" "/DPROJECT_ROOT=$shortRoot" "/DPAYLOAD_ROOT=$payload" "/DOUTPUT_EXE=$output" (Join-Path $shortRoot 'scripts\installer.nsi')
+    if ($LASTEXITCODE -ne 0) { throw "NSIS compilation failed: $LASTEXITCODE" }
+} finally {
+    & subst $drive /D
+}
 $hash = (Get-FileHash -LiteralPath $output -Algorithm SHA256).Hash.ToLowerInvariant()
 ($hash+'  '+[IO.Path]::GetFileName($output)) | Set-Content -LiteralPath ($output+'.sha256') -Encoding ASCII
 Write-Host "Installer ready: $output"

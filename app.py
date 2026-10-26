@@ -18,7 +18,7 @@ def main():
     permission.add_argument("--admin", dest="admin", action="store_true", help="请求管理员权限启动桌面工作台（默认）")
     permission.add_argument("--no-admin", dest="admin", action="store_false", help="本次启动不主动请求管理员权限")
     mcp_mode = parser.add_mutually_exclusive_group()
-    mcp_mode.add_argument("--mcp", dest="mcp", action="store_true", help="启用本机 MCP 接口（默认启用）")
+    mcp_mode.add_argument("--mcp", dest="mcp", action="store_true", help="启用本机 MCP 接口（默认关闭，可在设置中开启）")
     mcp_mode.add_argument("--no-mcp", dest="mcp", action="store_false", help="本次启动关闭 MCP 接口")
     parser.set_defaults(mcp=None, admin=None)
     args = parser.parse_args()

@@ -51,9 +51,9 @@ function useControl(name){
 }
 function controlImage(target){return target.kind==='image'?(target.image||target.templates?.find(item=>item.image)?.image||''):'';}
 function controlImages(target){return target.kind==='image'?[...new Set([controlImage(target),...(target.templates||[]).map(item=>item.image)].filter(Boolean))]:[];}
-function controlKind(target){return target.kind==='coordinate'?'坐标':target.recognition==='ocr'?'OCR 文字':'图片模板';}
+function controlKind(target){return target.kind==='android_ui'?'安卓 UI':target.kind==='coordinate'?'坐标':target.recognition==='ocr'?'OCR 文字':'图片模板';}
 function matchesControl(entry,search){
-  const target=entry.selector,text=[target.name,categoryName(entry.category_id),target.text||'',controlKind(target),target.kind,target.recognition||''].join(' ').toLocaleLowerCase();
+  const target=entry.selector,text=[target.name,categoryName(entry.category_id),target.text||'',...Object.values(target.ui||{}),controlKind(target),target.kind,target.recognition||''].join(' ').toLocaleLowerCase();
   return search.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean).every(word=>text.includes(word));
 }
 function controlChoice(step,key){
@@ -80,9 +80,9 @@ async function openControlPicker(key){
   const data=await api('control_list');
   if(lock()||S.project!==project||S.project.steps[S.selected]!==step)return;
   setControls(data,true);
-  const imageOnly=key==='target'&&IMAGES.has(step.action),eligible=S.controls.entries.filter(entry=>!imageOnly||entry.selector.kind==='image');
+  const imageOnly=key==='target'&&IMAGES.has(step.action),androidOnly=key==='target'&&UI_ACTIONS.has(step.action),eligible=S.controls.entries.filter(entry=>(!imageOnly||entry.selector.kind==='image')&&(!androidOnly||entry.selector.kind==='android_ui'));
   const selected=eligible.find(entry=>entry.selector.name===step[key]);
-  const m={kind:'control-picker',project,step,key,imageOnly,category:'all',search:'',selectedId:selected?.id||'',clear:false};
+  const m={kind:'control-picker',project,step,key,imageOnly,androidOnly,category:'all',search:'',selectedId:selected?.id||'',clear:false};
   showModal(m);modal.querySelector('#control-picker-search').focus();
   // Load saved templates without requiring a connected application. Keep search focus and scroll intact.
   const images=[...new Set(eligible.flatMap(entry=>controlImages(entry.selector)))];
@@ -91,10 +91,10 @@ async function openControlPicker(key){
   await Promise.all(Array.from({length:Math.min(4,images.length)},worker));
 }
 function controlPickerResults(m){
-  const entries=S.controls.entries.filter(entry=>(!m.imageOnly||entry.selector.kind==='image')&&(m.category==='all'||m.category===entry.category_id)&&matchesControl(entry,m.search));
+  const entries=S.controls.entries.filter(entry=>((!m.imageOnly||entry.selector.kind==='image')&&(!m.androidOnly||entry.selector.kind==='android_ui'))&&(m.category==='all'||m.category===entry.category_id)&&matchesControl(entry,m.search));
   return `<div class="control-result-count">${entries.length} 个${m.search?'匹配':''}控件${m.imageOnly?' · 仅图片 / OCR 控件':''}</div>${entries.length?`<div class="control-picker-grid">${entries.map(entry=>{
     const target=entry.selector,image=controlImage(target),selected=m.selectedId===entry.id;
-    const preview=image?controlImageSlot(image,target.name):`<div class="control-text-preview">${icon(target.kind==='coordinate'?'coordinate':'image')}<span>${esc(target.kind==='coordinate'?target.normalized!==false?`X ${(target.x*100).toFixed(1)}% · Y ${(target.y*100).toFixed(1)}%`:`X ${target.x} · Y ${target.y}`:target.text||'未设置识别文字')}</span></div>`;
+    const preview=image?controlImageSlot(image,target.name):`<div class="control-text-preview">${icon(target.kind==='coordinate'?'coordinate':'image')}<span>${esc(target.kind==='coordinate'?target.normalized!==false?`X ${(target.x*100).toFixed(1)}% · Y ${(target.y*100).toFixed(1)}%`:`X ${target.x} · Y ${target.y}`:target.kind==='android_ui'?androidUiSummary(target):target.text||'未设置识别文字')}</span></div>`;
     return `<button type="button" class="control-picker-card ${selected?'selected':''}" data-act="picker-select" data-id="${entry.id}" aria-pressed="${selected}">${preview}<span class="control-picker-copy"><strong>${esc(target.name)}</strong><small>${esc(categoryName(entry.category_id))} · ${controlKind(target)}</small></span></button>`;
   }).join('')}</div>`:'<div class="empty compact"><strong>没有匹配的控件</strong><p>试试其他分类或搜索词。</p></div>'}`;
 }
@@ -102,7 +102,7 @@ function controlPickerDetail(m){
   const entry=S.controls.entries.find(item=>item.id===m.selectedId);
   if(!entry)return `<div class="empty compact"><p>${m.clear?'确认后将清空此步骤的目标。':'选择控件，查看图片和信息。'}</p></div>`;
   const target=entry.selector,images=controlImages(target);
-  return `<strong>${esc(target.name)}</strong><p>${esc(categoryName(entry.category_id))} · ${controlKind(target)}</p>${images.map(image=>controlImageSlot(image,target.name+' 模板预览')).join('')}${target.recognition==='ocr'?`<p class="control-ocr-text">识别文字：${esc(target.text||'未设置')}</p>`:''}${target.kind==='coordinate'?`<p>${target.normalized!==false?`客户区比例坐标<br>X ${(target.x*100).toFixed(1)}% · Y ${(target.y*100).toFixed(1)}%`:`客户区像素坐标<br>X ${target.x} · Y ${target.y}`}</p>`:''}`;
+  return `<strong>${esc(target.name)}</strong><p>${esc(categoryName(entry.category_id))} · ${controlKind(target)}</p>${images.map(image=>controlImageSlot(image,target.name+' 模板预览')).join('')}${target.recognition==='ocr'?`<p class="control-ocr-text">识别文字：${esc(target.text||'未设置')}</p>`:''}${target.kind==='android_ui'?`<p>${esc(androidUiSummary(target))}</p>`:''}${target.kind==='coordinate'?`<p>${target.normalized!==false?`客户区比例坐标<br>X ${(target.x*100).toFixed(1)}% · Y ${(target.y*100).toFixed(1)}%`:`客户区像素坐标<br>X ${target.x} · Y ${target.y}`}</p>`:''}`;
 }
 function renderControlPickerResults(){
   const m=S.modal;if(m?.kind!=='control-picker')return;
@@ -114,7 +114,7 @@ function renderControlPickerResults(){
   for(const button of modal.querySelectorAll('[data-act="picker-category"]')){const active=button.dataset.category===m.category;button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));}
 }
 function controlPickerModal(m){
-  const eligible=S.controls.entries.filter(entry=>!m.imageOnly||entry.selector.kind==='image');
+  const eligible=S.controls.entries.filter(entry=>(!m.imageOnly||entry.selector.kind==='image')&&(!m.androidOnly||entry.selector.kind==='android_ui'));
   const categories=[{id:'all',name:'全部控件'},{id:'',name:'未分类'},...S.controls.categories];
   return header(m.key==='end_target'?'选择拖动终点控件':'选择目标控件')+`<div class="control-picker-tools"><div class="search"><input id="control-picker-search" placeholder="搜索名称、分类或识别文字" aria-label="搜索可选控件" value="${esc(m.search)}">${icon('search')}</div><span>选中控件后，确认选择</span></div><div class="control-picker-layout"><aside class="control-categories" aria-label="可选控件分类">${categories.map(category=>`<button type="button" class="control-category ${m.category===category.id?'active':''}" data-act="picker-category" data-category="${esc(category.id)}" aria-pressed="${m.category===category.id}"><span>${esc(category.name)}</span><small>${eligible.filter(entry=>category.id==='all'||entry.category_id===category.id).length}</small></button>`).join('')}</aside><div id="control-picker-results">${controlPickerResults(m)}</div><aside id="control-picker-detail" aria-label="选中控件预览">${controlPickerDetail(m)}</aside></div><footer class="modal-footer"><button class="btn ghost control-picker-clear" data-act="picker-clear" ${disabled()}>清空目标</button>${button('取消','close-modal')}${button('确认选择','picker-accept','primary','',disabled()||(!m.selectedId&&!m.clear?'disabled':''))}</footer>`;
 }
@@ -134,12 +134,12 @@ function controlView(){
   });
   const usedIds=new Set(projectControlIds());
   const categoryButton=(id,name,count)=>`<button class="control-category ${S.targetCategory===id?'active':''}" data-act="control-filter" data-category="${esc(id)}" aria-pressed="${S.targetCategory===id}"><span>${esc(name)}</span><small>${count}</small></button>`;
-  return `<div class="page-heading control-heading"><div><h1>通用控件库</h1><p class="sub">所有用例共享控件；在步骤设置中直接选择，修改后统一生效。</p></div><div class="heading-actions"><div class="search"><input placeholder="搜索名称、分类或识别文字" id="target-search" value="${esc(S.targetSearch)}" aria-label="搜索通用控件">${icon('search')}</div>${button('刷新','control-refresh','ghost','refresh')}${button('新增控件','new-target','primary','plus',disabled())}</div></div>
+  return `<div class="page-heading control-heading"><div class="heading-actions"><div class="search"><input placeholder="搜索名称、分类或识别文字" id="target-search" value="${esc(S.targetSearch)}" aria-label="搜索通用控件">${icon('search')}</div>${button('刷新','control-refresh','ghost','refresh')}${button('新增控件','new-target','primary','plus',disabled())}</div></div>
   <div class="control-layout"><aside class="control-categories" aria-label="控件分类"><div class="control-category-heading"><strong>分类</strong>${button('管理','control-categories','ghost','',disabled())}</div>${categoryButton('all','全部控件',S.controls.entries.length)}${categoryButton('','未分类',S.controls.uncategorized||0)}${S.controls.categories.map(category=>categoryButton(category.id,category.name,category.count||0)).join('')}${button('新建分类','new-category','ghost','plus',disabled())}</aside>
   <div class="control-results"><div class="control-result-count">${esc(S.targetCategory==='all'?'全部控件':categoryName(S.targetCategory))} · ${cards.length} 个${S.targetSearch?'匹配结果':''}</div>${S.controls.warnings?.length?`<p class="control-import-note">${S.controls.warnings.length} 个旧文件未能迁入，请检查用例文件和模板是否完整。</p>`:''}
   ${cards.length?`<div class="target-grid">${cards.map(entry=>{
     const target=entry.selector,index=entry.index,used=usedIds.has(entry.id);
-    return `<article class="target-card" data-control-id="${entry.id}">${target.kind==='image'?`<div class="target-thumb">${controlImageSlot(controlImage(target),target.name)}</div>`:''}<div class="target-body"><div class="top">${icon(target.kind)}<strong>${esc(target.name)}</strong><span class="type-pill">${target.kind==='image'?target.recognition==='ocr'?'OCR':'图片':'坐标'}</span></div><div class="control-tags"><span>${esc(categoryName(entry.category_id))}</span>${used?'<span class="control-used">当前用例已引用</span>':''}</div><div class="target-values">${target.kind==='image'?`${target.recognition==='ocr'?'OCR 文字':'模板匹配'} · 阈值 ${target.threshold??.86}<br>${esc(target.recognition==='ocr'?target.text:target.image||target.templates?.[0]?.image||'')}${target.templates?.length?`<br>附加模板 ${target.templates.length} 张`:''}${target.anchor?`<br>锚点 ${esc(target.anchor)}`:''}`:target.normalized!==false?`X ${(target.x*100).toFixed(1)}% · Y ${(target.y*100).toFixed(1)}%<br>随客户区尺寸变化`:`X ${target.x} · Y ${target.y}<br>客户区像素坐标`}</div></div><footer>${button('编辑','edit-target','','',`data-i="${index}" ${disabled()}`)}${button('预览定位','preview-target','ghost','',`data-i="${index}" ${disabled()}`)}<button class="icon-button last" data-act="delete-target" data-i="${index}" title="删除通用控件" ${disabled()}>${icon('trash')}</button></footer></article>`;
+    return `<article class="target-card" data-control-id="${entry.id}">${target.kind==='image'?`<div class="target-thumb">${controlImageSlot(controlImage(target),target.name)}</div>`:''}<div class="target-body"><div class="top">${icon(target.kind)}<strong>${esc(target.name)}</strong><span class="type-pill">${controlKind(target)}</span></div><div class="control-tags"><span>${esc(categoryName(entry.category_id))}</span>${used?'<span class="control-used">当前用例已引用</span>':''}</div><div class="target-values">${target.kind==='android_ui'?esc(androidUiSummary(target)):target.kind==='image'?`${target.recognition==='ocr'?'OCR 文字':'模板匹配'} · 阈值 ${target.threshold??.86}<br>${esc(target.recognition==='ocr'?target.text:target.image||target.templates?.[0]?.image||'')}${target.templates?.length?`<br>附加模板 ${target.templates.length} 张`:''}${target.anchor?`<br>锚点 ${esc(target.anchor)}`:''}`:target.normalized!==false?`X ${(target.x*100).toFixed(1)}% · Y ${(target.y*100).toFixed(1)}%<br>随客户区尺寸变化`:`X ${target.x} · Y ${target.y}<br>客户区像素坐标`}</div></div><footer>${button('编辑','edit-target','','',`data-i="${index}" ${disabled()}`)}${button('预览定位','preview-target','ghost','',`data-i="${index}" ${disabled()}`)}<button class="icon-button last" data-act="delete-target" data-i="${index}" title="删除通用控件" ${disabled()}>${icon('trash')}</button></footer></article>`;
   }).join('')}</div>`:`<div class="empty"><div class="empty-icon">${icon('targets')}</div><strong>${S.targetSearch?'没有匹配的控件':'此分类还没有控件'}</strong><p>新建控件后，所有用例都可以引用。</p>${S.targetSearch?button('清除搜索','control-clear-search','ghost'):button('新增控件','new-target','quiet','plus',disabled())}</div>`}</div></div>`;
 }
 async function editSharedControl(index=null){
@@ -147,7 +147,7 @@ async function editSharedControl(index=null){
   const entry=index===null?null:S.controls.entries[index];
   if(index!==null&&!entry)throw new Error('控件已不存在，请刷新');
   showModal({kind:'selector',index,id:entry?.id||null,categoryId:entry?.category_id??(S.targetCategory==='all'?'':S.targetCategory),draft:entry?clone(entry.selector):defaultSelector()});
-  await thumbnail(controlImage(S.modal.draft),true);
+  await Promise.all(controlImages(S.modal.draft).map(image=>thumbnail(image,true)));
 }
 async function saveSharedControl(){
   if(lock())return;
@@ -170,7 +170,7 @@ async function sharedControlAction(action,node){
     if(action==='picker-category'){m.category=node.dataset.category;renderControlPickerResults();}
     if(action==='picker-select'){
       const entry=S.controls.entries.find(item=>item.id===node.dataset.id);
-      if(!entry||(m.imageOnly&&entry.selector.kind!=='image'))return true;
+      if(!entry||(m.imageOnly&&entry.selector.kind!=='image')||(m.androidOnly&&entry.selector.kind!=='android_ui'))return true;
       m.selectedId=entry.id;m.clear=false;renderControlPickerResults();
     }
     if(action==='picker-clear'){m.selectedId='';m.clear=true;renderControlPickerResults();}
@@ -178,7 +178,7 @@ async function sharedControlAction(action,node){
       if(lock())return true;
       if(S.project!==m.project||!S.project.steps.includes(m.step))throw new Error('步骤已发生变化，请重新选择控件');
       const entry=S.controls.entries.find(item=>item.id===m.selectedId);
-      if(!m.clear&&(!entry||(m.imageOnly&&entry.selector.kind!=='image')))throw new Error('请先选择控件');
+      if(!m.clear&&(!entry||(m.imageOnly&&entry.selector.kind!=='image')||(m.androidOnly&&entry.selector.kind!=='android_ui')))throw new Error('请先选择控件');
       m.step[m.key]=m.clear?'':useControl(entry.selector.name).name;
       dirty();closeModal();render();
     }
@@ -217,9 +217,9 @@ async function sharedControlAction(action,node){
     }return true;
   }
   if(action==='preview-target'){
-    if(!S.handle)throw new Error('请先连接目标窗口');
+    if(!hasTarget())throw new Error('请先连接目标窗口或安卓设备');
     const target=S.controls.entries[index]?.selector;if(!target)throw new Error('控件已不存在，请刷新');
-    const shot=await api('preview',{handle:S.handle,selector:target,selectors:controlSelectors()});showModal({kind:'preview',shot});return true;
+    const shot=await api('preview',{...targetArgs(),selector:target,selectors:controlSelectors()});showModal({kind:'preview',shot});return true;
   }
   return false;
 }

@@ -30,6 +30,9 @@ def main():
     (ROOT/'runtime'/'requirements.lock').write_text('\n'.join(row['name']+'=='+row['version'] for row in packages)+'\n', encoding='utf-8')
     (ROOT/'requirements-portable.lock').write_text('\n'.join(row['name']+'=='+row['version'] for row in packages)+'\n', encoding='utf-8')
     redist = ROOT/'runtime'/'redist'/'vc_redist.x64.exe'
+    manifest['android_adb'] = json.loads((ROOT/'runtime/android/manifest.json').read_text(encoding='utf-8'))
+    manifest['android_video'] = json.loads((ROOT/'runtime/android/scrcpy/manifest.json').read_text(encoding='utf-8'))
+    (ROOT/'runtime'/'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
     if redist.exists():
         manifest['vc_redist_sha256'] = hashlib.sha256(redist.read_bytes()).hexdigest()
         (ROOT/'runtime'/'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')

@@ -89,6 +89,9 @@ if (!(Test-Path -LiteralPath (Join-Path $projectRoot 'node_modules\electron\dist
     } finally { $env:PATH = $originalPath }
 }
 $env:PYTHONUTF8 = '1'
+Run-Checked $pythonExe @((Join-Path $PSScriptRoot 'vendor-adb.py'))
+Run-Checked $pythonExe @((Join-Path $PSScriptRoot 'vendor-scrcpy.py'))
+Run-Checked $nodeExe @((Join-Path $PSScriptRoot 'build-editor.cjs'))
 Run-Checked $pythonExe @((Join-Path $PSScriptRoot 'portable-manifest.py'), '--python-version', $pythonVersion, '--python-sha256', $pythonHash, '--node-version', $nodeVersion, '--node-sha256', $nodeHash)
 Run-Checked $nodeExe @((Join-Path $PSScriptRoot 'verify-portable.cjs'))
 if (!$SkipArchive) { Run-Checked $pythonExe @((Join-Path $PSScriptRoot 'package-portable.py')) }

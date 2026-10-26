@@ -12,6 +12,9 @@ const PythonCompletion=(()=>{
     ['key_up','key_up(keys)','松开指定按键。',true],
     ['text','text(text)','向当前目标窗口输入文本。输入前先聚焦目标输入框。',true],
     ['sleep','sleep(seconds)','等待指定秒数，支持停止按钮和 F12 中止。',true],
+    ['wait_ui','wait_ui(target, timeout=5)','等待安卓 UI 控件出现。',true],
+    ['assert_ui','assert_ui(target, timeout=5)','断言安卓 UI 控件存在；超时失败。',true],
+    ['assert_ui_absent','assert_ui_absent(target, timeout=5)','等待并断言安卓 UI 控件消失；读取失败不视为消失。',true],
     ['assert_image','assert_image(target, timeout=5)','等待并断言图片或 OCR 控件出现；超时则失败。',true],
     ['assert_absent','assert_absent(target, timeout=5)','在指定时段内断言图片或 OCR 控件持续不存在。',true],
     ['screenshot','screenshot()','保存目标窗口截图到报告目录，返回文件路径。',false],
@@ -52,7 +55,7 @@ if(typeof module!=='undefined')module.exports=PythonCompletion;
 
 if(typeof document!=='undefined')(()=>{
   let active=null;
-  function editable(editor){return editor?.matches?.('textarea.python-editor')&&!editor.disabled&&!editor.readOnly;}
+  function editable(editor){return editor?.matches?.('textarea.python-editor')&&!editor.hidden&&!editor.disabled&&!editor.readOnly;}
   function close(){
     if(active){active.popup.remove();active.editor.removeAttribute('aria-controls');active.editor.removeAttribute('aria-expanded');active.editor.removeAttribute('aria-activedescendant');active=null;}
   }

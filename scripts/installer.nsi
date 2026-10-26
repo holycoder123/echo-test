@@ -8,14 +8,27 @@ RequestExecutionLevel user
 
 !define APP_NAME "EchoTest"
 !define APP_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\EchoTest"
+!ifndef INSTALLER_UI_ROOT
+  !define INSTALLER_UI_ROOT "${PROJECT_ROOT}\.runtime\installer-build\ui"
+!endif
+Var RegistryKey
+Var TestInstall
+Var NoShortcuts
 Name "${APP_NAME} ${PRODUCT_VERSION}"
 OutFile "${OUTPUT_EXE}"
 InstallDir "$LOCALAPPDATA\Programs\EchoTest"
 InstallDirRegKey HKCU "${APP_KEY}" "InstallLocation"
-SetCompressor /SOLID lzma
-SetCompressorDictSize 32
-ShowInstDetails show
-ShowUninstDetails show
+!ifndef SETUP_COMPRESSION
+  !define SETUP_COMPRESSION "/SOLID lzma"
+!endif
+SetCompressor ${SETUP_COMPRESSION}
+!if "${SETUP_COMPRESSION}" == "/SOLID lzma"
+  SetCompressorDictSize 32
+!endif
+ShowInstDetails hide
+ShowUninstDetails hide
+AutoCloseWindow true
+ManifestDPIAware true
 Icon "${PROJECT_ROOT}\electron\assets\studio.ico"
 UninstallIcon "${PROJECT_ROOT}\electron\assets\studio.ico"
 VIProductVersion "${PRODUCT_VERSION}.0"
@@ -24,22 +37,18 @@ VIAddVersionKey "FileDescription" "${APP_NAME}安装程序"
 VIAddVersionKey "FileVersion" "${PRODUCT_VERSION}"
 VIAddVersionKey "ProductVersion" "${PRODUCT_VERSION}"
 VIAddVersionKey "LegalCopyright" ""
+!include "${PROJECT_ROOT}\scripts\installer-ui\pages.nsh"
 
-!define MUI_ABORTWARNING
-!define MUI_WELCOMEPAGE_TEXT "安装工作台及其离线运行环境。无需另行安装 Node.js 或 Python。$\r$\n$\r$\n默认仅安装给当前用户，请选择可写目录。升级前请保存用例并正常关闭工作台。"
-!define MUI_FINISHPAGE_TEXT "安装完成。可以从桌面或开始菜单启动工作台。$\r$\n$\r$\n工作台默认请求管理员权限，请确认 Windows 权限提示。缺少微软运行库时，首次启动会使用包内安装器补齐。"
-!insertmacro MUI_PAGE_WELCOME
-!insertmacro MUI_PAGE_DIRECTORY
-!insertmacro MUI_PAGE_COMPONENTS
+!insertmacro MUI_INTERFACE
+Page custom SetupWelcome
+Page custom SetupOptions SetupOptionsLeave
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW SetupProgressShow
 !insertmacro MUI_PAGE_INSTFILES
-!insertmacro MUI_PAGE_FINISH
+Page custom SetupFinish SetupFinishLeave
 !insertmacro MUI_UNPAGE_CONFIRM
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW un.SetupProgressShow
 !insertmacro MUI_UNPAGE_INSTFILES
 !insertmacro MUI_LANGUAGE "SimpChinese"
-
-Var RegistryKey
-Var TestInstall
-Var NoShortcuts
 
 Function .onInit
   SetShellVarContext current
@@ -47,6 +56,8 @@ Function .onInit
   StrCpy $RegistryKey "${APP_KEY}"
   StrCpy $TestInstall "0"
   StrCpy $NoShortcuts "0"
+  StrCpy $DesktopChoice 1
+  StrCpy $LaunchChoice 1
   ${IfNot} ${RunningX64}
     MessageBox MB_ICONSTOP "此安装包需要 64 位 Windows。"
     Abort
@@ -66,11 +77,21 @@ Function .onInit
   ${GetOptions} $0 "/NOSHORTCUTS" $1
   ${IfNot} ${Errors}
     StrCpy $NoShortcuts "1"
+    StrCpy $DesktopChoice 0
   ${EndIf}
+  IfSilent 0 init_done
+  Call SetupValidateDirectory
+  Pop $0
+  ${If} $0 != 1
+    SetErrorLevel 2
+    Abort
+  ${EndIf}
+  init_done:
 FunctionEnd
 
 Section "工作台及离线运行环境（必需）" Core
   SectionIn RO
+  !insertmacro SetupStage 0
   IfFileExists "$INSTDIR\runtime\python\python.exe" 0 idle_checked
   InitPluginsDir
   SetOutPath "$PLUGINSDIR"
@@ -84,6 +105,7 @@ Section "工作台及离线运行环境（必需）" Core
     Abort
   ${EndIf}
   idle_checked:
+  !insertmacro SetupStage 1
   SetOutPath "$INSTDIR"
   SetOverwrite on
   File /r /x "test_cases" /x "projects" /x "control_library" /x "__pycache__" /x "*.pyc" "${PAYLOAD_ROOT}\*"
@@ -99,6 +121,7 @@ Section "工作台及离线运行环境（必需）" Core
   File /r /x "__pycache__" /x "*.pyc" "${PAYLOAD_ROOT}\projects\*"
   SetOverwrite on
   SetOutPath "$INSTDIR"
+  !insertmacro SetupStage 2
   WriteINIStr "$INSTDIR\echo-test-install.ini" "Installer" "AppId" "EchoTest"
   WriteINIStr "$INSTDIR\echo-test-install.ini" "Installer" "TestInstall" "$TestInstall"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
@@ -114,17 +137,19 @@ Section "工作台及离线运行环境（必需）" Core
   WriteRegDWORD HKCU "$RegistryKey" "EstimatedSize" $0
   ${If} $NoShortcuts != "1"
     CreateDirectory "$SMPROGRAMS\${APP_NAME}"
-    CreateShortCut "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk" "$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "$INSTDIR\scripts\start-studio.ps1" -Admin' "$INSTDIR\electron\assets\studio.ico"
+    CreateShortCut "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk" "$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "$INSTDIR\scripts\start-studio.ps1"' "$INSTDIR\electron\assets\studio.ico"
     CreateShortCut "$SMPROGRAMS\${APP_NAME}\管理员启动.lnk" "$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "$INSTDIR\scripts\start-studio.ps1" -Admin' "$INSTDIR\electron\assets\studio.ico"
-    CreateShortCut "$SMPROGRAMS\${APP_NAME}\MCP 管理员启动.lnk" "$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "$INSTDIR\scripts\start-studio.ps1" -Admin -Mcp' "$INSTDIR\electron\assets\studio.ico"
+    ; Remove the obsolete product shortcut when upgrading an older installation.
+    Delete "$SMPROGRAMS\${APP_NAME}\MCP 管理员启动.lnk"
     CreateShortCut "$SMPROGRAMS\${APP_NAME}\卸载.lnk" "$INSTDIR\Uninstall.exe"
   ${EndIf}
 SectionEnd
 
 Section "桌面快捷方式" Desktop
   ${If} $NoShortcuts != "1"
+  ${AndIf} $DesktopChoice == 1
     SetOutPath "$INSTDIR"
-    CreateShortCut "$DESKTOP\${APP_NAME}.lnk" "$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "$INSTDIR\scripts\start-studio.ps1" -Admin' "$INSTDIR\electron\assets\studio.ico"
+    CreateShortCut "$DESKTOP\${APP_NAME}.lnk" "$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "$INSTDIR\scripts\start-studio.ps1"' "$INSTDIR\electron\assets\studio.ico"
   ${EndIf}
 SectionEnd
 

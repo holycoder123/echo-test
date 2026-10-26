@@ -33,6 +33,6 @@ test('Python strings, comments, unrelated objects and selections do not trigger 
 test('completion supports multiline Unicode source and does not confuse browser APIs',()=>{
   const source='名称 = "按钮"\n    window.assert_';
   assert.equal(Completion.context(source,source.length).prefix,'assert_');
-  assert.deepEqual(Completion.suggestions('assert_').map(item=>item.name),['assert_image','assert_absent']);
+  assert.deepEqual(Completion.suggestions('assert_').map(item=>item.name),['assert_ui','assert_ui_absent','assert_image','assert_absent']);
   assert.equal(Completion.suggestions('not_a_function').length,0);
 });

@@ -16,6 +16,7 @@ ACTIONS = {
     "key_down": "按下按键", "key_up": "松开按键",
     "python": "Python 脚本",
     "loop": "循环开始", "end_loop": "循环结束", "set_variable": "设置变量",
+    "wait_ui": "等待安卓控件", "assert_ui": "安卓控件存在", "assert_ui_absent": "安卓控件不存在",
 }
 PARAMETERS = {
     "click": [], "double_click": [("interval", "双击间隔（秒）", .12)],
@@ -23,6 +24,7 @@ PARAMETERS = {
     "drag": [("duration", "拖动时间（秒）", 1)],
     "scroll": [("amount", "滚动格数（向上为正）", -3), ("axis", "方向 vertical / horizontal", "vertical")],
     "wait_image": [], "assert_image": [], "assert_absent": [],
+    "wait_ui": [], "assert_ui": [], "assert_ui_absent": [],
     "key": [("keys", "按键，如 CTRL+A、ENTER、F1", "ENTER")],
     "text": [("text", "文本内容", "")], "sleep": [("duration", "等待时间（秒）", 1)],
     "screenshot": [],
@@ -33,6 +35,8 @@ PARAMETERS = {
 }
 TARGET_ACTIONS = {"click", "double_click", "right_click", "long_press", "drag", "scroll", "wait_image", "assert_image", "assert_absent"}
 IMAGE_ACTIONS = {"wait_image", "assert_image", "assert_absent"}
+UI_ACTIONS = {"wait_ui", "assert_ui", "assert_ui_absent"}
+TARGET_ACTIONS |= UI_ACTIONS
 
 
 def number(value, label, minimum, maximum):
@@ -61,6 +65,7 @@ class Selector:
     text_match: str = "exact"
     color_tolerance: float | None = None
     library_id: str = ""
+    ui: dict = field(default_factory=dict)
 
     def asset_fields(self):
         if self.kind != "image":
@@ -77,11 +82,14 @@ class Selector:
             raise ValueError("通用控件引用标识无效")
         if not self.name.strip():
             raise ValueError("控件名称不能为空")
-        if self.kind not in {"coordinate", "image"}:
-            raise ValueError("定位方式必须是 coordinate 或 image")
+        if self.kind not in {"coordinate", "image", "android_ui"}:
+            raise ValueError("定位方式必须是 coordinate、image 或 android_ui")
         if self.kind == "coordinate":
             number(self.x, "X", 0, 1 if self.normalized else 100000)
             number(self.y, "Y", 0, 1 if self.normalized else 100000)
+        elif self.kind == 'android_ui':
+            from .android_ui import validate_query
+            validate_query(self.ui)
         else:
             if self.recognition not in {"template", "ocr"}:
                 raise ValueError("识别方式必须为 template 或 ocr")
@@ -98,8 +106,10 @@ class Selector:
             if not isinstance(self.templates, list) or len(self.templates) > 10:
                 raise ValueError("附加模板最多 10 张")
             for item in self.templates:
-                if not isinstance(item, dict) or set(item) - {"image", "mask"} or not isinstance(item.get("image"), str) or not item["image"]:
-                    raise ValueError("附加模板需要 image，可选 mask")
+                if not isinstance(item, dict) or set(item) - {"image", "mask", "name"} or not isinstance(item.get("image"), str) or not item["image"]:
+                    raise ValueError("附加模板需要 image，可选 mask、name")
+                if "name" in item and (not isinstance(item["name"], str) or not item["name"].strip() or len(item["name"]) > 200):
+                    raise ValueError("附加模板名称需要 1 ~ 200 字")
             if any(not isinstance(v, str) for v in [self.image, self.mask] + [item.get("mask", "") for item in self.templates]):
                 raise ValueError("模板和遮罩路径必须是文本")
             if self.color_tolerance is not None:
@@ -153,6 +163,8 @@ class Step:
             raise ValueError("拖动终点控件不存在")
         if self.action in IMAGE_ACTIONS and selectors[self.target].kind != "image":
             raise ValueError("图片等待 / 断言需要截图识别控件")
+        if self.action in UI_ACTIONS and selectors[self.target].kind != 'android_ui':
+            raise ValueError('安卓控件等待 / 断言需要安卓 UI 控件')
         for key, _, default in PARAMETERS[self.action]:
             value = self.params.get(key, default)
             if self.action == 'loop' and key in {'start', 'end', 'step'}:

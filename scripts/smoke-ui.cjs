@@ -25,6 +25,8 @@ try {
     return data;
   }
   assert.equal(read('electron-smoke.json').ready, true);
+  assert.equal(read('electron-smoke.json').startupTargetPage, true, 'Startup must show the target window selection page');
+  assert.equal(read('electron-smoke.json').startupSelectionMethods, true, 'Startup must offer picking and searching');
   const interaction = read('electron-interaction.json');
   for (const name of ['localCasesVisible', 'localCaseOpened', 'caseSearch', 'added', 'selectorDialog', 'recordButton', 'converted']) {
     assert.equal(interaction[name], true, `${name} failed`);
@@ -49,6 +51,7 @@ try {
   assert.equal(read('case-modes-smoke.json').passed,true);
   assert.equal(read('python-completion-smoke.json').passed,true);
   assert.equal(read('recognition-smoke.json').passed,true);
+  assert.equal(read('android-smoke.json').passed,true);
   assert.equal(read('help-smoke.json').passed,true);
   assert.equal(read('shared-controls-smoke.json').passed,true);
   assert.equal(read('control-picker-smoke.json').passed,true);

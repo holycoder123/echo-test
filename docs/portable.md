@@ -1,6 +1,6 @@
 # 便携运行环境
 
-便携版面向 Windows 10/11 x64。解压 `dist/echo-test-win-x64.zip` 后双击 `start.cmd`，不依赖系统 Node.js、Python 或 npm。所有默认入口均请求管理员权限并启用 MCP；请确认 Windows UAC 提示，取消则不启动。已具有管理员权限时不会重复请求；`start_admin.cmd` 仍兼容。关闭当前工作台后，`start_no_mcp.cmd` 可禁用本次 MCP。
+便携版面向 Windows 10/11 x64。解压 `dist/latest/echo-test-1.2.0-portable-x64.zip` 后双击 `start.cmd`，不依赖系统 Node.js、Python 或 npm。默认入口请求管理员权限，MCP 默认关闭，可在「设置 → MCP」中开启；请确认 Windows UAC 提示，取消则不启动。已具有管理员权限时不会重复请求；`start_admin.cmd` 仍兼容。关闭当前工作台后，`start_no_mcp.cmd` 可强制禁用本次 MCP。已保存的手动开关继续生效。
 
 ## 包内内容
 
@@ -8,6 +8,8 @@
 |---|---|
 | `runtime/python` | 隔离的 64 位 Python、标准库、Tcl/Tk、Pillow、NumPy、OpenCV、RapidOCR、ONNX Runtime 及其依赖与中英文模型 |
 | `runtime/node` | 独立 Node.js、npm 与官方许可证，用于 MCP 代理和开发命令 |
+| `runtime/android/platform-tools` | 内置 ADB、运行 DLL、版本信息与许可声明，安卓连接无需另装 SDK |
+| `runtime/android/scrcpy` | 固定版本的视频服务及 Apache-2.0 许可，用于工作台内流畅预览 |
 | `runtime/redist/vc_redist.x64.exe` | 带微软签名的 Visual C++ 离线安装器；仅系统缺失运行库时由启动器调用 |
 | `node_modules` | Electron 可执行文件和项目锁定的 JS 依赖，包括 Koffi 与 MCP SDK |
 | `runtime/manifest.json` | 平台、实际版本、下载包校验值和 Python 包清单 |
@@ -29,6 +31,6 @@ Python 使用官方可嵌入发行版，以相对路径加载项目和私有库�
 
 ## 从源码构建
 
-联网运行 `build_portable.cmd`，无需预先安装 Node/Python。脚本下载并校验官方 Python、Node 压缩包，安装私有 Python 库，验证微软安装器签名，并安装缺失的项目 JS 依赖；版本固定在构建脚本、`package-lock.json` 和 `requirements-portable.lock` 中。构建缓存位于 `.runtime/portable-build`。
+联网运行 `build_portable.cmd`，无需预先安装 Node/Python。脚本下载并校验官方 Python、Node 和 ADB 压缩包，安装私有 Python 库，验证微软安装器签名，并安装缺失的项目 JS 依赖；版本固定在构建脚本、`package-lock.json` 和 `requirements-portable.lock` 中。构建缓存位于 `.runtime/portable-build`，ADB 缓存位于 `.runtime/android-build`。`verify_portable.cmd` 还会在屏蔽系统 SDK 路径时检查内置 ADB 的依赖、文件哈希和版本。
 
-完成后输出 `dist/echo-test-win-x64.zip` 和 SHA-256 文件。运行环境二进制与发行文件不进入 Git；源码和构建脚本保留在项目中。库的许可证保留在对应包目录，Electron 与 Node 的官方许可证也包含在发行包。
+完成后输出 `dist/latest/echo-test-<版本>-portable-x64.zip` 和同名 `.sha256` 文件。重建前，旧的 latest 文件会整体移动到 `dist/history/v<版本>/<UTC构建时间>-<标识>/`，同版本重建也保留历史。运行环境二进制与发行文件不进入 Git；源码和构建脚本保留在项目中。库的许可证保留在对应包目录，Electron 与 Node 的官方许可证也包含在发行包。

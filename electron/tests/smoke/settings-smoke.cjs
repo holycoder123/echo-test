@@ -7,7 +7,7 @@ async function verify(main){
       window.__settingsSaved={view:S.view,settingsData:S.settingsData,settingsDraft:S.settingsDraft,settingsTab:S.settingsTab,windowSearch:S.windowSearch,targetWindowMode:S.targetWindowMode};
       window.__settingsOriginal=await api('settings_get');window.__settingsProject=JSON.stringify(S.project);window.__settingsDirty=S.dirty;
       await handleAction('view-settings',{dataset:{}});
-      const tabs=document.querySelectorAll('.settings-nav>button').length===5;
+      const tabs=document.querySelectorAll('.settings-nav>button').length===6;
       const field=document.querySelector('[data-setting="shortcuts.run"]');field.focus();
       await new Promise(resolve=>setTimeout(resolve,50));
       field.dispatchEvent(new KeyboardEvent('keydown',{key:'F23',ctrlKey:true,altKey:true,shiftKey:true,bubbles:true}));field.blur();
@@ -23,16 +23,23 @@ async function verify(main){
       const saved=persisted.values.target.refreshSeconds===10&&persisted.values.target.defaultMode==='search'&&persisted.values.shortcuts.run==='Ctrl+Alt+Shift+F23';
       let conflict=false;try{await api('settings_save',{values:{...persisted.values,shortcuts:{...persisted.values.shortcuts,run:'F12'}}});}catch(error){conflict=error.message.includes('冲突');}
       const unchanged=(await api('settings_get')).values.shortcuts.run==='Ctrl+Alt+Shift+F23';
-      await handleAction('settings-tab',{dataset:{tab:'startup'}});
+      await handleAction('settings-tab',{dataset:{tab:'environment'}});
+      const environment=!!document.querySelector('[aria-label="ADB 路径"]')&&!!document.querySelector('[data-act="settings-environment-adb"]')&&document.querySelector('.settings-panel').textContent.includes('Python')&&document.querySelector('.settings-panel').textContent.includes('OCR 文字识别');
       const toggle=document.querySelector('[data-setting="startup.admin"]');toggle.click();
       const changed=S.settingsDraft.startup.admin!==persisted.values.startup.admin;
       await handleAction('settings-reset',{dataset:{}});
-      const reset=JSON.stringify(S.settingsDraft.startup)===JSON.stringify(S.settingsData.defaults.startup);
+      const reset=S.settingsDraft.startup.admin===S.settingsData.defaults.startup.admin&&JSON.stringify(S.settingsDraft.environment)===JSON.stringify(S.settingsData.defaults.environment);
+      const fps=document.querySelector('[data-setting="environment.androidMaxFps"]');fps.value='60';fps.dispatchEvent(new Event('change',{bubbles:true}));
+      await handleAction('settings-save',{dataset:{}});const videoSaved=(await api('settings_get')).values.environment.androidMaxFps===60;
+      const beforeInvalid=(await api('settings_get')).values.environment.adbPath;
+      let invalidAdb=false;try{await api('settings_save',{values:{...S.settingsDraft,environment:{...S.settingsDraft.environment,adbPath:'C:/EchoTest-not-present/adb.exe'}}});}catch(error){invalidAdb=error.message.includes('请选择');}
+      const invalidAdbPreserves=invalidAdb&&(await api('settings_get')).values.environment.adbPath===beforeInvalid;
+      await handleAction('settings-tab',{dataset:{tab:'startup'}});const adminMoved=!document.querySelector('[data-setting="startup.admin"]');
       await handleAction('settings-tab',{dataset:{tab:'mcp'}});
       const mcp=!!document.querySelector('[data-setting="mcp.explorationTimeout"]')&&!!document.querySelector('[data-act="settings-mcp-copy"]');
       await handleAction('settings-tab',{dataset:{tab:'history'}});
       const history=!!document.querySelector('[data-act="settings-cleanup-preview"]');
-      return {cleanupGuard:window.__settingsCleanupGuard,tabs,capture,saved,conflict,unchanged,changed,reset,mcp,history,projectPreserved:JSON.stringify(S.project)===before&&S.dirty===window.__settingsDirty};
+      return {cleanupGuard:window.__settingsCleanupGuard,tabs,capture,saved,conflict,unchanged,changed,reset,environment,videoSaved,invalidAdbPreserves,adminMoved,mcp,history,projectPreserved:JSON.stringify(S.project)===before&&S.dirty===window.__settingsDirty};
     })()`));
     const size=main.getSize();main.setSize(1120,740);
     try{
@@ -42,6 +49,9 @@ async function verify(main){
     await js(`S.settingsTab='shortcuts';render();document.querySelector('#toasts').replaceChildren()`);
     await new Promise(resolve=>setTimeout(resolve,100));
     fs.writeFileSync(artifactFile('smoke','settings-preview.png'),(await main.webContents.capturePage()).toPNG());
+    await js("handleAction('settings-tab',{dataset:{tab:'environment'}})");
+    await js('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+    fs.writeFileSync(artifactFile('smoke','environment-settings-preview.png'),(await main.webContents.capturePage()).toPNG());
     Object.assign(result,await js(`(async()=>{
       window.__settingsApi=api;window.__settingsCalls=[];S.settingsDraft=clone(S.settingsData.values);
       api=async(method,args)=>{

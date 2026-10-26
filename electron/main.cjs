@@ -17,12 +17,13 @@ const mcpStartupSmoke=process.argv.includes('--mcp-startup-smoke');
 const {authorize}=require('./window-access.cjs');
 
 const {ROOT, runtimeFile, artifactFile} = require('./paths.cjs');
+const pythonLanguage=new (require('./python-language-service.cjs').PythonLanguageService)({root:ROOT,onDiagnostics:data=>send({kind:'python_diagnostics',...data}),caseDirectory:()=>currentPath?path.dirname(currentPath):ROOT});
 const RENDERER = path.join(__dirname, 'renderer');
 app.setName('EchoTest');
 app.setPath('userData',path.join(app.getPath('appData'),'echo-test'));
 const gameSmoke=process.argv.includes('--game-smoke');
 if (process.env.ECHO_TEST_SMOKE_TEST === '1' || gameSmoke) app.setPath('userData', path.join(app.getPath('temp'), gameSmoke?'echo-test-game-smoke':'echo-test-smoke-'+process.pid));
-if(mcpStartupSmoke)app.setPath('userData',path.join(app.getPath('temp'),'echo-test-mcp-startup-smoke'));
+if(mcpStartupSmoke)app.setPath('userData',path.join(app.getPath('temp'),'echo-test-mcp-startup-smoke-'+process.pid));
 const {SettingsStore,DEFAULTS,validateSettings,ShortcutRegistry}=require('./settings.cjs');
 const settingsStore=new SettingsStore(app.getPath('userData'));
 let settings=settingsStore.value,shortcutRegistry,settingsChanging=false,forceExit=false;
@@ -52,6 +53,27 @@ let toolbarLinked=false,toolbarLinkWanted=settings.target.linkToolbar;
 let recordStart=0,recordCount=0,recordPending=false;
 let continuousRole='';
 let selectedGame=null,connectingGame=false;
+let selectedAndroid=null,androidOperating=false,androidConfigured=false;
+let androidRecordTail=Promise.resolve(),androidRecordSize=null,androidRecordCount=0,androidRecordError='',androidStopping=false;
+const androidStream=new (require('./android-stream.cjs').AndroidStream)({root:ROOT,onPacket:packet=>send({kind:'android_video',...packet}),onState:state=>send({kind:'android_video_state',...state}),onAction:action=>{
+  if(busy!=='recording')return;
+  androidRecordSize=action.size;androidRecordCount++;
+  const target={platform:'android',serial:action.serial};
+  androidRecordTail=androidRecordTail.then(()=>bridge.call('android_record_control',{target,...action})).catch(error=>{androidRecordError=error.message;auditError('android.record',error);send({kind:'notice',message:'安卓录制失败：'+error.message});});
+}});
+let androidVideoRequest=null;
+let androidConfiguring=null,androidConfigurationWarning='';
+async function ensureAndroidConfigured(){
+  if(androidConfigured||busy)return;
+  if(androidConfiguring)return androidConfiguring;
+  androidConfiguring=(async()=>{
+    try{if(settings.environment.adbPath)await bridge.call('android_configure',{path:settings.environment.adbPath});androidConfigurationWarning='';}
+    catch(error){androidConfigurationWarning='保存的 ADB 路径不可用，已自动检测可用版本：'+error.message;auditWrite('warning','android.configure','fallback',{message:androidConfigurationWarning});}
+    androidConfigured=true;
+  })();
+  try{await androidConfiguring;}finally{androidConfiguring=null;}
+}
+function publishAndroid(){send({kind:'android_connection',connection:selectedAndroid});}
 let windowDiscoverySignature='';
 let windowPickOverlay=null,windowPickHover=null;
 const {AuditLog}=require('./audit.cjs');
@@ -128,12 +150,14 @@ async function openGameWindow(){
 }
 
 async function connectSelectedGame(handle,expectedPid,fromPicker=false){
+  if(androidOperating)throw new Error('安卓设备正在处理操作，请稍候');
   if(busy&&!(fromPicker&&busy==='selecting'))throw new Error('请先停止录制或执行');
   if(connectingGame)throw new Error('正在连接目标应用，请稍候');
   connectingGame=true;
   try{
     await detachGame();toolbarLinkWanted=settings.target.linkToolbar;
     selectedGame=await bridge.call('game_info',{handle,restore:true,expected_pid:expectedPid});
+    if(selectedAndroid){androidVideoRequest=null;await androidStream.stop();await bridge.call('android_disconnect');selectedAndroid=null;publishAndroid();}
     publishConnection();if(settings.target.autoToolbar)await openGameWindow();
     return {connection:selectedGame};
   }finally{connectingGame=false;}
@@ -279,16 +303,24 @@ function createBridge() {
 
 async function studioCall(event, method, args = {}) {
   const role=authorize(event,window,gameWindow,method,args);
-  if(settingsChanging&&!['settings_get','dirty','stop','record_stop','renderer_error','game_state','audit_list'].includes(method))throw new Error('设置正在更新，请稍后重试');
-  if(automation?.active&&!['dirty','stop','record_stop','window_pick_cancel','game_state','audit_list','control_list','renderer_error'].includes(method))throw new Error('MCP 正在操作工作台，请稍候');
+  const releaseControl=method==='android_control'&&args.event==='cancel';
+  if(!releaseControl&&settingsChanging&&!['android_stream_stop','android_stream_ack','settings_get','dirty','stop','record_stop','renderer_error','game_state','audit_list'].includes(method))throw new Error('设置正在更新，请稍后重试');
+  if(!releaseControl&&automation?.active&&!['android_stream_stop','android_stream_ack','dirty','stop','record_stop','window_pick_cancel','game_state','audit_list','control_list','renderer_error'].includes(method))throw new Error('MCP 正在操作工作台，请稍候');
   return dispatchStudioCall(role,method,args);
 }
-function stopCurrent(method='stop'){
+async function stopCurrent(method='stop'){
   automation?.cancelStart();
   startGate.cancel();
-  return bridge.call(method);
+  androidStopping=true;
+  try{androidStream.releaseTouch();await androidRecordTail;return await bridge.call(method);}
+  finally{androidStopping=false;}
 }
 async function dispatchStudioCall(role, method, args = {}) {
+  if(method.startsWith('android_'))return androidCall(method,args);
+  if(method==='editor_sync')return pythonLanguage.sync(args);
+  if(method==='editor_query')return pythonLanguage.query(args.kind,args);
+  if(method==='editor_format')return {code:await pythonLanguage.format(args.code)};
+  if(method==='editor_close'){pythonLanguage.closeDocument(args.id);return {};}
   if(['stop','record_stop'].includes(method))return stopCurrent(method);
   if(method==='renderer_error'){
     const error=new Error(String(args.message||'未知界面错误').slice(0,4000));error.stack=String(args.stack||'').slice(0,12000);
@@ -428,6 +460,11 @@ async function dispatchStudioCall(role, method, args = {}) {
     return {};
   }
   if (['run', 'record_start', 'capture', 'preview','automation_capture','automation_preview','automation_explore'].includes(method)) {
+    androidStream.releaseTouch();
+    if(connectingGame||androidOperating)throw new Error('正在连接或操作设备，请稍候');
+    const androidTarget=args.target?.platform==='android';
+    if(androidTarget&&(!selectedAndroid||args.target.serial!==selectedAndroid.serial))throw new Error('请先连接所选安卓设备');
+    if(!androidTarget&&selectedAndroid)throw new Error('当前目标是安卓设备，请先连接桌面窗口');
     if(busy&&busy!=='selecting'&&method==='automation_capture')return bridge.call(method,args);
     if (busy||settingsChanging) throw new Error('请先停止录制或执行，或等待设置保存完成');
     if(method==='record_start'&&recordPending)throw new Error('请先在工作台处理上一段录制结果');
@@ -444,17 +481,62 @@ async function dispatchStudioCall(role, method, args = {}) {
       const source=method==='automation_explore'?'exploration':args.source==='recording'?'recording':'case';
       runState.start(args.project,args.iterations||1,source==='case'?currentPath:null,source);publishRun();
     }
-    if (continuous) {if(method==='record_start'){recordStarting=true;recordStart=0;recordCount=0;}busy = execution ? 'running' : 'recording'; registerStop();sendGameState();}
+    if (continuous) {if(method==='record_start'){recordStarting=true;recordStart=0;recordCount=0;androidRecordSize=null;androidRecordCount=0;androidRecordError='';}busy = execution ? 'running' : 'recording'; registerStop();sendGameState();}
     try {
       // MCP observations leave the game foreground so the next authorized
       // operation can reuse it; manual renderer captures still return to the UI.
-      return await handoff.call(begin, continuous || role === 'mcp');
+      return androidTarget?await begin():await handoff.call(begin, continuous || role === 'mcp');
     }
     catch (error) {if(execution){if(error.cancelled)runState.finish({status:'stopped',error:error.message});else runState.fail(error.message);publishRun();}if (continuous) {busy = '';continuousRole='';recordStarting=false; registerStop();sendGameState();} throw error;}
     finally{if(continuous)startGate.finish();}
   }
   const data = await bridge.call(method, args);
   return data;
+}
+async function androidCall(method,args){
+  if(method==='android_stream_ack'){androidStream.ack(args.id,args.sequence);return {};}
+  if(method==='android_control'){
+    const cleanup=args.event==='cancel';
+    if(!cleanup){
+      if(!selectedAndroid||args.target?.serial!==selectedAndroid.serial)throw new Error('请先连接所选安卓设备');
+      if(args.event!=='geometry'&&(connectingGame||androidOperating||recordStarting||androidStopping||busy&&busy!=='recording'))throw new Error('当前不能操作安卓设备');
+      if(busy==='recording'&&!['geometry','move','up'].includes(args.event)){
+        if(androidRecordError)throw new Error('请停止录制并处理错误：'+androidRecordError);
+        if(androidRecordCount>=10000)throw new Error('安卓录制操作数达到上限，请停止并保存');
+        if(androidRecordSize&&String(androidRecordSize)!==String(args.size))throw new Error('录制过程中画面方向发生变化，请结束本段录制');
+      }
+    }
+    return androidStream.control(args);
+  }
+  if(method==='android_stream_stop'){if(args.request_id&&args.request_id!==androidVideoRequest)return {};androidVideoRequest=null;await androidStream.stop(args.id);return {};}
+  if(method==='android_stream_start'){
+    if(!selectedAndroid||args.target?.platform!=='android'||args.target.serial!==selectedAndroid.serial)throw new Error('请先连接所选安卓设备');
+    androidVideoRequest=args.request_id;
+    const info=await bridge.call('android_stream_info',{target:args.target});
+    if(androidVideoRequest!==args.request_id)throw new Error('视频预览已取消');
+    if(!selectedAndroid||selectedAndroid.serial!==info.serial)throw new Error('安卓目标设备已变化');
+    const environment=settings.environment;
+    return androidStream.start({...info,request_id:args.request_id,max_fps:environment.androidMaxFps,max_size:environment.androidMaxSize,bit_rate:environment.androidBitRate*1000000});
+  }
+  const previewOperation=['android_frame','android_action'].includes(method);
+  if(busy&&!(busy==='recording'&&selectedAndroid&&previewOperation))throw new Error('请先停止录制或执行');
+  if(connectingGame||androidOperating)throw new Error('安卓设备正在处理操作，请稍候');
+  if(previewOperation||['android_launch','android_hierarchy','android_ui_pick'].includes(method)){
+    if(!selectedAndroid||args.target?.serial!==selectedAndroid.serial||args.target?.platform!=='android')throw new Error('请先连接所选安卓设备');
+  }
+  const mutating=method!=='android_frame';
+  if(mutating)androidOperating=true;
+  try{
+    await ensureAndroidConfigured();
+    if(['android_connect','android_disconnect'].includes(method)){androidVideoRequest=null;await androidStream.stop();await androidRecordTail;}
+    const result=await bridge.call(method,args,25000);
+    if(method==='android_connect'){
+      await detachGame();if(gameWindow&&!gameWindow.isDestroyed())gameWindow.hide();
+      selectedAndroid=result.connection;publishAndroid();
+    }
+    if(method==='android_disconnect'){selectedAndroid=null;publishAndroid();}
+    return result;
+  }finally{if(mutating)androidOperating=false;}
 }
 function shortcutAction(action){
   if(action==='stop'){stopCurrent().catch(error=>send({kind:'notice',message:error.message}));return;}
@@ -498,6 +580,13 @@ async function previewCleanup(){
 }
 async function settingsCall(method,args){
   if(method==='settings_get')return settingsSnapshot();
+  if(method==='settings_environment'){
+    await ensureAndroidConfigured();
+    const info=await bridge.call('environment_info');
+    info.adb.connected=!!selectedAndroid;info.adb.warning=androidConfigurationWarning;
+    info.video={version:require('./android-stream.cjs').VERSION,available:fs.existsSync(path.join(ROOT,'runtime/android/scrcpy/scrcpy-server.jar'))};
+    return {...info,admin:backendAdmin,electron:process.versions.electron,node:process.versions.node};
+  }
   if(method==='settings_shortcut_capture'){
     if(busy||recordStarting||settingsChanging)throw new Error('请先停止操作');
     if(args.active===true){shortcutRegistry.replace({});shortcutsCapturing=true;}else restoreShortcuts();return {};
@@ -520,6 +609,11 @@ async function settingsCall(method,args){
   if(busy||recordStarting||automation?.active||settingsChanging)throw new Error('请先停止操作，再修改设置或清理历史');
   settingsChanging=true;
   try{
+    if(method==='settings_environment_pick'){
+      if(selectedAndroid)throw new Error('请先在安卓设备页断开设备，再更换 ADB');
+      const result=await dialog.showOpenDialog(window,{title:'选择 Android Platform-Tools 的 adb.exe',properties:['openFile'],filters:[{name:'ADB',extensions:['exe']}]});
+      return result.canceled?null:{path:result.filePaths[0]};
+    }
     if(method==='settings_cleanup_preview'){
       cleanupPreview={...await previewCleanup(),token:require('node:crypto').randomUUID()};return cleanupPreview;
     }
@@ -536,12 +630,21 @@ async function settingsCall(method,args){
     if(method==='settings_mcp_reset'){await changeMcp(settings.mcp.enabled,true);return settingsSnapshot();}
     if(method==='settings_save'){
       const next=validateSettings(args.values),previous=settings;
+      const adbChanged=next.environment.adbPath!==previous.environment.adbPath;
+      if(adbChanged&&selectedAndroid)throw new Error('请先在安卓设备页断开设备，再更换 ADB');
+      let adbApplied=false,previousAdb='';
       try{
+        if(adbChanged){await ensureAndroidConfigured();const applied=await bridge.call('android_configure',{path:next.environment.adbPath});previousAdb=applied.previous_path;adbApplied=true;}
         shortcutRegistry.replace(next.shortcuts);shortcutsCapturing=false;
         await changeMcp(next.mcp.enabled);
         settingsStore.save(next);settings=next;cleanupPreview=null;
+        if(adbChanged){androidConfigured=true;androidConfigurationWarning='';}
       }catch(error){
-        try{shortcutRegistry.replace(previous.shortcuts);await changeMcp(previous.mcp.enabled);}catch(rollback){auditError('settings.rollback',rollback);}
+        const rollback=await Promise.allSettled([
+          Promise.resolve().then(()=>shortcutRegistry.replace(previous.shortcuts)),changeMcp(previous.mcp.enabled),
+          ...(adbApplied?[bridge.call('android_configure',{path:previousAdb})]:[]),
+        ]);
+        for(const item of rollback)if(item.status==='rejected')auditError('settings.rollback',item.reason);
         throw error;
       }
       send({kind:'settings_changed',settings:settingsSnapshot()});return settingsSnapshot();
@@ -668,12 +771,13 @@ app.whenReady().then(async () => {
     if (busy||settingsChanging) {dialog.showMessageBoxSync(window, {type: 'info', message: '请先停止录制或执行，再关闭工作台。', buttons: ['知道了']}); return;}
     if (dirty && dialog.showMessageBoxSync(window, {type: 'question', message: '当前用例有未保存的修改。', detail: '可以取消关闭，保存后再退出。', buttons: ['继续编辑', '放弃修改并退出'], defaultId: 0, cancelId: 0}) === 0) return;
     closing = true;
-    detachGame().then(()=>mcpServer?.close()).then(() => bridge.shutdown()).then(() => {gameWindow?.destroy();window.destroy();}).catch(error => {
+    androidStream.stop().then(()=>detachGame()).then(()=>mcpServer?.close()).then(() => bridge.shutdown()).then(() => {gameWindow?.destroy();window.destroy();}).catch(error => {
       closing=false;
       dialog.showErrorBox('无法断开窗口工具栏',error.message);
     });
   });
   window.loadURL('echo-test://studio/index.html');
+  window.webContents.on('did-start-navigation',(_event,_url,_inPlace,isMainFrame)=>{if(isMainFrame)pythonLanguage.resetDocuments();});
   if(mcpAllowed&&(settings.mcp.enabled||process.argv.includes('--force-mcp')))window.webContents.once('did-finish-load',()=>changeMcp(true).catch(error=>{
     auditError('mcp.start',error);send({kind:'notice',level:'error',message:'MCP 启动失败：'+error.message});
   }));
@@ -698,11 +802,14 @@ app.whenReady().then(async () => {
     window.webContents.once('did-finish-load', async () => {
       try {
         const result = await window.webContents.executeJavaScript(`new Promise(resolve => { const started=Date.now(); const timer=setInterval(() => { if(window.__studioReady || Date.now()-started>15000) { clearInterval(timer); resolve({ready:!!window.__studioReady,title:document.title,steps:document.querySelectorAll('.step-row').length,nav:document.querySelectorAll('.nav-button').length,errors:window.__studioErrors||[]}); }},100); })`);
+        Object.assign(result,await window.webContents.executeJavaScript(`({initialView:S.view,startupTargetPage:S.view==='select-window'&&!!document.querySelector('.target-window-page')&&document.querySelector('.nav-button.active')?.dataset.act==='view-select-window',startupSelectionMethods:document.querySelectorAll('.target-method').length===2&&!!document.querySelector('[data-act="target-pick-start"]')})`));
         fs.writeFileSync(artifactFile('smoke', 'electron-smoke.json'), JSON.stringify(result));
+        await window.webContents.executeJavaScript(`if(S.view!=='select-window'||!document.querySelector('.target-window-page')||document.querySelectorAll('.target-method').length!==2||!document.querySelector('[data-act="target-pick-start"]'))throw new Error('Startup must show the target window selection page');`);
         await new Promise(resolve => setTimeout(resolve, 500));
         await window.webContents.executeJavaScript('windowDiscovery.stop()');
         const image = await window.webContents.capturePage();
         fs.writeFileSync(artifactFile('smoke', 'electron-preview.png'), image.toPNG());
+        if(process.env.ECHO_TEST_EDITOR_SMOKE==='1'){await require('./tests/smoke/python-ide-smoke.cjs').verify(window);return;}
         const fixtureDirectory=path.join(app.getPath('userData'),'case-fixtures');
         fs.mkdirSync(fixtureDirectory,{recursive:true});
         const fixturePath=path.join(fixtureDirectory,'ui-smoke.echo.json');
@@ -712,7 +819,7 @@ app.whenReady().then(async () => {
         fs.writeFileSync(secondFixturePath,JSON.stringify({name:'第二个界面验证用例',schema_version:1,selectors:[{name:'按钮',kind:'coordinate',x:.4,y:.6,normalized:true}],steps:[{name:'单击按钮',action:'click',target:'按钮',params:{}}]}));
         knownCases.add(secondFixturePath);
         const interaction = await window.webContents.executeJavaScript(`(async () => {
-          await refreshCases();
+          await handleAction('view-cases',{dataset:{}});
           const localCasesVisible=document.querySelectorAll('.library-list [data-act="case-open"]').length===S.library.length&&S.library.length>0;
           const caseDirectory=S.caseDirectory;
           const savedCase=S.library.find(item=>!item.error);
@@ -760,8 +867,9 @@ app.whenReady().then(async () => {
           await require('./tests/smoke/sidebar-smoke.cjs').verify(gameWindow);
           await require('./tests/smoke/script-smoke.cjs').verify(window);
           await require('./tests/smoke/case-modes-smoke.cjs').verify(window);
-          await require('./tests/smoke/python-completion-smoke.cjs').verify(window);
+          await require('./tests/smoke/python-ide-smoke.cjs').verify(window);
           await require('./tests/smoke/recognition-smoke.cjs').verify(window);
+          await require('./tests/smoke/android-smoke.cjs').verify(window);
           await require('./tests/smoke/help-smoke.cjs').verify(window,gameWindow);
           await require('./tests/smoke/shared-controls-smoke.cjs').verify(window);
           await require('./tests/smoke/control-picker-smoke.cjs').verify(window);
@@ -775,4 +883,4 @@ app.whenReady().then(async () => {
   }
 });
 app.on('window-all-closed', () => app.quit());
-app.on('will-quit', () => {globalShortcut.unregisterAll();tray?.destroy();});
+app.on('will-quit', () => {androidStream.stop().catch(()=>{});pythonLanguage.close();globalShortcut.unregisterAll();tray?.destroy();});

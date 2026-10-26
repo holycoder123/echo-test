@@ -3,6 +3,15 @@ const assert=require('node:assert/strict');
 const {authorize}=require('../window-access.cjs');
 function surface(page){const frame={url:`echo-test://studio/${page}`};return {isDestroyed:()=>false,webContents:{mainFrame:frame}};}
 function event(win){return {sender:win.webContents,senderFrame:win.webContents.mainFrame};}
+
+test('Android device access is restricted to the workbench and offers no arbitrary ADB command',()=>{
+  const main=surface('index.html'),game=surface('game.html');
+  for(const method of ['settings_environment','settings_environment_pick','android_control','android_stream_start','android_stream_stop','android_stream_ack','android_devices','android_pair','android_network_connect','android_connect','android_disconnect','android_frame','android_action','android_launch']){
+    assert.equal(authorize(event(main),main,game,method,{}),'main');
+    assert.throws(()=>authorize(event(game),main,game,method,{}));
+  }
+  assert.throws(()=>authorize(event(main),main,game,'android_shell',{}));
+});
 test('only workbench can generate or copy Python cases and change draft context',()=>{
   const main=surface('index.html'),game=surface('game.html');
   for(const method of ['generate_python','python_copy','case_context']){
@@ -49,6 +58,13 @@ test('only the workbench can start or cancel native window selection',()=>{
  for(const method of ['window_pick_start','window_pick_cancel']){
    assert.equal(authorize(event(main),main,game,method,{}),'main');
    assert.throws(()=>authorize(event(game),main,game,method,{}));
+ }
+});
+test('Python editing services are restricted to the main workbench',()=>{
+ const main=surface('index.html'),game=surface('game.html');
+ for(const method of ['editor_sync','editor_query','editor_format','editor_close']){
+  assert.equal(authorize(event(main),main,game,method,{}),'main');
+  assert.throws(()=>authorize(event(game),main,game,method,{}));
  }
 });
 

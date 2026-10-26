@@ -145,6 +145,15 @@ class Window:
     def screenshot(self):
         return Path(self._call('screenshot'))
 
+    def wait_ui(self, target, timeout=5):
+        return self._call('wait_ui', target=target, timeout=timeout)
+
+    def assert_ui(self, target, timeout=5):
+        return self._call('assert_ui', target=target, timeout=timeout)
+
+    def assert_ui_absent(self, target, timeout=5):
+        return self._call('assert_ui_absent', target=target, timeout=timeout)
+
     def capture(self):
         from PIL import Image
         with Image.open(self.screenshot()) as image:

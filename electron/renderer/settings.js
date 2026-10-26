@@ -1,4 +1,21 @@
-const settingSections={shortcuts:['快捷键','常用操作，随时触达'],mcp:['MCP','管理 AI 工具连接'],startup:['启动与关闭','让工作台按习惯启动'],target:['目标窗口','选择与发现窗口'],history:['报告与日志','管理本机历史数据']};
+const settingSections={shortcuts:['快捷键','常用操作，随时触达'],environment:['环境设置','ADB、运行环境与安卓画面'],mcp:['MCP','管理 AI 工具连接'],startup:['启动与关闭','让工作台按习惯启动'],target:['目标窗口','选择与发现窗口'],history:['报告与日志','管理本机历史数据']};
+function environmentSettingsView(){
+  const data=S.environmentData,adb=data?.adb,locked=disabled()||S.android.connection||adb?.connected;
+  const path=S.settingsDraft.environment.adbPath||adb?.path||'';
+  const runtimeRow=(label,value,detail='')=>`<div class="setting-row environment-runtime"><div><strong>${label}</strong>${detail?`<p>${esc(detail)}</p>`:''}</div><span class="environment-value">${esc(value||'尚未检测')}</span></div>`;
+  return `${S.environmentError?`<p class="settings-note android-error" role="alert">${esc(S.environmentError)}</p>`:''}
+    <h3 class="settings-group-title">安卓连接</h3><div class="setting-row environment-adb"><div class="environment-adb-heading"><strong>ADB 工具</strong><div>${button('更换 ADB','settings-environment-adb','quiet','folder',locked?'disabled':'')}${button('恢复自动','settings-environment-adb-auto','ghost','',locked||!S.settingsDraft.environment.adbPath?'disabled':'')}</div></div><input class="environment-path" readonly aria-label="ADB 路径" value="${esc(path)}" title="${esc(path)}" placeholder="自动检测内置 ADB"><p>${S.settingsDraft.environment.adbPath?'手动指定路径，保存时校验。':adb?.source==='bundled'?'使用内置 ADB，无需另行安装。':'自动检测可用 ADB。'}${locked?' 请先断开安卓设备，再更换 ADB。':''}</p>${adb?.path&&S.settingsDraft.environment.adbPath&&S.settingsDraft.environment.adbPath!==adb.path?`<p>当前生效：${esc(adb.path)}</p>`:''}${adb?.version?`<p>${esc(adb.version)}</p>`:''}${adb?.error||adb?.warning?`<p class="environment-error">${esc(adb.error||adb.warning)}</p>`:''}</div>
+    ${settingField('environment','androidMaxFps','视频帧率上限','下次连接画面生效；静止画面自动降低帧率。',[[15,'15 FPS'],[30,'30 FPS'],[60,'60 FPS']])}
+    ${settingField('environment','androidMaxSize','视频最长边','较低分辨率可减少编码和传输压力，下次连接画面生效。',[[720,'720 像素'],[1080,'1080 像素'],[1280,'1280 像素'],[1920,'1920 像素']])}
+    ${settingField('environment','androidBitRate','视频码率','较高码率提高画质，也会增加带宽占用，下次连接画面生效。',[[2,'2 Mbps'],[4,'4 Mbps'],[8,'8 Mbps'],[12,'12 Mbps']])}
+    <h3 class="settings-group-title">运行环境</h3>${settingField('startup','admin','启动时请求管理员权限','下次启动生效，用于操作具有管理员权限的目标程序。')}
+    ${runtimeRow('当前权限',data?(data.admin?'管理员':'普通权限'):'')}
+    ${runtimeRow('Python',data?`${data.python.version} · ${data.python.bits} 位 · ${data.python.source==='bundled'?'内置':'外部'}`:'',data?.python.path)}
+    ${runtimeRow('OCR 文字识别',data?`${data.ocr.engine} ${data.ocr.version||'未安装'}`:'',data?`ONNX Runtime ${data.ocr.runtime_version||'未安装'} · ${data.ocr.model_count} 个本地模型${data.ocr.ready?' · 依赖与模型文件齐全':' · 请检查依赖和模型文件'}`:'')}
+    ${data?.ocr.model_directory?`<p class="settings-note environment-model-path">${esc(data.ocr.model_directory)}</p>`:''}
+    ${runtimeRow('安卓视频组件',data?`scrcpy ${data.video.version} · ${data.video.available?'已内置':'文件缺失'}`:'')}
+    ${runtimeRow('桌面运行时',data?`Electron ${data.electron} · Node ${data.node}`:'')}`;
+}
 function settingField(section,key,label,help='',choices=null){
   const value=S.settingsDraft[section][key],attribute=`data-setting="${section}.${key}"`;
   let control;
@@ -10,12 +27,13 @@ function settingField(section,key,label,help='',choices=null){
 function settingsView(){
   const data=S.settingsData;if(!data||!S.settingsDraft)return '<div class="empty">正在加载设置…</div>';
   const tab=S.settingsTab||'shortcuts',f=(...args)=>settingField(tab,...args);let body='';
+  if(tab==='environment')body=environmentSettingsView();
   if(tab==='shortcuts')body=Object.entries({run:'运行当前用例',record:'开始录制',screenshot:'截取目标窗口',pick:'指选目标窗口',show:'显示工作台',stop:'停止执行 / 录制'}).map(([key,label])=>f(key,label,key==='stop'?'F12 始终保留为紧急停止键。':'点击输入框，直接按下组合键；Backspace 清空。')).join('')+'<p class="settings-note">这些快捷键在其他应用前台时也可使用。F1 帮助、Ctrl+S 保存、Ctrl+Shift+S 另存为保持固定。</p>';
   if(tab==='mcp')body=`<div class="settings-status"><i class="status-dot ${data.mcp.running?'green':''}"></i><strong>${data.mcp.running?'MCP 正在运行':'MCP 已关闭'}</strong><span>${esc(data.mcp.url)}</span></div>`+f('enabled','启用 MCP','允许本机 AI 工具通过 MCP 操作工作台。')+f('explorationTimeout','默认探索超时（秒）','范围 1 ~ 30 秒；接口明确传入超时时优先使用传入值。')+`<div class="settings-tools">${button('复制 Codex 配置','settings-mcp-copy','','copy')}${button('复制通用配置','settings-mcp-copy','ghost','', 'data-format="json"')}${button('重置连接','settings-mcp-reset','','refresh',data.mcp.running?'':'disabled')}</div><p class="settings-note">重置后旧连接凭据立即失效，客户端需要重新连接。${data.mcp.allowed?'':'本次启动使用了 --disable-mcp，需正常重启后才能启用。'}</p>`;
-  if(tab==='startup')body=f('admin','启动时请求管理员权限','下次启动生效。用于操作具有管理员权限的目标程序。')+f('rememberBounds','记住窗口位置与大小','再次启动时恢复工作台位置；屏幕变化时自动调整可见区域。')+f('closeAction','点击关闭按钮时','托盘菜单始终提供“退出工作台”。',[['exit','退出程序'],['tray','最小化到系统托盘']])+`<p class="settings-note">退出前仍会提示未保存的用例。运行或录制期间请先停止再退出。</p>`;
+  if(tab==='startup')body=f('rememberBounds','记住窗口位置与大小','再次启动时恢复工作台位置；屏幕变化时自动调整可见区域。')+f('closeAction','点击关闭按钮时','托盘菜单始终提供“退出工作台”。',[['exit','退出程序'],['tray','最小化到系统托盘']])+`<p class="settings-note">退出前仍会提示未保存的用例。运行或录制期间请先停止再退出。</p>`;
   if(tab==='target')body=f('defaultMode','默认选择方式','打开工作台后优先展示的窗口选择方式。',[['pick','鼠标指选'],['search','搜索窗口']])+f('refreshSeconds','窗口列表自动刷新','后台扫描不会切换或连接目标窗口。',[[0,'关闭'],[3,'每 3 秒'],[5,'每 5 秒'],[10,'每 10 秒'],[30,'每 30 秒']])+f('filter','默认搜索条件','可填写窗口标题或进程名，留空展示全部窗口。')+f('autoToolbar','连接后自动打开工具栏','关闭后仍可手动打开窗口工具栏。')+f('linkToolbar','默认捆绑工具栏','下次连接目标窗口时生效。');
   if(tab==='history')body=f('retentionDays','历史清理范围','仅清理早于此时间且已完成的报告和诊断日志。',[[7,'超过 7 天'],[30,'超过 30 天'],[90,'超过 90 天'],[180,'超过 180 天'],[365,'超过 1 年']])+`<div class="settings-cleanup"><div>${icon('history')}<h3>检查历史占用</h3><p>先保存清理范围，再查看候选记录和可释放空间。确认后才会删除。</p></div>${button('预览清理','settings-cleanup-preview','','search')}</div><p class="settings-note">每次最多处理 1000 份报告、最近 1000 条日志。保留测试用例、通用控件和录制数据。</p>`;
-  return `<div class="settings-page"><div class="page-heading"><div><h1>设置</h1><p class="sub">配置你的工作台，设置保存在本机。</p></div><span class="settings-version">v${esc(data.version)}</span></div>${data.warning?`<p class="settings-warning">${esc(data.warning)}</p>`:''}<div class="settings-layout"><nav class="settings-nav" aria-label="设置分类">${Object.entries(settingSections).map(([key,[label,description]])=>`<button data-act="settings-tab" data-tab="${key}" class="${key===tab?'active':''}"><strong>${label}</strong><small>${description}</small></button>`).join('')}<div class="settings-transfer">${button('导入设置','settings-import','ghost','folder')}${button('导出设置','settings-export','ghost','upload')}</div></nav><section class="settings-panel"><header><h2>${settingSections[tab][0]}</h2><span>${settingSections[tab][1]}</span></header>${body}<footer><span id="settings-save-state" role="status">${settingsDraftChanged()?'有未保存的设置':'已保存'}</span><div>${button('重置本组','settings-reset','ghost','refresh')}${button('保存设置','settings-save','primary','save',disabled())}</div></footer></section></div></div>`;
+  return `<div class="settings-page">${data.warning?`<p class="settings-warning">${esc(data.warning)}</p>`:''}<div class="settings-layout"><nav class="settings-nav" aria-label="设置分类">${Object.entries(settingSections).map(([key,[label,description]])=>`<button data-act="settings-tab" data-tab="${key}" class="${key===tab?'active':''}"><strong>${label}</strong><small>${description}</small></button>`).join('')}<div class="settings-transfer">${button('导入设置','settings-import','ghost','folder')}${button('导出设置','settings-export','ghost','upload')}<span class="settings-version">v${esc(data.version)}</span></div></nav><section class="settings-panel"><header><h2>${settingSections[tab][0]}</h2><span>${settingSections[tab][1]}</span>${tab==='environment'?button(S.environmentLoading?'检测中…':'检测环境','settings-environment-refresh','ghost','refresh',S.environmentLoading?'disabled':''):''}</header>${body}<footer><span id="settings-save-state" role="status">${settingsDraftChanged()?'有未保存的设置':'已保存'}</span><div>${button('重置本组','settings-reset','ghost','refresh')}${button('保存设置','settings-save','primary','save',disabled())}</div></footer></section></div></div>`;
 }
 function settingsDraftChanged(){return S.settingsDraft&&JSON.stringify(S.settingsDraft)!==JSON.stringify(S.settingsData?.values);}
 function applySettingsConfig(data){
@@ -24,14 +42,33 @@ function applySettingsConfig(data){
   if(!previous||previous.target.filter!==data.values.target.filter)S.windowSearch=data.values.target.filter;
   if(window.__studioReady)windowDiscovery.start();
 }
-async function loadSettings(){const data=await api('settings_get');applySettingsConfig(data);S.settingsDraft=clone(data.values);render();}
+async function loadSettings(){const data=await api('settings_get');applySettingsConfig(data);S.settingsDraft=clone(data.values);render();if(S.settingsTab==='environment')await loadEnvironment();}
+let environmentRequest=null;
+async function loadEnvironment(){
+  if(environmentRequest)return environmentRequest;
+  S.environmentLoading=true;S.environmentError='';render();
+  environmentRequest=(async()=>{
+    try{S.environmentData=await api('settings_environment');}
+    catch(error){S.environmentError=error.message;}
+    finally{S.environmentLoading=false;if(S.view==='settings'&&S.settingsTab==='environment')render();}
+  })();
+  try{await environmentRequest;}finally{environmentRequest=null;}
+}
 const humanBytes=value=>value<1024?value+' B':value<1048576?(value/1024).toFixed(1)+' KB':(value/1048576).toFixed(1)+' MB';
 async function settingsAction(action,node){
   if(!action.startsWith('settings-'))return false;
-  if(action==='settings-tab'){S.settingsTab=node.dataset.tab;render();return true;}
-  if(action==='settings-reset'){const tab=S.settingsTab||'shortcuts';S.settingsDraft[tab]=clone(S.settingsData.defaults[tab]);render();return true;}
+  if(action==='settings-tab'){S.settingsTab=node.dataset.tab;render();if(S.settingsTab==='environment')await loadEnvironment();return true;}
+  if(action==='settings-environment-refresh'){await loadEnvironment();return true;}
+  if(action==='settings-environment-adb'){const picked=await api('settings_environment_pick');if(picked){S.settingsDraft.environment.adbPath=picked.path;render();}return true;}
+  if(action==='settings-environment-adb-auto'){S.settingsDraft.environment.adbPath='';render();return true;}
+  if(action==='settings-reset'){
+    const tab=S.settingsTab||'shortcuts';
+    if(tab==='startup'){for(const key of ['rememberBounds','closeAction'])S.settingsDraft.startup[key]=S.settingsData.defaults.startup[key];}
+    else{S.settingsDraft[tab]=clone(S.settingsData.defaults[tab]);if(tab==='environment')S.settingsDraft.startup.admin=S.settingsData.defaults.startup.admin;}
+    render();return true;
+  }
   if(action==='settings-save'){
-    if(lock())return true;const data=await api('settings_save',{values:S.settingsDraft});applySettingsConfig(data);S.settingsDraft=clone(data.values);render();toast('设置已保存','success');return true;
+    if(lock())return true;const data=await api('settings_save',{values:S.settingsDraft});applySettingsConfig(data);S.settingsDraft=clone(data.values);render();if(S.settingsTab==='environment')await loadEnvironment();toast('设置已保存','success');return true;
   }
   if(action==='settings-import'){const data=await api('settings_import');if(data){S.settingsDraft=data.values;render();toast('已载入设置，点击保存后生效');}return true;}
   if(action==='settings-export'){await api('settings_export');return true;}

@@ -1,5 +1,6 @@
 """Extract the tested portable payload and add installation-only support files."""
 from pathlib import Path
+import json
 import shutil
 import zipfile
 
@@ -13,7 +14,8 @@ def main():
             raise RuntimeError('Refusing redirected installer staging directory')
         shutil.rmtree(stage)
     stage.mkdir(parents=True)
-    with zipfile.ZipFile(ROOT/'dist'/'echo-test-win-x64.zip') as archive:
+    version = json.loads((ROOT/'package.json').read_text(encoding='utf-8'))['version']
+    with zipfile.ZipFile(ROOT/'dist'/'latest'/f'echo-test-{version}-portable-x64.zip') as archive:
         if not all((stage/name).resolve().is_relative_to(stage.resolve()) for name in archive.namelist()):
             raise RuntimeError('Unexpected path in portable archive')
         archive.extractall(stage)

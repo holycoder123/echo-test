@@ -207,7 +207,7 @@ class McpStartupTests(unittest.TestCase):
 
     def test_already_elevated_launcher_enables_mcp_and_waits_for_readiness(self):
         import app
-        with patch('sys.argv',['app.py']), patch('echo_test.mcp_startup.check_mcp_startup',return_value={'already_enabled':False}) as preflight, \
+        with patch('sys.argv',['app.py','--mcp']), patch('echo_test.mcp_startup.check_mcp_startup',return_value={'already_enabled':False}) as preflight, \
              patch('echo_test.mcp_startup.wait_for_mcp') as ready, patch('echo_test.backend.is_admin',return_value=True), patch('subprocess.Popen') as launch:
             self.assertEqual(app.main(),0)
             self.assertIn('--enable-mcp',launch.call_args.args[0])
@@ -223,16 +223,16 @@ class McpStartupTests(unittest.TestCase):
 
     def test_admin_start_cannot_reuse_a_non_elevated_mcp_instance(self):
         import app
-        with patch('sys.argv',['app.py','--admin']), patch('echo_test.mcp_startup.check_mcp_startup',return_value={'already_enabled':True,'pid':88}), \
+        with patch('sys.argv',['app.py','--admin','--mcp']), patch('echo_test.mcp_startup.check_mcp_startup',return_value={'already_enabled':True,'pid':88}), \
              patch('echo_test.backend.elevation',return_value=False), patch.object(ct.windll.shell32,'ShellExecuteW') as launch:
             with self.assertRaisesRegex(McpStartupError,'管理员权限'):
                 app.main()
             launch.assert_not_called()
 
-    def test_default_launcher_requests_elevation_and_keeps_case_and_mcp_parameters(self):
+    def test_explicit_mcp_launcher_requests_elevation_and_keeps_case_and_mcp_parameters(self):
         import app
         case=Path('test_cases')/'example test.echo.json'
-        with patch('sys.argv',['app.py','--case',str(case)]), \
+        with patch('sys.argv',['app.py','--mcp','--case',str(case)]), \
              patch('echo_test.mcp_startup.check_mcp_startup',return_value={'already_enabled':False}), \
              patch('echo_test.mcp_startup.wait_for_mcp') as ready, \
              patch('echo_test.backend.is_admin',return_value=False), \
@@ -272,14 +272,19 @@ class McpStartupTests(unittest.TestCase):
             self.assertEqual(app.main(),0)
             self.assertIn('--no-admin',launch.call_args.args[0]);elevated.assert_not_called()
 
-    def test_default_start_cannot_reuse_a_non_elevated_mcp_instance(self):
+    def test_default_start_does_not_enable_or_wait_for_mcp(self):
         import app
         with patch('sys.argv',['app.py']), \
-             patch('echo_test.mcp_startup.check_mcp_startup',return_value={'already_enabled':True,'pid':88}), \
-             patch('echo_test.backend.elevation',return_value=False), \
-             patch.object(ct.windll.shell32,'ShellExecuteW') as launch:
-            with self.assertRaisesRegex(McpStartupError,'管理员权限'):app.main()
-            launch.assert_not_called()
+             patch('echo_test.startup_preferences.startup_preferences',return_value={'admin': True,'mcp': False}), \
+             patch('echo_test.mcp_startup.check_mcp_startup') as preflight, \
+             patch('echo_test.mcp_startup.wait_for_mcp') as ready, \
+             patch('echo_test.backend.is_admin',return_value=True), \
+             patch('subprocess.Popen') as launch:
+            self.assertEqual(app.main(),0)
+            self.assertNotIn('--enable-mcp',launch.call_args.args[0])
+            self.assertNotIn('--force-mcp',launch.call_args.args[0])
+            self.assertNotIn('--disable-mcp',launch.call_args.args[0])
+            preflight.assert_not_called();ready.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 # Dependencies and Python caches
 node_modules/
+electron/renderer/editor/
 .venv/
 runtime/
 dist/

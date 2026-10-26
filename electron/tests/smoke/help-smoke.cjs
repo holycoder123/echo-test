@@ -14,7 +14,7 @@ async function verify(main,bar) {
       return {nav:!!document.querySelector('.nav-button.active[data-act="view-help"]'),
         topics:document.querySelectorAll('.help-article').length===10,
         preservesEdits:JSON.stringify(S.project)===project&&S.dirty&&S.recordPending===pending,
-        local:document.querySelector('.help-heading').textContent.includes('离线可用')};
+        local:!!document.querySelector('#guide-start')&&!document.querySelector('.help-articles iframe')};
     })()`);
     for(const [key,value] of Object.entries(result.read))assert.equal(value,true,key);
     result.search=await js(`(()=>{

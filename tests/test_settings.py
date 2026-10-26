@@ -38,12 +38,14 @@ class SettingsTests(unittest.TestCase):
     def test_launcher_defaults_and_local_overrides(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            self.assertEqual(startup_preferences(root), {'admin': True, 'mcp': True})
+            self.assertEqual(startup_preferences(root), {'admin': True, 'mcp': False})
             (root / 'settings.json').write_text(json.dumps({'startup': {'admin': False}, 'mcp': {'enabled': False}}))
             self.assertEqual(startup_preferences(root), {'admin': False, 'mcp': False})
             (root / 'settings.json').write_text('{broken')
-            self.assertEqual(startup_preferences(root), {'admin': True, 'mcp': True})
+            self.assertEqual(startup_preferences(root), {'admin': True, 'mcp': False})
             (root / 'settings.json').write_text(json.dumps({'startup': {'admin': 'false'}, 'mcp': {'enabled': None}}))
+            self.assertEqual(startup_preferences(root), {'admin': True, 'mcp': False})
+            (root / 'settings.json').write_text(json.dumps({'mcp': {'enabled': True}}))
             self.assertEqual(startup_preferences(root), {'admin': True, 'mcp': True})
 
     def test_cleanup_only_previews_old_complete_reports_without_mutation(self):

@@ -19,7 +19,7 @@ const caseName = safeBasename.refine(value => !value.endsWith('.png'), 'Case nam
 const templateName = safeBasename.refine(value => !value.endsWith('.echo.json'), 'Template name must use .png');
 const templatePath = z.string().max(75).regex(/^assets\/[\p{L}\p{N}_-]{1,64}\.png$/u)
   .refine(value => safeStem.safeParse(value.slice(7,-4)).success, 'Template must be an assets PNG');
-const keyNames = new Set(['CTRL','CONTROL','ALT','SHIFT','ENTER','RETURN','ESC','ESCAPE','TAB','SPACE','BACKSPACE','DELETE',
+const keyNames = new Set(['BACK','APP_SWITCH','CTRL','CONTROL','ALT','SHIFT','ENTER','RETURN','ESC','ESCAPE','TAB','SPACE','BACKSPACE','DELETE',
   'LEFT','UP','RIGHT','DOWN','HOME','END','PAGEUP','PAGEDOWN','LCTRL','RCTRL','LSHIFT','RSHIFT','LALT','RALT','CAPSLOCK','INSERT']);
 const keys = z.string().min(1).max(80).refine(value => {
   const parts = value.toUpperCase().split('+').map(key => key.trim());
@@ -30,7 +30,7 @@ const keys = z.string().min(1).max(80).refine(value => {
 }, 'Unsupported or system-reserved key combination');
 const selectorSchema = z.object({
   library_id: z.union([z.literal(''),z.string().regex(/^[a-f0-9]{32}$/)]).default(''),
-  name: label, kind: z.enum(['coordinate','image']).default('coordinate'),
+  name: label, kind: z.enum(['coordinate','image','android_ui']).default('coordinate'),
   x: finite.min(0).max(100000).default(.5), y: finite.min(0).max(100000).default(.5),
   normalized: z.boolean().default(true), image: z.union([z.literal(''), templatePath]).default(''),
   threshold: finite.min(.5).max(1).default(.86),
@@ -38,11 +38,13 @@ const selectorSchema = z.object({
   roi: z.tuple([z.int().min(-100000).max(100000), z.int().min(-100000).max(100000), z.int().min(1).max(100000), z.int().min(1).max(100000)]).nullable().default(null),
   offset_x: z.int().min(-100000).max(100000).default(0), offset_y: z.int().min(-100000).max(100000).default(0),
   recognition: z.enum(['template','ocr']).default('template'),
-  templates: z.array(z.object({image:templatePath,mask:z.union([z.literal(''),templatePath]).default('')}).strict()).max(10).default([]),
+  templates: z.array(z.object({image:templatePath,mask:z.union([z.literal(''),templatePath]).default(''),name:label.optional()}).strict()).max(10).default([]),
   mask: z.union([z.literal(''),templatePath]).default(''), anchor:z.string().max(200).default(''),
   text:z.string().max(200).default(''), text_match:z.enum(['exact','contains']).default('exact'),
   color_tolerance:finite.min(0).max(255).nullable().default(null),
+  ui:z.object({resource_id:z.string().max(4096).optional(),text:z.string().max(4096).optional(),description:z.string().max(4096).optional(),class_name:z.string().max(4096).optional(),package:z.string().max(4096).optional(),clickable:z.boolean().optional(),enabled:z.boolean().optional(),index:z.int().min(1).max(5000).optional()}).strict().default({}),
 }).strict().superRefine((value, ctx) => {
+  if(value.kind==='android_ui'&&!['resource_id','text','description','class_name','package'].some(key=>value.ui[key]?.trim()))ctx.addIssue({code:'custom',path:['ui'],message:'Android UI selector needs a property condition'});
   if (value.kind === 'image' && value.recognition === 'template' && !value.image && !value.templates.length) ctx.addIssue({code:'custom',path:['image'],message:'Image selector needs an assets PNG'});
   if (value.kind === 'image' && value.recognition === 'ocr' && !value.text.trim()) ctx.addIssue({code:'custom',path:['text'],message:'OCR needs target text'});
   if (value.kind === 'image' && value.anchor && !value.roi) ctx.addIssue({code:'custom',path:['roi'],message:'Anchor needs relative ROI'});
@@ -50,7 +52,7 @@ const selectorSchema = z.object({
   if (value.kind === 'coordinate' && value.normalized && (value.x > 1 || value.y > 1)) ctx.addIssue({code:'custom',message:'Normalized coordinates must be in 0..1'});
 });
 const actionNames = ['click','double_click','right_click','long_press','drag','scroll','wait_image','assert_image','assert_absent',
-  'key','text','sleep','screenshot','key_down','key_up','python','loop','end_loop','set_variable'];
+  'key','text','sleep','screenshot','key_down','key_up','python','loop','end_loop','set_variable','wait_ui','assert_ui','assert_ui_absent'];
 const pythonCode=z.string().max(256*1024).refine(value=>Buffer.byteLength(value,'utf8')<=256*1024,'Python source exceeds 256 KB');
 const paramsSchema = z.object({
   duration: finite.min(.01).max(600).optional(), interval: finite.min(.01).max(600).optional(),
@@ -72,7 +74,7 @@ const stepSchema = z.object({
   if (value.params.path && value.action !== 'drag') ctx.addIssue({code:'custom',path:['params','path'],message:'Only drag supports a path'});
   if(value.action==='python'&&value.enabled&&!value.params.code?.trim())ctx.addIssue({code:'custom',path:['params','code'],message:'Python script must not be blank'});
 });
-const targetActions = new Set(['click','double_click','right_click','long_press','drag','scroll','wait_image','assert_image','assert_absent']);
+const targetActions = new Set(['click','double_click','right_click','long_press','drag','scroll','wait_image','assert_image','assert_absent','wait_ui','assert_ui','assert_ui_absent']);
 const imageActions = new Set(['wait_image','assert_image','assert_absent']);
 const projectSchema = z.object({name:label.default('目标应用测试用例'), schema_version:z.literal(1).default(1),
   mode:z.enum(['lowcode','python']).default('lowcode'),code:pythonCode.default(''),script_timeout:finite.min(.1).max(600).default(600),
@@ -114,6 +116,7 @@ const projectSchema = z.object({name:label.default('目标应用测试用例'), 
   for (const [index, step] of value.steps.entries()) {
     if (!step.enabled||value.mode==='python') continue;
     if (targetActions.has(step.action) && !selectors.has(step.target)) ctx.addIssue({code:'custom',path:['steps',index,'target'],message:'Target selector does not exist'});
+    if (['wait_ui','assert_ui','assert_ui_absent'].includes(step.action) && selectors.get(step.target)?.kind !== 'android_ui') ctx.addIssue({code:'custom',path:['steps',index,'target'],message:'Android UI action needs an Android UI selector'});
     if (step.action === 'drag' && !selectors.has(step.end_target)) ctx.addIssue({code:'custom',path:['steps',index,'end_target'],message:'Drag end selector does not exist'});
     if (imageActions.has(step.action) && selectors.get(step.target)?.kind !== 'image') ctx.addIssue({code:'custom',path:['steps',index,'target'],message:'Image action needs an image selector'});
   }

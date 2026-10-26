@@ -135,14 +135,21 @@ class RecognitionTests(unittest.TestCase):
     def test_assets_roundtrip_includes_alternatives_and_masks(self):
         self.store('hover.png', self.pattern[::-1].copy())
         self.store('mask.png', np.ones(self.pattern.shape[:2], dtype=np.uint8)*255)
-        selector = Selector('button', kind='image', image='button.png', mask='mask.png', templates=[{'image':'hover.png','mask':'mask.png'}])
+        selector = Selector('button', kind='image', image='button.png', mask='mask.png', templates=[{'image':'hover.png','mask':'mask.png','name':'悬停状态'}])
         text = Selector('text', kind='image', recognition='ocr', text='任务', anchor='button', roi=[0,20,60,30])
         path = self.root/'portable'/'case.echo.json'
         saved = save_project(Project(selectors=[selector,text]), path, self.root)
         self.assertEqual(saved.to_dict(), load_project(path).to_dict())
+        self.assertEqual(saved.selectors[0].templates[0]['name'], '悬停状态')
         for asset in saved.selectors[0].asset_paths():
             self.assertTrue((path.parent/asset).is_file())
         self.assertIsNotNone(Vision(path.parent).match(self.frame(), saved.selectors[0]))
+
+    def test_template_names_validate_without_requiring_names_in_older_cases(self):
+        Selector('button', kind='image', templates=[{'image':'hover.png'}]).validate()
+        for name in ['', '   ', 123, '名' * 201]:
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                Selector('button', kind='image', templates=[{'image':'hover.png','name':name}]).validate()
 
     def test_anchor_validation_rejects_cycles_missing_and_coordinate(self):
         for anchor in ['missing', 'A', 'point']:

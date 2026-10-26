@@ -6,7 +6,7 @@ on:
       tag:
         description: Existing source tag to build
         required: true
-        default: v1.1.0
+        default: v1.2.0
         type: string
       release_id:
         description: Existing draft release ID
@@ -78,8 +78,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Source verification failed' }
       - name: Build portable archive and installer
         run: |
-          & runtime/python/python.exe -X utf8 scripts/package-portable.py
-          if ($LASTEXITCODE -ne 0) { throw 'Portable archive failed' }
           & scripts/build-installer.ps1
           if ($LASTEXITCODE -ne 0) { throw 'Installer build failed' }
       - name: Verify installation, upgrade, offline UI, MCP and uninstall
@@ -94,7 +92,7 @@ jobs:
           root=Path.cwd(); version=os.environ['RELEASE_VERSION']; tag=os.environ['RELEASE_TAG']; commit=os.environ['RELEASE_SHA']
           report=json.loads((root/'artifacts/installer-test.json').read_text(encoding='utf-8-sig'))
           assert report['passed'] and report['version']==version
-          archive=root/'dist/echo-test-win-x64.zip'
+          archive=root/f'dist/latest/echo-test-{version}-portable-x64.zip'
           with zipfile.ZipFile(archive) as bundle:
               assert bundle.testzip() is None
               names=bundle.namelist(); prefix='echo-test/'
@@ -109,7 +107,7 @@ jobs:
                   if name and prefix+name in names: assert bundle.read(prefix+name)==(root/name).read_bytes(), name
           output=root/'dist/release'; output.mkdir()
           sums=[]
-          for source,dest in [(root/f'dist/echo-test-{version}-setup-x64.exe',output/f'echo-test-{version}-setup-x64.exe'),(archive,output/f'echo-test-{version}-portable-x64.zip')]:
+          for source,dest in [(root/f'dist/latest/echo-test-{version}-setup-x64.exe',output/f'echo-test-{version}-setup-x64.exe'),(archive,output/f'echo-test-{version}-portable-x64.zip')]:
               shutil.copy2(source,dest)
               with dest.open('rb') as stream: digest=hashlib.file_digest(stream,'sha256').hexdigest()
               line=digest+'  '+dest.name+'\n'; dest.with_name(dest.name+'.sha256').write_bytes(line.encode('ascii')); sums.append(line)

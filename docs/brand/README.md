@@ -42,7 +42,7 @@
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/set-desktop-icon.ps1
 ```
 
-桌面入口使用项目内启动脚本，默认请求管理员权限并开启 MCP。安装器使用同一 ICO，后续构建会继承新图标。
+桌面入口使用项目内启动脚本，默认请求管理员权限，MCP 默认关闭，可在设置中开启。安装器使用同一 ICO，后续构建会继承新图标。
 
 ## 重新生成
 

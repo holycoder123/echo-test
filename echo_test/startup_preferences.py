@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 def startup_preferences(directory=None):
-    result = {'admin': True, 'mcp': True}
+    result = {'admin': True, 'mcp': False}
     directory = Path(directory) if directory is not None else Path(os.environ.get('APPDATA', Path.home() / 'AppData' / 'Roaming')) / 'echo-test'
     try:
         data = json.loads((directory / 'settings.json').read_text(encoding='utf-8'))

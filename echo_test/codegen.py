@@ -65,6 +65,8 @@ def generate_python(project):
                 elif action in {'wait_image', 'assert_image', 'assert_absent'}:
                     method = 'assert_absent' if action == 'assert_absent' else 'assert_image'
                     emit(f'window.{method}({target(step.target)}, {timeout})', inner)
+                elif action in {'wait_ui', 'assert_ui', 'assert_ui_absent'}:
+                    emit(f'window.{action}({target(step.target)}, {timeout})', inner)
                 elif action in {'key', 'key_down', 'key_up'}:
                     emit(f'window.{action}({params.get("keys", "ENTER" if action == "key" else "W")!r})', inner)
                 elif action == 'text':
