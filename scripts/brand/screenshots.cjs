@@ -3,10 +3,10 @@ const fs=require('node:fs');
 const path=require('node:path');
 const root=path.resolve(__dirname,'../..');
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-async function capture(main,toolbar){
+async function capture(main){
   if(process.env.ECHO_TEST_SMOKE_TEST!=='1')throw new Error('Documentation screenshots require isolated smoke mode');
   const output=path.join(root,'docs/images');fs.mkdirSync(output,{recursive:true});
-  const mainSize=main.getSize(),barSize=toolbar.getSize();
+  const mainSize=main.getSize();
   try{
     main.setSize(1440,1000);
     await main.webContents.executeJavaScript(`(()=>{
@@ -50,18 +50,9 @@ async function capture(main,toolbar){
     await pause(200);
     fs.writeFileSync(path.join(output,'android.png'),(await main.webContents.capturePage()).toPNG());
     await main.webContents.executeJavaScript('AndroidVideo.stop(true);S.view="cases";S.android=window.__brandScreenshotSaved.android;api=window.__brandScreenshotApi;delete window.__brandScreenshotApi;');
-    toolbar.setSize(380,760);
-    await toolbar.webContents.executeJavaScript(`(()=>{
-      window.__brandScreenshotSaved={...G};
-      const names=['单击「新建订单」','输入订单名称','单击「保存订单」','等待创建成功提示','验证订单已出现在列表','保存结果截图'];
-      Object.assign(G,{connection:{title:'本地示例应用',width:1280,height:800},toolbarLinked:true,busy:'running',recordStarting:false,recordPending:false,caseName:'订单创建与结果校验',caseChoice:'',library:[],run:{case:'订单创建与结果校验',status:'running',iterations:1,total:6,completed:3,passed:3,failed:0,stopped:0,current:{index:3,name:names[3],iteration:1,repeat:1,status:'running',started:Date.now()},steps:names.map((name,index)=>({index,name,repeatTotal:1,status:index<3?'passed':index===3?'running':'pending'}))}});renderState();
-    })()`);
-    await pause(150);
-    fs.writeFileSync(path.join(output,'toolbar.png'),(await toolbar.webContents.capturePage()).toPNG());
   }finally{
     await main.webContents.executeJavaScript('if(window.__brandScreenshotApi){AndroidVideo.stop(true);api=window.__brandScreenshotApi;delete window.__brandScreenshotApi;}Object.assign(S,window.__brandScreenshotSaved);delete window.__brandScreenshotSaved;render()');
-    await toolbar.webContents.executeJavaScript('if(window.__brandScreenshotSaved){Object.assign(G,window.__brandScreenshotSaved);delete window.__brandScreenshotSaved;renderState()}');
-    main.setSize(...mainSize);toolbar.setSize(...barSize);
+    main.setSize(...mainSize);
   }
 }
 module.exports={capture};

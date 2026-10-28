@@ -11,6 +11,9 @@ RequestExecutionLevel user
 !ifndef INSTALLER_UI_ROOT
   !define INSTALLER_UI_ROOT "${PROJECT_ROOT}\.runtime\installer-build\ui"
 !endif
+!ifndef INSTALLER_ENVIRONMENT_ROOT
+  !define INSTALLER_ENVIRONMENT_ROOT "${PROJECT_ROOT}\.runtime\installer-build"
+!endif
 Var RegistryKey
 Var TestInstall
 Var NoShortcuts
@@ -92,6 +95,11 @@ FunctionEnd
 Section "工作台及离线运行环境（必需）" Core
   SectionIn RO
   !insertmacro SetupStage 0
+  ; A closed workbench has no state file. Do not execute a damaged old Python
+  ; merely to confirm that no session exists; allow the installer to repair it.
+  IfFileExists "$INSTDIR\.runtime\workbench-state.json" guard_required
+  IfFileExists "$INSTDIR\.runtime\embed-recovery.json" guard_required idle_checked
+  guard_required:
   IfFileExists "$INSTDIR\runtime\python\python.exe" 0 idle_checked
   InitPluginsDir
   SetOutPath "$PLUGINSDIR"
@@ -105,10 +113,31 @@ Section "工作台及离线运行环境（必需）" Core
     Abort
   ${EndIf}
   idle_checked:
+  InitPluginsDir
+  SetOutPath "$PLUGINSDIR"
+  File /oname=installer-environment.ps1 "${PROJECT_ROOT}\scripts\installer-environment.ps1"
+  File /oname=environment-manifest.json "${INSTALLER_ENVIRONMENT_ROOT}\environment-manifest.json"
+  DetailPrint "Checking bundled environment versions and file integrity..."
+  nsExec::ExecToStack /TIMEOUT=300000 '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\installer-environment.ps1" -InstallDirectory "$INSTDIR" -Manifest "$PLUGINSDIR\environment-manifest.json" -Output "$PLUGINSDIR\environment-reuse.ini"'
+  Pop $0
+  Pop $1
+  DetailPrint "$1"
+  ${If} $0 != "0"
+    Delete "$PLUGINSDIR\environment-reuse.ini"
+    DetailPrint "Environment detection unavailable; installing bundled dependencies."
+  ${EndIf}
   !insertmacro SetupStage 1
   SetOutPath "$INSTDIR"
   SetOverwrite on
-  File /r /x "test_cases" /x "projects" /x "control_library" /x "__pycache__" /x "*.pyc" "${PAYLOAD_ROOT}\*"
+  File /r /x "runtime" /x "node_modules" /x "test_cases" /x "projects" /x "control_library" /x "__pycache__" /x "*.pyc" "${PAYLOAD_ROOT}\*"
+  ; Metadata and npm command shims are small and always follow the application version.
+  SetOutPath "$INSTDIR\runtime"
+  File "${PAYLOAD_ROOT}\runtime\*.*"
+  SetOutPath "$INSTDIR\node_modules"
+  File "${PAYLOAD_ROOT}\node_modules\*.*"
+  SetOutPath "$INSTDIR\node_modules\.bin"
+  File /r "${PAYLOAD_ROOT}\node_modules\.bin\*"
+  !include "${INSTALLER_ENVIRONMENT_ROOT}\environment-files.nsh"
   ; Seed empty workspace metadata only once; upgrades keep user-created cases and controls.
   SetOverwrite off
   SetOutPath "$INSTDIR\test_cases"
@@ -124,6 +153,10 @@ Section "工作台及离线运行环境（必需）" Core
   !insertmacro SetupStage 2
   WriteINIStr "$INSTDIR\echo-test-install.ini" "Installer" "AppId" "EchoTest"
   WriteINIStr "$INSTDIR\echo-test-install.ini" "Installer" "TestInstall" "$TestInstall"
+  ReadINIStr $0 "$PLUGINSDIR\environment-reuse.ini" "Summary" "Reused"
+  WriteINIStr "$INSTDIR\echo-test-install.ini" "Environment" "Reused" "$0"
+  ReadINIStr $0 "$PLUGINSDIR\environment-reuse.ini" "Summary" "InstalledOrRepaired"
+  WriteINIStr "$INSTDIR\echo-test-install.ini" "Environment" "InstalledOrRepaired" "$0"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   WriteRegStr HKCU "$RegistryKey" "DisplayName" "${APP_NAME}"
   WriteRegStr HKCU "$RegistryKey" "DisplayVersion" "${PRODUCT_VERSION}"

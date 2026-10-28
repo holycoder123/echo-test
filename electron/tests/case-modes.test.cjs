@@ -27,7 +27,7 @@ test('Python control insertion uses stable ID and escapes control names',()=>{
   c.target.library_id='';
   assert.equal(vm.runInContext('pythonControlReference(target)',c),'controls["按钮\\"\\n"]');
 });
-test('Python copies preserve a separate low-code draft and reset save identity',async()=>{
+test('Python copies preserve the current low-code draft and reset save identity',async()=>{
   const c=context([{action:'text',params:{text:'original'}}]);const calls=[];
   Object.assign(c,{lock:()=>false,dirty:()=>{c.S.dirty=true;},render:()=>{},toast:()=>{},api:async(method,args)=>{
     calls.push({method,args});
@@ -37,6 +37,7 @@ test('Python copies preserve a separate low-code draft and reset save identity',
   await vm.runInContext('createPythonCopy()',c);
   assert.equal(c.S.project.mode,'python');assert.equal(c.S.path,null);
   assert.equal(c.S.modeSource.project.steps[0].params.text,'original');
+  assert.equal(calls.find(call=>call.method==='python_copy').args.project.steps[0].params.text,'original');
   c.S.project.code='changed';assert.equal(c.S.modeSource.project.mode,undefined);
   assert.equal(calls.some(call=>call.method==='save_project'),false);
   assert.equal(calls.some(call=>call.method==='case_context'&&call.args.path===null),true);

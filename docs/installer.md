@@ -12,7 +12,11 @@
 
 ## 升级和卸载
 
-升级覆盖程序与运行环境，已存在的用例和模板不会被安装包覆盖。可以从 Windows 应用列表、开始菜单或安装目录的 `Uninstall.exe` 卸载。
+安装包直接提供离线运行环境，不会在用户电脑重复运行 pip / npm 安装依赖。安装或升级前，按组件核对目标目录中的环境文件大小和 SHA-256：Python（含识别库与 OCR 模型）、Node、安卓工具、运行库安装器及各个 npm 包完整且与本次载荷一致时直接复用，不重新写入；组件缺失、内容损坏或依赖版本变化时，安装或修复对应组件。仅安装了系统 Python / Node 不会跳过内置环境，以保证离线运行和版本兼容。系统 Visual C++ 运行库仍由启动入口检测，已有所需 DLL 时不再安装。
+
+检测使用 Windows 自带的 PowerShell / .NET，不依赖被检查的 Python / Node；检测失败时回退为正常安装。安装详情会显示环境复用或修复信息，安装目录的 `echo-test-install.ini` 记录组件数量。首次安装正常写入全部环境；应用源码、运行环境说明和启动脚本随版本更新。该行为在下一次构建的安装包中生效，已发布的 1.2.0 安装包保持原样。
+
+已存在的用例和模板不会被安装包覆盖。可以从 Windows 应用列表、开始菜单或安装目录的 `Uninstall.exe` 卸载。
 
 卸载只移除程序及运行环境，保留 `test_cases`、`projects`、`reports`、`recordings` 以及用户生成的其他数据。保留数据时安装目录可能仍然存在；如需删除，卸载后先确认已备份，再自行处理。
 
@@ -25,6 +29,8 @@
 `scripts/installer-guard.py` 只读检查同一安装目录的工作台是否仍在运行。目录选择会拒绝相对路径、磁盘/共享根目录和 Windows 系统目录。
 
 `scripts/test-installer.ps1` 在项目内隔离目录及专用注册表项中验证静默安装、重复安装后的用例保留、屏蔽系统 Node/Python 后的 OCR 与界面启动，以及卸载后的数据保留。测试不会安装到默认用户目录，也不会创建正式快捷方式。
+
+`node scripts/python.cjs scripts/test-installer-environment.py` 使用独立的小型载荷和真实 NSIS 安装流程，验证首次安装、完整环境复用（文件修改时间保持不变）、损坏 / 缺失修复、依赖版本升级与用户数据保留；不替换 `dist/latest` 中的发行包。结果写入 `artifacts/installer-environment.json`。
 
 `scripts/test-installer-ui.py <安装包> --target .runtime/installer-build/<新测试目录> --report artifacts/installer-ui.json` 检查真实向导的页面、目录校验、选项记忆和取消确认，并保存原生窗口截图。该检查不会执行安装；DPI 参数只能验证当前真实缩放，不能模拟其他系统缩放。
 

@@ -14,7 +14,74 @@ async function sync(record){
   await record.chain;return version;
 }
 async function query(record,kind,position){try{const version=await sync(record);if(version!==record.model.getVersionId())return null;return await rpc('editor_query',{id:record.id,version,kind,line:position.lineNumber-1,character:position.column-1});}catch(error){status(record,error.message);return null;}}
-function schedule(record){clearTimeout(record.timer);record.timer=setTimeout(()=>sync(record).catch(error=>status(record,error.message)),300);}
+function schedule(record){clearTimeout(record.timer);record.timer=setTimeout(()=>sync(record).catch(error=>status(record,error.message)),300);schedulePreviews(record);}
+function previewStatus(record,text){const node=record.wrapper?.querySelector('.ide-controls-status');if(node)node.textContent=text;}
+function clearPreviews(record){
+  record.previewToken=(record.previewToken||0)+1;clearTimeout(record.previewTimer);
+  if(record.editor&&record.previewZones?.length)record.editor.changeViewZones(accessor=>{for(const id of record.previewZones)accessor.removeZone(id);});
+  for(const item of record.previewInline||[])record.editor?.removeContentWidget(item.widget);
+  record.previewDecorations?.clear();record.previewInline=[];
+  record.previewZones=[];record.previewDialog?.remove();record.previewDialog=null;
+}
+function updateInlinePreviews(record){
+  if(!record.editor||!record.previewInline?.length)return;
+  const editor=record.editor,positions=(editor.getSelections()||[]).map(selection=>selection.getPosition()),decorations=[];
+  for(const item of record.previewInline){
+    item.expanded=editor.hasTextFocus()&&positions.some(position=>position.lineNumber===item.range.startLineNumber&&position.column>=item.range.startColumn&&position.column<item.range.endColumn);
+    if(!item.expanded)decorations.push({range:item.range,options:{description:'control-image-argument',inlineClassName:'ide-control-source-hidden',inlineClassNameAffectsLetterSpacing:true,lineHeight:2.1,before:{content:'\u00a0',inlineClassName:'ide-control-image-slot',inlineClassNameAffectsLetterSpacing:true,cursorStops:monaco.editor.InjectedTextCursorStops.None},stickiness:monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges}});
+    editor.layoutContentWidget(item.widget);
+  }
+  if(!record.previewDecorations)record.previewDecorations=editor.createDecorationsCollection();record.previewDecorations.set(decorations);
+}
+function inlinePreview(record,ref,row){
+  if(ref.endLine!==ref.line||!Number.isInteger(ref.column)||!Number.isInteger(ref.endColumn)||ref.column<1||ref.endColumn<=ref.column||ref.endColumn>record.model.getLineMaxColumn(ref.line))return false;
+  const item={range:new monaco.Range(ref.line,ref.column,ref.line,ref.endColumn),expanded:false};row.classList.add('ide-control-inline');row.title=row.textContent+'\n'+record.model.getValueInRange(item.range)+'\n光标移入参数可编辑源码';
+  item.widget={getId:()=>record.id+'-control-'+record.previewToken+'-'+record.previewInline.length,getDomNode:()=>row,suppressMouseDown:true,getPosition:()=>item.expanded?null:{position:{lineNumber:ref.line,column:ref.column},positionAffinity:monaco.editor.PositionAffinity.LeftOfInjectedText,preference:[monaco.editor.ContentWidgetPositionPreference.EXACT]}};
+  // Capture the ID now: the array length changes as further occurrences are added.
+  const id=item.widget.getId();item.widget.getId=()=>id;record.previewInline.push(item);record.editor.addContentWidget(item.widget);return true;
+}
+function schedulePreviews(record){clearPreviews(record);if(record.previewEnabled&&record.editor)record.previewTimer=setTimeout(()=>refreshPreviews(record),250);}
+function previewImage(value){return typeof value==='string'&&value.length<=16*1024*1024&&/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(value)?value:null;}
+function openControlImage(record,image,current){
+  if(!current())return;record.previewDialog?.remove();
+  const dialog=document.createElement('dialog'),close=document.createElement('button'),message=document.createElement('p');dialog.className='ide-control-image-dialog';close.type='button';close.textContent='关闭';message.textContent='正在读取图片…';dialog.append(close,message);document.body.append(dialog);record.previewDialog=dialog;
+  const dismiss=()=>{dialog.remove();if(record.previewDialog===dialog)record.previewDialog=null;};close.onclick=dismiss;dialog.addEventListener('close',dismiss,{once:true});dialog.showModal();
+  rpc('template_preview',{image,full_size:true}).then(result=>{if(!current()||record.previewDialog!==dialog||!dialog.isConnected)return;const source=previewImage(result.image);if(!source)throw new Error('图片数据无效');const large=document.createElement('img');large.alt='控件模板大图';large.onerror=()=>{if(dialog.isConnected){large.remove();message.textContent='图片加载失败';}};large.src=source;message.textContent='';dialog.append(large);}).catch(()=>{if(current()&&dialog.isConnected)message.textContent='图片加载失败';});
+}
+async function refreshPreviews(record){
+  clearPreviews(record);if(!record.previewEnabled||!record.editor||!record.wrapper?.isConnected)return;
+  const token=record.previewToken,editor=record.editor,version=record.model.getVersionId();
+  const current=()=>record.previewEnabled&&record.previewToken===token&&record.editor===editor&&!record.model.isDisposed()&&record.model.getVersionId()===version&&record.wrapper?.isConnected;
+  previewStatus(record,'正在读取控件引用…');
+  try{
+    const result=await rpc('editor_control_refs',{code:record.model.getValue()});if(!current())return;
+    if(result.error){previewStatus(record,result.error==='syntax'?'语法未完整，继续编辑后刷新':'代码过大，暂不显示预览');return;}
+    const grouped=new Map();
+    for(const ref of (result.references||[]).slice(0,500)){
+      if(!Number.isInteger(ref.line)||ref.line<1||ref.line>record.model.getLineCount())continue;
+      const rows=grouped.get(ref.line)||[];rows.push(ref);grouped.set(ref.line,rows);
+    }
+    editor.changeViewZones(accessor=>{for(const [line,refs] of grouped){
+      const zone=document.createElement('div');zone.className='ide-control-zone';
+      for(const ref of refs){
+        const row=document.createElement('div'),label=document.createElement('span');row.className='ide-control-reference';row.dataset.line=String(line);row.append(label);zone.append(row);
+        if(ref.kind==='dynamic'||ref.kind==='unknown'){label.textContent=ref.kind==='dynamic'?'动态引用 · 无法静态预览':'未知引用 · '+String(ref.value);continue;}
+        const entries=typeof S==='undefined'?[]:S.controls?.entries||[],aliases=ref.kind==='name'&&typeof S!=='undefined'?(S.project?.selectors||[]).filter(selector=>selector.name===ref.value):[];
+        const matches=aliases.length?aliases.flatMap(selector=>selector.library_id?entries.filter(entry=>entry.id===selector.library_id):[{selector}]):entries.filter(entry=>ref.kind==='id'?entry.id===ref.value:entry.selector?.name===ref.value);
+        if(matches.length!==1){label.textContent=(matches.length?'控件名称不唯一 · ':'控件不存在 · ')+String(ref.value);continue;}
+        const selector=matches[0].selector||{},types={image:'图片',coordinate:'坐标',android_ui:'原生控件'};label.textContent=(selector.name||ref.value)+' · '+(types[selector.kind]||selector.kind||'控件');
+        if(selector.kind!=='image')continue;
+        const image=selector.image||selector.templates?.[0]?.image,thumbnail=document.createElement('button');thumbnail.type='button';thumbnail.className='ide-control-thumbnail';thumbnail.textContent=image?'正在读取图片…':'未配置模板图片';row.prepend(thumbnail);thumbnail.disabled=true;
+        thumbnail.setAttribute('aria-label',(selector.name||ref.value)+' · 查看控件图片');thumbnail.title=(selector.name||ref.value)+' · 点击查看大图';
+        inlinePreview(record,ref,row);
+        if(image)rpc('template_preview',{image}).then(result=>{if(!current()||!row.isConnected)return;const source=previewImage(result.image);if(!source)throw new Error('图片数据无效');const img=document.createElement('img');img.alt=(selector.name||'控件')+'模板缩略图';img.onerror=()=>{if(current()&&row.isConnected){thumbnail.replaceChildren();thumbnail.textContent='图片加载失败';thumbnail.disabled=true;}};img.src=source;thumbnail.replaceChildren(img);thumbnail.disabled=false;thumbnail.title='查看控件模板大图';thumbnail.onclick=()=>openControlImage(record,image,current);}).catch(()=>{if(current()&&row.isConnected)thumbnail.textContent='图片加载失败';});
+      }
+      if(zone.children.length)record.previewZones.push(accessor.addZone({afterLineNumber:line,heightInPx:zone.children.length*48+8,domNode:zone,suppressMouseDown:true}));
+    }});
+    updateInlinePreviews(record);
+    previewStatus(record,result.truncated?'引用过多，已截断':grouped.size?'':'没有可预览的控件引用');
+  }catch(error){if(current())previewStatus(record,'控件预览失败：'+error.message);}
+}
 function markdown(contents){if(!contents)return [];return (Array.isArray(contents)?contents:[contents]).map(item=>({value:typeof item==='string'?item:item.language?'```'+item.language+'\n'+item.value+'\n```':item.value||'',isTrusted:false}));}
 function lspKind(kind){const names={2:'Method',3:'Function',4:'Constructor',5:'Field',6:'Variable',7:'Class',8:'Interface',9:'Module',10:'Property',14:'Keyword',15:'Snippet',21:'Constant'};return monaco.languages.CompletionItemKind[names[kind]||'Text'];}
 function controlSuggestions(model,position){
@@ -64,8 +131,11 @@ function mount(container=document){
     node.setSelectionRange=(start,end)=>{node.setSelectionRangeNative(start,end);const a=record.model.getPositionAt(start),b=record.model.getPositionAt(end);editor.setSelection(new monaco.Selection(a.lineNumber,a.column,b.lineNumber,b.column));};
     node.setRangeText=(text,start,end)=>{const a=record.model.getPositionAt(start),b=record.model.getPositionAt(end);editor.executeEdits('control-reference',[{range:new monaco.Range(a.lineNumber,a.column,b.lineNumber,b.column),text,forceMoveMarkers:true}]);const p=record.model.getPositionAt(start+text.length);editor.setPosition(p);};
     node.addEventListener('input',()=>{if(record.model.getValue()!==node.value)record.model.setValue(node.value);});
-    editor.onDidChangeCursorSelection(()=>positionStatus(record));
-    const tools=wrapper.querySelector('.ide-editor-tools');
+    editor.onDidChangeCursorSelection(()=>{positionStatus(record);updateInlinePreviews(record);});
+    editor.onDidFocusEditorText(()=>updateInlinePreviews(record));editor.onDidBlurEditorText(()=>updateInlinePreviews(record));
+    const tools=wrapper.querySelector('.ide-editor-tools'),previewButton=document.createElement('button'),previewHint=document.createElement('span');
+    previewButton.type='button';previewButton.className='ide-controls-toggle';previewButton.textContent='控件预览';previewButton.setAttribute('aria-pressed',String(!!record.previewEnabled));previewButton.onclick=()=>{record.previewEnabled=!record.previewEnabled;previewButton.setAttribute('aria-pressed',String(record.previewEnabled));if(record.previewEnabled)refreshPreviews(record);else{clearPreviews(record);previewStatus(record,'');}};tools.append(previewButton);
+    previewHint.className='ide-controls-status';previewHint.setAttribute('aria-live','polite');wrapper.querySelector('.ide-status').prepend(previewHint);
     for(const [label,action,disabled] of [['格式化','editor.action.formatDocument',node.readOnly||node.disabled],['查找','actions.find',false],['替换','editor.action.startFindReplaceAction',node.readOnly||node.disabled],['定义','editor.action.peekDefinition',false]]){const button=document.createElement('button');button.type='button';button.textContent=label;button.disabled=disabled;button.onclick=()=>{editor.focus();const registered=editor.getAction(action);if(registered)registered.run().catch(error=>status(record,error.message));else editor.trigger('toolbar',action,{});};tools.append(button);}
     editor.addAction({id:'echo.format',label:'格式化 Python',keybindings:[monaco.KeyMod.CtrlCmd|monaco.KeyMod.Alt|monaco.KeyCode.KeyL],run:()=>node.disabled||node.readOnly?undefined:editor.getAction('editor.action.formatDocument').run()});
     editor.addAction({id:'echo.definition',label:'查看定义',keybindings:[monaco.KeyMod.CtrlCmd|monaco.KeyCode.KeyB],run:()=>editor.trigger('keyboard','editor.action.peekDefinition',{})});
@@ -74,12 +144,12 @@ function mount(container=document){
     if(record.view)editor.restoreViewState(record.view);positionStatus(record);status(record,record.status);showProblems(record);schedule(record);
     if(record.wasFocused&&!node.disabled&&!node.readOnly&&!document.querySelector('#modal')?.open)queueMicrotask(()=>{if(record.editor===editor)editor.focus();});
   }
-  for(const record of [...records.values()])if(records.size>12&&!record.wrapper?.isConnected){clearTimeout(record.timer);record.editor?.dispose();record.model.dispose();byModel.delete(record.model);records.delete(record.id);rpc('editor_close',{id:record.id}).catch(()=>{});}
+  for(const record of [...records.values()])if(records.size>12&&!record.wrapper?.isConnected){clearTimeout(record.timer);clearPreviews(record);record.editor?.dispose();record.model.dispose();byModel.delete(record.model);records.delete(record.id);rpc('editor_close',{id:record.id}).catch(()=>{});}
   refreshLocks();
 }
-function detach(container){for(const record of records.values())if(record.editor&&(record.wrapper===container||container?.contains(record.wrapper))){record.wasFocused=record.editor.hasTextFocus();record.view=record.editor.saveViewState();record.editor.dispose();record.editor=null;}}
+function detach(container){for(const record of records.values())if(record.editor&&(record.wrapper===container||container?.contains(record.wrapper))){record.wasFocused=record.editor.hasTextFocus();record.view=record.editor.saveViewState();clearPreviews(record);record.previewDecorations=null;record.editor.dispose();record.editor=null;}}
 function refreshLocks(){if(typeof S==='undefined')return;for(const record of records.values()){if(!record.editor)continue;const node=record.node,blocked=!!disabled();if(blocked&&!record.stateDisabled){record.previousDisabled=node.disabled;record.stateDisabled=true;node.disabled=true;}else if(!blocked&&record.stateDisabled){node.disabled=record.previousDisabled;record.stateDisabled=false;}const readOnly=node.disabled||node.readOnly;record.editor.updateOptions({readOnly,domReadOnly:readOnly});for(const button of record.wrapper.querySelectorAll('.ide-editor-tools button'))if(['格式化','替换'].includes(button.textContent)&&button.disabled!==readOnly)button.disabled=readOnly;}}
 let scheduled=false;new MutationObserver(changes=>{const selector='textarea.python-editor:not(.ide-source)';if(!changes.some(change=>change.type==='attributes'&&change.target.matches?.('textarea.ide-source')||[...change.addedNodes].some(node=>node.nodeType===1&&(node.matches?.(selector)||node.querySelector?.(selector)))))return;if(scheduled)return;scheduled=true;queueMicrotask(()=>{scheduled=false;for(const record of records.values())if(record.editor&&!record.wrapper.isConnected)detach(record.wrapper);mount();});}).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled','readonly']});
 window.studio.onEvent(event=>{if(event.kind!=='python_diagnostics')return;const record=records.get(event.id);if(!record||record.model.getVersionId()!==event.version)return;record.diagnostics=event.diagnostics;monaco.editor.setModelMarkers(record.model,'python',event.diagnostics.map(d=>({severity:d.severity===1?monaco.MarkerSeverity.Error:d.severity===2?monaco.MarkerSeverity.Warning:monaco.MarkerSeverity.Info,message:d.message,...{startLineNumber:d.range.start.line+1,startColumn:d.range.start.character+1,endLineNumber:d.range.end.line+1,endColumn:Math.max(d.range.end.character+1,d.range.start.character+2)}})));showProblems(record);status(record,event.diagnostics.length?`${event.diagnostics.length} 个问题`:'检查通过');});
-globalThis.PythonIde={mount,detach,editorFor(selector){const node=typeof selector==='string'?document.querySelector(selector):selector;return [...records.values()].find(record=>record.node===node)?.editor;},recordFor(selector){const node=typeof selector==='string'?document.querySelector(selector):selector;return [...records.values()].find(record=>record.node===node);},monaco};
-window.addEventListener('beforeunload',()=>{for(const record of records.values()){clearTimeout(record.timer);rpc('editor_close',{id:record.id}).catch(()=>{});record.editor?.dispose();record.model.dispose();}for(const model of externalModels.values())model.dispose();});
+globalThis.PythonIde={mount,detach,refreshPreviews(){for(const record of records.values())schedulePreviews(record);},editorFor(selector){const node=typeof selector==='string'?document.querySelector(selector):selector;return [...records.values()].find(record=>record.node===node)?.editor;},recordFor(selector){const node=typeof selector==='string'?document.querySelector(selector):selector;return [...records.values()].find(record=>record.node===node);},monaco};
+window.addEventListener('beforeunload',()=>{for(const record of records.values()){clearTimeout(record.timer);clearPreviews(record);rpc('editor_close',{id:record.id}).catch(()=>{});record.editor?.dispose();record.model.dispose();}for(const model of externalModels.values())model.dispose();});

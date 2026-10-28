@@ -102,9 +102,11 @@ jobs:
               metadata=json.loads(bundle.read(prefix+'runtime/release.json')); assert metadata['source_commit']==commit and metadata['tag']==tag
               controls=json.loads(bundle.read(prefix+'control_library/controls.json')); assert not controls['entries'] and not controls['categories']
               assert not any(n.startswith(prefix+d) and n.endswith(('.echo.json','.nycs.json')) for n in names for d in ('test_cases/','projects/'))
+              from scripts.release_payload import WORKSPACE_SEEDS, assert_clean_archive
+              assert_clean_archive(bundle)
               tracked=subprocess.check_output(['git','ls-files','-z']).decode('utf-8').split('\0')
               for name in tracked:
-                  if name and prefix+name in names: assert bundle.read(prefix+name)==(root/name).read_bytes(), name
+                  if name and name not in WORKSPACE_SEEDS and name != 'runtime/release.json' and prefix+name in names: assert bundle.read(prefix+name)==(root/name).read_bytes(), name
           output=root/'dist/release'; output.mkdir()
           sums=[]
           for source,dest in [(root/f'dist/latest/echo-test-{version}-setup-x64.exe',output/f'echo-test-{version}-setup-x64.exe'),(archive,output/f'echo-test-{version}-portable-x64.zip')]:

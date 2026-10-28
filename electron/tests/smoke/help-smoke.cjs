@@ -2,7 +2,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {artifactFile}=require('../../paths.cjs');
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-async function verify(main,bar) {
+async function verify(main) {
   const js=code=>main.webContents.executeJavaScript(code);
   const result={};
   try {
@@ -32,13 +32,6 @@ async function verify(main,bar) {
     fs.writeFileSync(artifactFile('smoke','help-preview.png'),(await main.webContents.capturePage()).toPNG());
     result.shortcut=await js(`(async()=>{await handleAction('view-cases',{dataset:{}});document.dispatchEvent(new KeyboardEvent('keydown',{key:'F1',bubbles:true}));return S.view==='help';})()`);
     assert.equal(result.shortcut,true);
-    // Exercise the real toolbar IPC with no game connected.
-    await js("S.view='cases';render()");
-    await bar.webContents.executeJavaScript("document.querySelector('#help').click()");await pause(100);
-    result.toolbar=await js("S.view==='help'&&!!document.querySelector('#help-search')");assert.equal(result.toolbar,true);
-    await js("S.view='cases';render()");
-    await bar.webContents.executeJavaScript("document.dispatchEvent(new KeyboardEvent('keydown',{key:'F1',bubbles:true}))");await pause(100);
-    result.toolbarShortcut=await js("S.view==='help'");assert.equal(result.toolbarShortcut,true);
     result.errors=await js('window.__studioErrors');assert.deepEqual(result.errors,[]);
     result.passed=true;
   }catch(error){result.error=error.stack;throw error;}finally {

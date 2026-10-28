@@ -34,7 +34,7 @@ MCP 回归覆盖标准 SDK 握手和工具模式、认证与文件边界、启�
 npm run test:ui
 ```
 
-使用独立应用配置，检查页面加载、用例库、控件编辑、录制结果转换和窗口工具栏空状态。结果位于 `artifacts/smoke/electron-smoke.json`、`electron-interaction.json`、`game-window-smoke.json`，截图也位于同一目录。结果中的 `errors` 应为空。用例运行面板的额外结果保存在 `artifacts/smoke/game-run-smoke.json`：验证本地用例选择、保留目标应用页、步骤 / 错误显示、进度更新保留运行结果区域、未保存内容保护及独立工具栏状态；这部分拦截运行请求，不发送目标应用输入。测试会退出，不向目标应用发送输入。
+使用独立应用配置，检查页面加载、用例库、控件编辑、录制结果转换和主工作台桌面操作入口。结果位于 `artifacts/smoke/electron-smoke.json`、`electron-interaction.json`、`desktop-workspace-smoke.json`，截图也位于同一目录。结果中的 `errors` 应为空。用例运行面板的额外结果保存在 `artifacts/smoke/game-run-smoke.json`：验证本地用例选择、保留目标应用页、步骤 / 错误显示、进度更新保留运行结果区域、未保存内容保护及主工作台操作按钮；这部分拦截运行请求，不发送目标应用输入。测试会退出，不向目标应用发送输入。
 
 也兼容设置 `ECHO_TEST_SMOKE_TEST=1` 后启动应用。
 
@@ -51,17 +51,11 @@ npm run test:ui
 
 `scripts/smoke-mcp-startup.cjs` 使用独立工作台配置验证 MCP 默认关闭、显式开启后的随机凭证 SDK 握手、显式关闭优先于强制开启和正常退出后的凭证清理，不连接目标应用或发送输入。已有工作台状态或 MCP 凭证时会拒绝覆盖；可以在安装测试的隔离目录中运行。结果为 `artifacts/mcp-startup-smoke.json`。
 
-`help-smoke.json` 验证内置使用说明的导航、关键词搜索、目录跳转、F1、无目标应用连接时从工具栏打开，以及未保存用例和录制结果保留；同时检查搜索文本不会作为 HTML 执行。页面预览为 `help-preview.png`，文档在本地静态加载，无需联网。
+`help-smoke.json` 验证内置使用说明的导航、关键词搜索、目录跳转、F1、无目标应用连接时打开，以及未保存用例和录制结果保留；同时检查搜索文本不会作为 HTML 执行。页面预览为 `help-preview.png`，文档在本地静态加载，无需联网。
 
-独立窗口捆绑可先用两个临时测试窗口验证，无需连接目标应用：
+`desktop-workspace-smoke.json` 验证连接卡片的「操作目标窗口」、主工作台的图片 / 坐标采集和录制入口、1120 × 740 与 1440 × 900 下按钮布局，以及工具栏设置已移除。测试拦截采集和录制请求，不发送实际目标输入；`desktop-workspace-preview.png` 为页面预览。
 
-```powershell
-npm run test:pair
-```
-
-该测试在两个独立进程中创建 Win32 窗口，检查右侧捆绑、双向移动、最小化与恢复、解绑后的独立移动、目标窗口关闭，以及原生目标应用样式和尺寸保持。测试窗口自动关闭，结果保存在 `artifacts/smoke/window-pair-native.json`，不向实际目标应用发送输入。界面冒烟的 `sidebar-smoke.json` 验证 300 × 600、380 × 730、420 × 800 三种面板尺寸下按钮可见、长名称换行、步骤默认展开、单一滚动区域及完整错误详情；预览为 `right-sidebar-running.png` 和 `right-sidebar-failure.png`。`game-run-smoke.json` 还检查捆绑提示和录制期间禁用解绑。
-
-录制回归包含启动过程、监听通知、事件计数、监听失败后恢复按钮，以及空录制重新启动和已有结果保护。`artifacts/smoke/recording-smoke.json` 记录工作台录制页回归结果，录制请求被拦截，不发送目标应用输入。真实窗口验证另外检查 `game_enabled` 和 `game_hit_test`；仅启动监听不代表验证了手动操作采集。
+录制回归包含启动过程、监听通知、事件计数、监听失败后恢复按钮，以及空录制重新启动和已有结果保护。`artifacts/smoke/recording-smoke.json` 记录工作台录制页回归结果，录制请求被拦截，不发送目标应用输入。原生连接验证不启动录制，手动操作采集需另行验收。
 
 零事件录制的错误日志包含鼠标按钮、滚轮和按键的观察计数，以及本工具回放输入、失焦、客户区之外和被其他窗口遮挡的过滤计数。`mouse_queued` 区分钩子是否收到待处理的操作，`mouse_recorded` 表示通过窗口过滤的事件数。窗口查询在后台处理，回调立即返回，避免慢查询导致 Windows 静默移除钩子。诊断不写入按键内容；仅移动鼠标不会生成用例步骤。
 
@@ -72,7 +66,7 @@ python app.py --list-windows
 npm run test:game -- --game <目标应用句柄>
 ```
 
-`--game-smoke` 验证原生目标应用连接、工具栏移动和解绑 / 重新捆绑、原生样式与尺寸保持、录制监听启停和截图采集入口。它不执行用例或发送目标应用输入，结束后正常关闭工作台。结果保存在 `artifacts/smoke/native-game-smoke.json`，`passed` 应为 `true`，`errors` 应为空。
+`--game-smoke` 验证原生目标应用连接与重新连接不会创建侧边窗口，主工作台的操作入口可用，目标窗口的样式、尺寸及位置保持。它不启动录制、执行用例或发送目标应用输入，结束后正常关闭工作台。结果保存在 `artifacts/smoke/native-game-smoke.json`，`passed` 应为 `true`，`errors` 应为空。
 
 手动焦点诊断：
 

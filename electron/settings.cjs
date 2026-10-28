@@ -7,7 +7,7 @@ const DEFAULTS={
   mcp:{enabled:false,explorationTimeout:15},
   startup:{admin:true,rememberBounds:true,closeAction:'exit'},
   environment:{adbPath:'',androidMaxFps:30,androidMaxSize:1280,androidBitRate:4},
-  target:{refreshSeconds:3,defaultMode:'pick',autoToolbar:true,linkToolbar:true,filter:''},
+  target:{refreshSeconds:3,defaultMode:'pick',filter:''},
   history:{retentionDays:30},
 };
 const clone=value=>JSON.parse(JSON.stringify(value));
@@ -27,6 +27,7 @@ function validateSettings(value){
   for(const [section,fields] of Object.entries(value)){
     if(!Object.hasOwn(DEFAULTS,section)||!fields||typeof fields!=='object'||Array.isArray(fields))throw new Error('未知的设置分组');
     for(const [key,item] of Object.entries(fields)){
+      if(section==='target'&&['autoToolbar','linkToolbar'].includes(key)){if(typeof item!=='boolean')throw new Error('无效的旧版工具栏设置');continue;}
       if(section==='environment'&&key==='androidPreviewMode'){if(!['stream','screenshot'].includes(item))throw new Error('无效的旧版安卓预览方式');continue;}
       if(!Object.hasOwn(DEFAULTS[section],key))throw new Error('未知的设置项');
       const expected=DEFAULTS[section][key];

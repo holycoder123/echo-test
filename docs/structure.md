@@ -7,11 +7,9 @@ JSON 用例包含版本、控件和步骤，也可保存显式添加的 Python �
 | electron/main.cjs、preload.cjs | 桌面窗口、文件对话框、受限 IPC、Python 进程通信 |
 | electron/renderer/app.js | 工作台页面、表单、截图选择器、录制预览 |
 | electron/renderer/case-modes.js、python-completion.js | 双模式编辑、循环组、控件参数插入及窗口 API 函数补全 |
-| electron/renderer/game.html、game.js、game.css | 目标应用原生窗口旁的浮动工具栏 |
-| electron/window-access.cjs | 按工作台与工具栏限制 IPC 权限 |
+| electron/window-access.cjs | 仅允许主工作台调用受限 IPC |
 | echo_test/native_windows.py | 原生窗口查询、位置与 Win32 事件声明 |
 | echo_test/legacy_window_recovery.py | 启动时恢复旧版本遗留的目标窗口状态 |
-| echo_test/window_pair.py | 独立工具栏与目标应用的双向移动、最小化联动和解绑恢复 |
 | electron/renderer/controls.js | 通用控件库、分类、搜索和共享控件选择 |
 | echo_test/control_library.py | 共享定义持久化、旧控件迁移、稳定引用解析及删除保护 |
 | echo_test/service.py | JSON 行协议服务，协调项目、录制和执行 |
@@ -40,10 +38,10 @@ echo-test/
 ├── electron/                   # Electron 应用源码
 │   ├── main.cjs / preload.cjs
 │   ├── paths.cjs                # 运行状态与验证产物路径
-│   ├── renderer/               # 工作台与窗口工具栏界面
+│   ├── renderer/               # 主工作台与设备界面
 │   ├── assets/                 # 应用图标
 │   ├── tests/                  # Node 单元测试与 mock 服务
-│   │   └── smoke/              # 工作台、工具栏和原生窗口冒烟
+│   │   └── smoke/              # 工作台与原生窗口冒烟
 │   └── tools/                  # 手动焦点 / 录制诊断
 ├── echo_test/                # Python / Win32 测试后端
 │   ├── paths.py                # 运行状态路径与旧版本兼容

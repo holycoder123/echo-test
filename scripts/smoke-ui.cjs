@@ -31,15 +31,9 @@ try {
   for (const name of ['localCasesVisible', 'localCaseOpened', 'caseSearch', 'added', 'selectorDialog', 'recordButton', 'converted']) {
     assert.equal(interaction[name], true, `${name} failed`);
   }
-  const toolbar = read('game-window-smoke.json');
-  for (const name of ['ready', 'recordButton', 'disabled', 'distinct', 'logsWithoutConnection']) {
-    assert.equal(toolbar[name], true, `${name} failed`);
-  }
-  assert.equal(toolbar.parent, null);
-  assert.equal(toolbar.alwaysOnTop, false);
+  assert.equal(read('desktop-workspace-smoke.json').passed,true);
   assert.equal(read('game-run-smoke.json').passed, true);
   assert.equal(read('exploration-smoke.json').passed, true);
-  assert.equal(read('sidebar-smoke.json').passed,true);
   const connectionFile = path.join(ROOT, 'artifacts', 'smoke', 'connection-smoke.json');
   assert.ok(fs.statSync(connectionFile).mtimeMs >= started - 1000);
   assert.equal(JSON.parse(fs.readFileSync(connectionFile, 'utf8')).passed, true);

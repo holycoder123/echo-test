@@ -69,7 +69,7 @@ async function caseModeAction(action,node){
   if(lock())return true;
   if(action==='mode-copy'){await createPythonCopy();return true;}
   if(action==='mode-preview'){
-    const project=S.project,data=await api('generate_python',{project});
+      const project=S.project,data=await api('generate_python',{project});
     if(lock()||S.project!==project)return true;
     showModal({kind:'python-preview',code:data.code});return true;
   }

@@ -4,7 +4,7 @@ const fs=require('node:fs');
 const {artifactFile}=require('../../paths.cjs');
 const {RunState}=require('../../run-state.cjs');
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-async function verify(main,toolbar){
+async function verify(main){
   const js=code=>main.webContents.executeJavaScript(code);
   const result={};
   try{
@@ -34,7 +34,7 @@ async function verify(main,toolbar){
     main.webContents.send('studio:event',{kind:'run_state',run:state.snapshot()});main.webContents.send('studio:event',failed);
     main.webContents.send('studio:event',{kind:'finished',result:{case:state.value.case,status:'failed',steps:[failed]},directory:'/reports/ui-smoke'});
     await pause(150);
-    result.finished=await js("({error:document.querySelector('.run-error').textContent==='验证用图片未找到',unlocked:!document.querySelector('#game-case').disabled,result:document.querySelector('.run-heading .run-badge').textContent==='失败',toolbarEntry:!!document.querySelector('[data-act=view-game]')})");
+    result.finished=await js("({error:document.querySelector('.run-error').textContent==='验证用图片未找到',unlocked:!document.querySelector('#game-case').disabled,result:document.querySelector('.run-heading .run-badge').textContent==='失败',workspaceActions:!!document.querySelector('.game-toolbar [data-act=game-pick-image]'),captureReady:!document.querySelector('.game-toolbar [data-act=game-pick-image]').disabled})");
     for(const value of Object.values(result.finished))assert.equal(value,true);
     await js("document.querySelector('.run-details').open=true");
     await pause(60);
@@ -46,34 +46,6 @@ async function verify(main,toolbar){
       try{await runGameCase(file);}finally{canReplace=original;}
       return S.project.name===name&&S.busy===''&&!S.gameRunStarting;
     })()`);assert.equal(result.unsavedGuard,true);
-    const bar=toolbar();
-    await pause(100);
-    const nativeState={connection:{width:1024,height:700,title:'工具栏验证'},busy:'running',run:runningSnapshot};
-    await bar.webContents.executeJavaScript(`Object.assign(G,${JSON.stringify(nativeState)});renderState()`);
-    await pause(120);
-    result.native=await bar.webContents.executeJavaScript("({choices:document.querySelector('#game-case').options.length>1,running:document.querySelector('.run-heading .run-badge').textContent==='执行中',stop:document.querySelector('#run').textContent==='停止执行',locked:document.querySelector('#game-case').disabled})");
-    for(const value of Object.values(result.native))assert.equal(value,true);
-    await bar.webContents.executeJavaScript(`Object.assign(G,{busy:'',run:${JSON.stringify(state.snapshot())}});renderState()`);
-    await pause(120);
-    result.nativeFinished=await bar.webContents.executeJavaScript("({failed:document.querySelector('.run-heading .run-badge').textContent==='失败',error:document.querySelector('.run-error').textContent==='验证用图片未找到',unlocked:!document.querySelector('#game-case').disabled,ready:document.querySelector('#run').textContent==='运行用例'})");
-    for(const value of Object.values(result.nativeFinished))assert.equal(value,true);
-    fs.writeFileSync(artifactFile('smoke','game-run-toolbar-preview.png'),(await bar.webContents.capturePage()).toPNG());
-    const originalSize=bar.getSize();bar.setSize(380,730);
-    await bar.webContents.executeJavaScript("Object.assign(G,{toolbarLinked:true,busy:'',run:null});renderState()");
-    await pause(120);
-    result.bundled=await bar.webContents.executeJavaScript(`({label:document.querySelector('#bundle').textContent==='解绑',
-      enabled:!document.querySelector('#bundle').disabled,pressed:document.querySelector('#bundle').getAttribute('aria-pressed')==='true',
-      controls:['record','coordinate','image','logs','workbench','game-case','run','bundle'].every(id=>{
-        const r=document.getElementById(id).getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight&&r.left>=0&&r.right<=innerWidth}),
-      footer:document.querySelector('footer').getBoundingClientRect().bottom<=innerHeight,
-      hint:document.querySelector('#clock').textContent.includes('拖动任一窗口'),ready:!document.querySelector('.run-area').hidden})`);
-    for(const value of Object.values(result.bundled))assert.equal(value,true);
-    fs.writeFileSync(artifactFile('smoke','game-pair-toolbar-preview.png'),(await bar.webContents.capturePage()).toPNG());
-    await bar.webContents.executeJavaScript("G.busy='recording';renderState()");
-    assert.equal(await bar.webContents.executeJavaScript("document.querySelector('#bundle').disabled"),true,'录制时不能切换窗口捆绑');
-    await bar.webContents.executeJavaScript("Object.assign(G,{toolbarLinked:false,busy:''});renderState()");
-    assert.equal(await bar.webContents.executeJavaScript("document.querySelector('#bundle').textContent==='捆绑目标应用'&&!document.querySelector('#bundle').disabled"),true);
-    bar.setSize(...originalSize);
     result.errors=await js('window.__studioErrors');assert.deepEqual(result.errors,[]);
     result.passed=true;return result;
   }catch(error){result.error=error.stack;throw error;}

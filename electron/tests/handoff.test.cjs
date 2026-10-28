@@ -13,6 +13,7 @@ function complete(role, event) {
   let minimized = true, restores = 0, shown = 0;
   const context = {
     event, continuousRole:role, busy:'running', recordStarting:true, recordPending:false,
+    gameWindow:null,sidebarLayout:null,
     recordStart:0, recordCount:0, motionEvents:[],
     automation:{receive(){}}, runState:{step(){},finish(){},fail(){}},
     publishRun(){}, auditError(){}, auditWrite(){}, errorMessage:error=>error.message,

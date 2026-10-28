@@ -46,11 +46,8 @@ async function verify(window){
       result.selectAllSyncsHeaders=[...document.querySelectorAll('[data-history-all="reports"]')].every(node=>node.checked&&!node.indeterminate)&&S.historySelections.reports.size===2;
       await begin('reports');reportBank.push(report('report-new'));await reports();await answer(true);
       result.allUsesConfirmedSnapshot=reportBank.length===1&&reportBank[0].id==='report-new'&&S.historySelections.reports.size===0;
-      const deletesBefore=calls.filter(call=>/delete$/.test(call.method)).length;
-      row('logs','log-two').click();await begin('logs');await answer(true);
-      result.singleExecutionLogDeleted=S.logs.length===1&&S.logs[0].id==='log-one'&&calls.filter(call=>/delete$/.test(call.method)).length===deletesBefore;
-      all('logs').click();await begin('logs');await answer(true);
-      result.allExecutionLogsDeleted=S.logs.length===0&&reportBank.length===1;
+      result.executionLogsReadOnly=S.logs.length===2&&!document.querySelector('.run-current input[type="checkbox"],.run-current .history-selection-bar,.run-current [data-act="history-delete"]');
+
       S.view='diagnostics';S.auditLevel='';S.auditSearch='';await refreshAudit();
       row('audit','audit-one').click();const filter=document.querySelector('#audit-level');filter.value='error';filter.dispatchEvent(new Event('change',{bubbles:true}));
       await wait(()=>S.auditEntries.length===2);

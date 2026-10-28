@@ -5,13 +5,11 @@ from pathlib import Path
 import shutil
 import zipfile
 import subprocess
+from datetime import datetime, timezone
 from scripts.release_output import prepare_latest
+from scripts.release_payload import copy_payload, assert_clean_archive
 
 ROOT = Path(__file__).resolve().parents[1]
-
-
-def excluded(directory, names):
-    return [name for name in names if name in {'__pycache__', '.drafts', '.git', '.cache'} or name.endswith(('.pyc', '.pyo'))]
 
 
 def main():
@@ -26,13 +24,18 @@ def main():
             raise RuntimeError('Refusing redirected staging directory')
         shutil.rmtree(stage)
     stage.mkdir(parents=True)
-    for name in ['electron', 'echo_test', 'scripts', 'docs', 'test_cases', 'projects', 'runtime', 'node_modules', 'tests']:
-        shutil.copytree(ROOT/name, stage/name, ignore=excluded)
-    if (ROOT/'control_library').exists():
-        shutil.copytree(ROOT/'control_library', stage/'control_library', ignore=excluded)
-    for pattern in ['*.cmd', 'app.py', 'README.md', 'package*.json', 'requirements*.txt', 'requirements*.lock']:
-        for source in ROOT.glob(pattern):
-            shutil.copy2(source, stage/source.name)
+    copy_payload(ROOT, stage)
+    # Rebuilding a local checkout must not claim to be the previous tagged binary.
+    try:
+        commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, stderr=subprocess.DEVNULL).decode().strip()
+        dirty = bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT))
+        metadata = {'product': 'EchoTest', 'version': json.loads((ROOT/'package.json').read_text())['version'],
+                    'source_commit': commit, 'source_url': f'https://github.com/holycoder123/echo-test/tree/{commit}',
+                    'tag': 'v' + json.loads((ROOT/'package.json').read_text())['version'],
+                    'source_dirty': dirty, 'built_at_utc': datetime.now(timezone.utc).isoformat()}
+        (stage/'runtime/release.json').write_text(json.dumps(metadata, indent=2) + '\n', encoding='utf-8')
+    except (OSError, subprocess.CalledProcessError):
+        pass  # Source archives retain the provenance supplied by their publisher.
     note = 'Offline bundle for Windows 10/11 x64. Unzip to a writable folder and run start.cmd.\nDefault starts request Windows administrator permission. Confirm the UAC prompt; cancellation stops startup.\nDo not copy .runtime, reports or recordings from a running workbench.\nNode, Python, Electron, libraries and OCR models are included.\n'
     (stage/'PORTABLE-README.txt').write_text(note, encoding='utf-8')
     version = json.loads((ROOT/'package.json').read_text(encoding='utf-8'))['version']
@@ -42,6 +45,8 @@ def main():
         for source in sorted(stage.rglob('*')):
             if source.is_file():
                 bundle.write(source, source.relative_to(stage.parent).as_posix())
+    with zipfile.ZipFile(archive) as bundle:
+        assert_clean_archive(bundle)
     with archive.open('rb') as stream:
         digest = hashlib.file_digest(stream, 'sha256').hexdigest()
     output = prepare_latest(ROOT, version)

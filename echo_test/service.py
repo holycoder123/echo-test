@@ -444,6 +444,9 @@ class Service:
                 self.recorder = None
 
     def call(self, method, args):
+        if method == 'editor_control_refs':
+            from .python_control_references import control_references
+            return control_references(args.get('code', ''), include_ranges=True)
         if method == 'environment_info':
             from .environment import runtime_info
             return runtime_info(ROOT, self.android.adb)

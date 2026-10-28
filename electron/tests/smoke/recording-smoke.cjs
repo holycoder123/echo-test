@@ -7,7 +7,7 @@ async function verify(main){
   const js=code=>main.webContents.executeJavaScript(code);
   const result={};
   try{
-    result.starting=await js(`(()=>{
+    result.starting=await js(`(async()=>{
       window.__recordSmokeOriginal=api;
       window.__recordSmokeSaved={connection:S.connection,handle:S.handle,view:S.view,pending:S.recordPending};
       window.__recordSmokeErrors=window.__studioErrors.slice();
@@ -15,6 +15,7 @@ async function verify(main){
       S.recordPending=null;S.busy='';S.view='game';S.handle=-1;
       S.connection={handle:-1,width:1280,height:720,title:'录制回归目标应用'};render();
       window.__recordSmokePromise=startRecord();
+      for(let i=0;i<100&&!S.recordStarting;i++)await new Promise(resolve=>setTimeout(resolve,10));
       return {recordView:S.view==='record',starting:S.recordStarting,
         disabled:document.querySelector('.record-card [data-act="stop"]').disabled,
         message:document.querySelector('.record-live').textContent.includes('正在启动录制监听')};
@@ -52,7 +53,7 @@ async function verify(main){
     })()`);
     for(const value of Object.values(result.emptyRetry))assert.equal(value,true);
     result.passed=true;
-  }finally{
+  }catch(error){result.error=error.stack;throw error;}finally{
     await js("if(window.__recordSmokeOriginal)api=window.__recordSmokeOriginal;S.busy='';S.recordStarting=false;const saved=window.__recordSmokeSaved;Object.assign(S,{connection:saved.connection,handle:saved.handle,view:saved.view,recordPending:saved.pending});render();");
     fs.writeFileSync(artifactFile('smoke','recording-smoke.json'),JSON.stringify(result,null,2));
   }
