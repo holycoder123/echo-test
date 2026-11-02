@@ -1,6 +1,6 @@
 # 便携运行环境
 
-便携版面向 Windows 10/11 x64。解压 `dist/latest/echo-test-1.2.0-portable-x64.zip` 后双击 `start.cmd`，不依赖系统 Node.js、Python 或 npm。默认入口请求管理员权限，MCP 默认关闭，可在「设置 → MCP」中开启；请确认 Windows UAC 提示，取消则不启动。已具有管理员权限时不会重复请求；`start_admin.cmd` 仍兼容。关闭当前工作台后，`start_no_mcp.cmd` 可强制禁用本次 MCP。已保存的手动开关继续生效。
+便携版面向 Windows 10/11 x64。解压 `dist/latest/echo-test-1.2.1-beta-portable-x64.zip` 后双击 `start.cmd`，不依赖系统 Node.js、Python 或 npm。默认入口请求管理员权限，MCP 默认关闭，可在「设置 → MCP」中开启；请确认 Windows UAC 提示，取消则不启动。已具有管理员权限时不会重复请求；`start_admin.cmd` 仍兼容。关闭当前工作台后，`start_no_mcp.cmd` 可强制禁用本次 MCP。已保存的手动开关继续生效。
 
 ## 包内内容
 

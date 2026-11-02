@@ -10,7 +10,7 @@ function authorize(event,main,game,method,args) {
 }
 for(const method of ['audit_list','audit_delete','audit_export','audit_folder','renderer_error'])MAIN_METHODS.add(method);
 MAIN_METHODS.add('script_import');MAIN_METHODS.add('reports_delete');
-for(const method of ['editor_sync','editor_query','editor_format','editor_close'])MAIN_METHODS.add(method);
+for(const method of ['editor_sync','editor_query','editor_format','editor_close','report_image','record_positions_localize'])MAIN_METHODS.add(method);
 for(const method of ['generate_python','python_copy','case_context'])MAIN_METHODS.add(method);
 for(const method of ['control_list','control_save','control_delete','control_import','control_category_save','control_category_delete'])MAIN_METHODS.add(method);
 MAIN_METHODS.add('window_pick_start');MAIN_METHODS.add('window_pick_cancel');

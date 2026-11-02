@@ -38,6 +38,7 @@ S.iterations = 1;S.recordStarting=false;S.auditEntries=[];S.auditLevel='';S.audi
 S.mcpOperation='';
 S.recordReplaying=false;S.recordReplayRun=null;
 S.connection=null;S.connecting=false;S.windowSearch='';S.targetWindowMode='pick';S.windowPicking=false;
+initializeWorkbench();
 initializeAndroid();
 let windowRefreshPromise=null;
 const windowDiscovery={
@@ -63,12 +64,12 @@ function toast(text, type='') {
 }
 async function api(method,args={}) { return window.studio.call(method,args); }
 function dirty() {
-  S.dirty=true; api('dirty',{value:true,caseName:S.project.name}).catch(()=>{});
+  S.dirty=true; persistWorkbenchDraft(); api('dirty',{value:true,caseName:S.project.name}).catch(()=>{});
   document.querySelectorAll('[data-save-dot]').forEach(node=>node.style.display='inline-block');
   document.title=`${S.project.name} · EchoTest`;
 }
-function lock() { if(S.busy||S.gameRunStarting||S.mcpOperation||S.windowPicking) {toast(S.mcpOperation?'MCP 正在操作工作台，请稍候':S.gameRunStarting?'正在准备用例，请稍候':'请先停止录制或执行');return true;} return false; }
-const disabled = () => S.busy||S.gameRunStarting||S.mcpOperation||S.windowPicking ? 'disabled' : '';
+function lock() { if(S.busy||S.gameRunStarting||S.mcpOperation||S.windowPicking||S.wb?.converting) {toast(S.mcpOperation?'MCP 正在操作工作台，请稍候':S.gameRunStarting?'正在准备用例，请稍候':'请先停止录制或执行');return true;} return false; }
+const disabled = () => S.busy||S.gameRunStarting||S.mcpOperation||S.windowPicking||S.wb?.converting ? 'disabled' : '';
 function button(label,action,kind='',symbol='',extra='') {return `<button class="btn ${kind}" data-act="${action}" ${extra}>${symbol?icon(symbol):''}${label}</button>`;}
 function field(label,body,help='') {return `<label class="field"><span>${label}</span>${body}${help?`<div class="field-help">${help}</div>`:''}</label>`;}
 function input(value,attribute,type='text',extra='') {return `<input type="${type}" value="${esc(value)}" ${attribute} ${extra} ${disabled()}>`;}
@@ -109,7 +110,7 @@ function paramsSummary(step) {
   if(step.action==='loop'){const p=step.params||{};return `${p.variable||'i'} 从 ${p.start??2} 到 ${p.end??64} · 步长 ${p.step??1}`;}
   if(step.action==='end_loop')return '返回循环起点，完成后继续后续步骤';
   if(step.action==='set_variable')return `${step.params?.variable||'变量'} = ${step.params?.value??''}`;
-  if(TARGETS.has(step.action)) return step.target ? step.target+(step.action==='drag'?` → ${step.end_target||'选择终点'}`:'') : '选择目标控件';
+  if(TARGETS.has(step.action)){const p=step.params||{},start=p.position?`本步位置 · ${positionSummary(p.position)}`:step.target||'选择操作目标',end=p.end_position?positionSummary(p.end_position):step.end_target||'选择终点';return start+(step.action==='drag'?` → ${end}`:'');}
   if(step.action.startsWith('key')) return step.params?.keys||'设置按键';
   if(step.action==='text') return step.params?.text||'设置输入内容';
     if(step.action==='sleep') return `${step.params?.duration??1} 秒`;
@@ -128,13 +129,14 @@ function render() {
     ${S.recent.length?'<div class="nav-label">最近使用</div>'+S.recent.slice(0,5).map((path,index)=>`<button class="recent-case" data-act="recent" data-i="${index}" title="${esc(path)}">${esc(shortFile(path))}</button>`).join(''):''}
     <div class="sidebar-bottom"><i class="status-dot ${S.admin?'green':''}"></i><span>${S.admin?'管理员权限':'普通权限'}</span><button data-act="view-settings" title="设置">${icon('settings')}</button></div>
   </aside><main class="workspace"><header class="topbar"><div class="breadcrumb"><span>工作区</span><span>/</span><strong>${esc(titles[S.view]||'目标窗口')}</strong></div><div class="topbar-right">${windowConnectionControls()}</div></header>
-    <section class="content ${S.view==='game'?'game-content':''}" id="content">${S.view==='select-window'?targetWindowSelectionView():S.view==='android'?androidView():S.view==='game'?gameView():S.view==='cases'?caseView():S.view==='targets'?targetView():S.view==='record'?recordView():S.view==='diagnostics'?diagnosticsView():S.view==='help'?StudioHelp.render(S.helpSearch):S.view==='settings'?settingsView():runView()}</section>
+    <section class="content ${S.view==='game'?'game-content':S.view==='cases'?'workbench-content':''}" id="content">${S.view==='select-window'?targetWindowSelectionView():S.view==='android'?androidView():S.view==='game'?gameView():S.view==='cases'?caseView():S.view==='targets'?targetView():S.view==='record'?recordView():S.view==='diagnostics'?diagnosticsView():S.view==='help'?StudioHelp.render(S.helpSearch):S.view==='settings'?settingsView():runView()}</section>
   </main></div>`;
   updateHistorySelection();
   if(S.view==='select-window')updateTargetWindowResults();
   if(S.view==='runs') document.querySelector('.log-lines')?.scrollTo(0,1e8);
   window.PythonIde?.mount(root);
   syncAndroidPreview();
+  if(S.view==='cases'){const target=S.project.selectors.find(t=>t.name===S.project.steps[S.selected]?.target);if(target)controlImages(target).forEach(image=>thumbnail(image));}
 }
 
 function gameCaseControls(){
@@ -145,7 +147,7 @@ function gameActionControls(){return `${button(S.busy==='recording'?'停止录�
 function gameView(){
   if(!S.connection)return `<div class="empty"><div class="empty-icon">${icon('game')}</div><strong>尚未连接目标应用</strong><p>点击右上角刷新，选择目标窗口后连接。只有一个客户端时也可直接点击「连接」。</p>${button(S.connecting?'连接中…':'连接目标应用','game-connect','primary','game',S.connecting||!S.windows.length?'disabled':'')}</div>`;
   const info=S.connection;
-  return `<div class="game-shell"><div class="game-toolbar"><div class="game-title"><strong>${esc(serverTitle(info))}</strong><span>${info.width} × ${info.height}</span></div><div class="right">${gameActionControls()}</div></div><div class="empty compact"><strong>目标应用在独立窗口运行</strong><p>在本页录制、采集控件或运行用例，步骤和 Python 在用例编辑器中完善。</p></div><div id="game-case-controls">${gameCaseControls()}</div><div class="game-status"><i class="status-dot ${S.busy?'red':''}"></i><span>${S.recordStarting?'正在启动录制监听…':S.busy==='recording'?`正在录制 · ${S.recordCount} 个事件 · F12 停止`:S.busy==='running'?'用例执行中 · F12 停止':'就绪'}</span></div><section id="game-run-results" class="game-run-results" aria-label="用例运行状态">${RunPanel.html(S.runState)}</section></div>`;
+  return `<div class="game-shell"><div class="game-toolbar"><div class="game-title"><strong>${esc(serverTitle(info))}</strong><span>${info.width} × ${info.height}</span></div><div class="right">${gameActionControls()}</div></div>${targetWindowGuideView()}<div id="game-case-controls">${gameCaseControls()}</div><div class="game-status"><i class="status-dot ${S.busy?'red':''}"></i><span>${S.recordStarting?'正在启动录制监听…':S.busy==='recording'?`正在录制 · ${S.recordCount} 个事件 · F12 停止`:S.busy==='running'?'用例执行中 · F12 停止':'就绪'}</span></div><section id="game-run-results" class="game-run-results" aria-label="用例运行状态">${RunPanel.html(S.runState)}</section></div>`;
 }
 function updateGameControls(){
   const actions=document.querySelector('.game-toolbar .right');if(actions)actions.innerHTML=gameActionControls();
@@ -160,6 +162,7 @@ function receiveRunState(run){
     if(S.view==='record'&&!document.querySelector('#record-replay-results'))render();
     else RunPanel.update(document.querySelector('#record-replay-results'),run);
   }
+  RunPanel.update(document.querySelector('#wb-run-results'),run);
   RunPanel.update(document.querySelector('#game-run-results'),run);
   RunPanel.update(document.querySelector('#android-run-results'),run);
 }
@@ -185,6 +188,7 @@ async function connectGame(handle){
     if(!requested){await api('game_disconnect');S.handle=null;S.connection=null;return;}
     const data=await api('game_connect',{handle:requested,expected_pid:S.windows.find(item=>item.handle===requested)?.pid});
     S.connection=data.connection;S.handle=data.connection?.handle||null;
+    if(S.view==='select-window')S.view='cases';
     await api('game_focus',{handle:requested});
   }catch(error){S.handle=S.connection?.handle||null;throw error;}
   finally{S.connecting=false;render();}
@@ -230,10 +234,10 @@ async function pickGameControl(kind){
 }
 
 
-function caseView() {
+function legacyCaseView() {
   const depths=caseStepDepths();
-  return `${caseLibraryView()}<div class="page-heading"><div class="case-name">${input(S.project.name,'data-project-name','text','class="project-title" aria-label="用例名称"')}<i class="save-dot" data-save-dot style="display:${S.dirty?'inline-block':'none'}"></i></div><div class="heading-actions">${button('','case-menu','ghost','more',`title="更多用例操作" ${disabled()}`)}${button('保存','save','','save',disabled())}${button(S.busy==='running'?'停止':'运行用例',S.busy==='running'?'stop':'run','primary',S.busy==='running'?'stop':'play',S.busy==='recording'?'disabled':'')}</div></div>
-  ${caseModeBar()}${S.project.mode==='python'?pythonCaseView():`<div class="case-layout"><div><div class="section-toolbar"><span>${S.project.steps.length} 个步骤</span><div class="right"><span>用例循环</span>${input(S.iterations,'id="iterations"','number','class="tiny-number" min="1" max="1000" aria-label="用例循环次数"')}${button('添加步骤','step-menu','ghost','plus',disabled())}</div></div><div class="step-list">${S.project.steps.length?S.project.steps.map((step,index)=>stepRow(step,index,depths[index])).join(''):`<div class="empty"><div class="empty-icon">${icon('cases')}</div><strong>从第一个步骤开始</strong><p>添加一个操作，或录制你在目标应用中的动作。</p>${button('添加步骤','step-menu','quiet','plus')}${button('去录制','view-record','ghost','record')}</div>`}</div>${S.project.steps.length?`<button class="insert-step" data-act="step-menu" ${disabled()}>${icon('plus')}添加下一步</button>`:''}</div><aside class="inspector">${inspectorView()}</aside></div>`}`;
+  return `<div class="page-heading"><div class="case-name">${input(S.project.name,'data-project-name','text','class="project-title" aria-label="用例名称"')}<i class="save-dot" data-save-dot style="display:${S.dirty?'inline-block':'none'}"></i></div><div class="heading-actions">${button('','case-menu','ghost','more',`title="更多用例操作" ${disabled()}`)}${button('保存','save','','save',disabled())}${button(S.busy==='running'?'停止':'运行用例',S.busy==='running'?'stop':'run','primary',S.busy==='running'?'stop':'play',S.busy==='recording'?'disabled':'')}</div></div>
+  ${caseModeBar()}${S.project.mode==='python'?pythonCaseView():`<div class="case-layout"><div><div class="section-toolbar"><span>${S.project.steps.length} 个步骤</span><div class="right"><span>用例循环</span>${input(S.iterations,'id="iterations"','number','class="tiny-number" min="1" max="1000" aria-label="用例循环次数"')}${button('录制','wb-record','ghost','record',disabled())}${button('添加验证','wb-assert','ghost','check',disabled())}${button('添加步骤','step-menu','ghost','plus',disabled())}</div></div><div class="step-list">${S.project.steps.length?S.project.steps.map((step,index)=>stepRow(step,index,depths[index])).join(''):`<div class="empty"><div class="empty-icon">${icon('cases')}</div><strong>从第一个步骤开始</strong><p>添加一个操作，或录制你在目标应用中的动作。</p>${button('添加步骤','step-menu','quiet','plus')}${button('开始录制','wb-record','record','record')}</div>`}</div>${S.project.steps.length?`<button class="insert-step" data-act="step-menu" ${disabled()}>${icon('plus')}添加下一步</button>`:''}</div><aside class="inspector">${workbenchInspectorView()}</aside></div>`}`;
 }
 function caseLibraryView(){
   const query=S.caseSearch.toLowerCase(),items=S.library.filter(item=>(item.name+' '+item.location).toLowerCase().includes(query));
@@ -243,7 +247,7 @@ function setLibrary(data){if(data){S.library=data.entries;S.caseDirectory=data.d
 async function refreshCases(){setLibrary(await api('case_list'));if(S.view==='cases')render();else if(S.view==='game')updateGameControls();}
 function stepRow(step,index,depth=0) {
   const status=S.stepStatus[index];
-  return `<div class="step-row ${S.selected===index?'selected':''} ${step.enabled===false?'disabled':''} ${['loop','end_loop'].includes(step.action)?'loop-marker':''}" style="margin-left:${Math.min(depth,8)*16}px" data-step="${index}" draggable="${!disabled()}"><span class="drag-handle">⠿</span><span class="step-number">${String(index+1).padStart(2,'0')}</span><div class="step-icon">${icon(step.action==='loop'?'refresh':step.action==='end_loop'?'chevron':step.action)}</div><div class="step-copy"><strong>${esc(step.name)}</strong><div class="step-meta"><span>${A[step.action]}</span><span>·</span><span>${esc(paramsSummary(step))}</span>${step.repeat>1?`<span>×${step.repeat}</span>`:''}</div></div>${status?`<span class="step-state ${status}">${LABELS[status]}</span>`:''}<div class="row-tools"><button class="icon-button" data-act="copy-step" data-i="${index}" title="复制步骤或整个循环组" ${disabled()}>${icon('copy')}</button><button class="icon-button" data-act="delete-step" data-i="${index}" title="删除步骤或整个循环组" ${disabled()}>${icon('trash')}</button></div></div>`;
+  return `<div class="step-row ${S.selected===index?'selected':''} ${step.enabled===false?'disabled':''} ${['loop','end_loop'].includes(step.action)?'loop-marker':''}" style="margin-left:${Math.min(depth,8)*16}px" data-step="${index}" draggable="${!disabled()}"><input type="checkbox" class="wb-step-check" data-act="wb-select" data-i="${index}" aria-label="选中第 ${index+1} 步" ${S.wb.selection.includes(index)?'checked':''} ${disabled()}><span class="drag-handle">⠿</span><span class="step-number">${String(index+1).padStart(2,'0')}</span><div class="step-icon">${icon(step.action==='loop'?'refresh':step.action==='end_loop'?'chevron':step.action)}</div><div class="step-copy"><strong>${esc(step.name)}</strong><div class="step-meta"><span>${A[step.action]}</span><span>·</span><span>${esc(paramsSummary(step))}</span>${step.repeat>1?`<span>×${step.repeat}</span>`:''}</div></div>${status?`<span class="step-state ${status}">${LABELS[status]}</span>`:''}<div class="row-tools"><button class="icon-button" data-act="copy-step" data-i="${index}" title="复制步骤或整个循环组" ${disabled()}>${icon('copy')}</button><button class="icon-button" data-act="delete-step" data-i="${index}" title="删除步骤或整个循环组" ${disabled()}>${icon('trash')}</button></div></div>`;
 }
 function inspectorView() {
   const step=S.project.steps[S.selected];
@@ -253,7 +257,7 @@ function inspectorView() {
   return `<div class="inspector-head"><span>步骤设置</span><label class="check-line"><input type="checkbox" data-sfield="enabled" ${step.enabled!==false?'checked':''} ${disabled()}>启用</label></div>
   ${field('步骤名称',input(step.name,'data-sfield="name"'))}
   ${action==='loop'?'<div class="field-help">循环包含结束值，最多 1000 轮；禁用本组会跳过组内步骤。</div>':field('操作',`<select data-sfield="action" ${disabled()}>${options(Object.entries(A).filter(([key])=>!['loop','end_loop'].includes(key)),action)}</select>`)}
-  ${TARGETS.has(action)?field('目标控件',controlChoice(step,'target')):''}
+  ${TARGETS.has(action)?field('操作目标',controlChoice(step,'target')):''}
   ${action==='drag'?field('拖动终点',controlChoice(step,'end_target')):''}
   ${paramFields(step)}
   ${action==='loop'?'':`<div class="divider"></div><div class="field-grid">${field('操作后等待 · 秒',input(step.delay??.5,'data-sfield="delay"','number','min="0" max="600" step="0.1"'))}${field('重复次数',input(step.repeat??1,'data-sfield="repeat"','number','min="1" max="1000"'))}</div><details class="details" ${action==='python'?'open':''}><summary>更多设置</summary>${field(action==='python'?'脚本执行超时 · 秒':'寻找控件超时 · 秒',input(step.timeout??5,'data-sfield="timeout"','number','min="0.1" max="600" step="0.5"'))}${step.params?.path?'<div class="field-help">已保留录制的拖动轨迹。</div>':''}</details>`}
@@ -286,7 +290,7 @@ function recordView() {
   const recording=S.busy==='recording';
   if(S.android.connection&&!pending)return `<div class="empty"><strong>${recording?'正在录制安卓操作':'准备录制安卓操作'}</strong><p>首版录制工作台预览中的操作。手机上直接触摸的操作不会被采集。</p>${button(recording?'返回设备画面':'开始录制',recording?'view-android':'record-start','primary','record')}</div>`;
   return `<div class="record-flow"><div class="flow-stage"><span class="flow-number">1</span>连接目标应用</div>${icon('chevron')}<div class="flow-stage"><span class="flow-number">2</span>手动操作</div>${icon('chevron')}<div class="flow-stage"><span class="flow-number">3</span>编辑测试用例</div></div>
-  <div class="record-layout"><div class="record-card">${recording?`<div class="record-live"><i class="status-dot red"></i>${S.recordStarting?'正在启动录制监听…':'正在记录目标应用操作'}</div><div class="record-time" id="record-clock">${elapsed()}</div><p>在目标应用中完成要测试的操作，按 F12 结束录制。</p><div class="record-preview" id="live-events">${liveEvents()}</div>${button('停止录制 · F12','stop','record','stop',S.recordStarting?'disabled':'style="margin-top:24px"')}`:pending?`<div class="record-symbol">${icon('check')}</div><h2>${pending.project.steps.length?'录制已完成':'未录到操作'}</h2><p>可先重放本次录制，再加入用例。你可以继续修改位置、等待时间和验证条件。</p><div class="stats-row"><div class="stat"><strong>${pending.project.steps.length}</strong><span>个测试步骤</span></div><div class="stat"><strong>${pending.project.selectors.length}</strong><span>个定位控件</span></div><div class="stat"><strong>${pending.duration}</strong><span>秒录制时长</span></div></div><div class="record-preview">${pending.project.steps.map(step=>`<div class="record-preview-row">${icon(step.action)}<span>${esc(step.name)}</span><small>${esc(paramsSummary(step))}</small></div>`).join('')||`<div class="empty compact">${esc(pending.hint||'没有采集到目标应用操作。请在所选目标应用画面内完成点击或按键，详情见错误日志。')}</div>`}</div>${recordChoices(pending)}`:`<div class="record-symbol">${icon('record')}</div><h2>快速开始</h2><p>点击开始录制，再像平常一样操作目标应用。点击、拖动、滚轮和键盘操作会被转换成测试步骤。</p><div class="record-connection"><i class="status-dot ${S.handle?'green':''}"></i>${esc(serverTitle(currentWindow()))}</div>${button('开始录制','record-start','record','record',S.busy?'disabled':'')}<div class="tag-line"><span>仅录制所选目标窗口</span><span>F12 停止</span></div>`}</div>
+  <div class="record-layout"><div class="record-card">${recording?`<div class="record-live"><i class="status-dot red"></i>${S.recordStarting?'正在启动录制监听…':'正在记录目标应用操作'}</div><div class="record-time" id="record-clock">${elapsed()}</div><p>在目标应用中完成要测试的操作，按 F12 结束录制。</p><div class="record-preview" id="live-events">${liveEvents()}</div>${button('停止录制 · F12','stop','record','stop',S.recordStarting?'disabled':'style="margin-top:24px"')}`:pending?`<div class="record-symbol">${icon('check')}</div><h2>${pending.project.steps.length?'录制已完成':'未录到操作'}</h2><p>可先重放本次录制，再加入用例。你可以继续修改位置、等待时间和验证条件。</p><div class="stats-row"><div class="stat"><strong>${pending.project.steps.length}</strong><span>个测试步骤</span></div><div class="stat"><strong>${pending.project.steps.filter(step=>step.params?.position).length}</strong><span>处操作位置</span></div><div class="stat"><strong>${pending.duration}</strong><span>秒录制时长</span></div></div><div class="record-preview">${pending.project.steps.map(step=>`<div class="record-preview-row">${icon(step.action)}<span>${esc(step.name)}</span><small>${esc(paramsSummary(step))}</small></div>`).join('')||`<div class="empty compact">${esc(pending.hint||'没有采集到目标应用操作。请在所选目标应用画面内完成点击或按键，详情见错误日志。')}</div>`}</div>${recordChoices(pending)}`:`<div class="record-symbol">${icon('record')}</div><h2>快速开始</h2><p>点击开始录制，再像平常一样操作目标应用。点击、拖动、滚轮和键盘操作会被转换成测试步骤。</p><div class="record-connection"><i class="status-dot ${S.handle?'green':''}"></i>${esc(serverTitle(currentWindow()))}</div>${button('开始录制','record-start','record','record',S.busy?'disabled':'')}<div class="tag-line"><span>仅录制所选目标窗口</span><span>F12 停止</span></div>`}</div>
   <aside class="record-note"><h3>录制后可以做什么</h3><div class="item">${icon('cases')}<span>为步骤和控件改名，整理操作顺序。</span></div><div class="item">${icon('image')}<span>把录制的位置切换为图片定位，提高定位稳定性。</span></div><div class="item">${icon('check')}<span>添加图片断言，验证界面变化和操作结果。</span></div><div class="divider"></div><span class="small">中文输入建议录制后添加「输入文本」步骤。复杂同时操作可在用例中调整。</span></aside></div>`;
 }
 function elapsed(){const seconds=S.recordStart?Math.floor((Date.now()-S.recordStart)/1000):0;return `${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;}
@@ -310,10 +314,10 @@ function menu(anchor) {
 }
 function addStep(action) {
   if(lock()) return;
-  const target=controlSelectors().find(item=>(!IMAGES.has(action)||item.kind==='image')&&(!UI_ACTIONS.has(action)||item.kind==='android_ui'))?.name||'';if(target&&TARGETS.has(action))useControl(target);
   if(S.project.mode==='python')return;
-  const step={name:A[action],action,target,end_target:'',enabled:true,timeout:action==='python'?30:controlSelectors().find(t=>t.name===target)?.kind==='android_ui'?15:5,delay:action==='loop'?0:.5,repeat:1,params:clone(action==='loop'?{variable:'i',start:2,end:64,step:1}:action==='set_variable'?{variable:'name',value:''}:DEFAULTS[action]||{})};
+  const step={name:A[action],action,target:'',end_target:'',enabled:true,timeout:action==='python'?30:UI_ACTIONS.has(action)?15:5,delay:action==='loop'?0:.5,repeat:1,params:clone(action==='loop'?{variable:'i',start:2,end:64,step:1}:action==='set_variable'?{variable:'name',value:''}:DEFAULTS[action]||{})};
   const index=S.project.steps.length?S.selected+1:0;
+  if(TARGETS.has(action))return beginStepSetup(step,index);
   S.project.steps.splice(index,0,step,...(action==='loop'?[{name:'循环结束',action:'end_loop',enabled:true,timeout:5,delay:0,repeat:1,params:{}}]:[]));S.selected=index;S.stepStatus={};dirty();render();
 }
 function showModal(data) {S.modal=data;renderModal();if(!modal.open)modal.showModal();}
@@ -362,13 +366,18 @@ function renderModal() {
   if(m.kind==='variant-preview'){modal.innerHTML=header('附加模板预览')+`<div class="modal-body"><p class="variant-preview-name">${esc(variantName(m.item))}</p><div class="image-stage-wrap"><img class="variant-preview-image" src="${esc(m.image)}" alt="${esc(variantName(m.item))}"></div><p class="field-help">${esc(m.item.image)}</p></div><footer class="modal-footer">${button('返回编辑','close-modal','primary')}</footer>`;return;}
   if(m.kind==='variant-rename'){modal.innerHTML=header('重命名附加模板')+`<div class="modal-body">${field('模板名称',input(m.name,'id="variant-name"','text','maxlength="200"'))}</div><footer class="modal-footer">${button('取消','close-modal')}${button('保存名称','save-variant-name','primary')}</footer>`;return;}
   if(m.kind==='python-preview'){modal.innerHTML=header('生成的 Python 代码')+`<div class="modal-body"><p class="field-help">预览随低代码步骤生成。创建独立副本后可自由编辑，低代码原稿保留。</p><textarea class="python-editor" id="generated-python-code" readonly spellcheck="false" aria-label="生成的 Python 代码">${esc(m.code)}</textarea></div><footer class="modal-footer">${button('关闭','close-modal')}${button('创建 Python 副本','mode-copy','primary','python',disabled())}</footer>`;return;}
+  if(m.kind==='selector'&&m.workbench){modal.innerHTML=workbenchVerificationModal(m);return;}
+  if(m.kind==='selector'&&m.stepPosition){modal.innerHTML=stepPositionModal(m);return;}
+  if(m.kind==='position-promotion'){modal.innerHTML=positionPromotionModal(m);return;}
+  if(m.kind==='step-setup'){modal.innerHTML=stepSetupModal(m);return;}
+  if(m.kind==='selector'&&m.stepSetup){modal.innerHTML=stepSetupImageModal(m);return;}
   const sharedModal=sharedControlModals(m);if(sharedModal!==null){modal.innerHTML=sharedModal;return;}
   if(m.kind==='script')modal.innerHTML=header('编辑 Python 脚本')+`<div class="modal-body">${field('Python 代码',`<textarea id="script-code" class="python-editor" spellcheck="false" aria-label="Python 脚本编辑器" ${disabled()}>${esc(m.code)}</textarea>`)}<div class="field-help">可使用 window、controls、case_dir、report_dir、step_name 和 variables。输入 window. 或按 Ctrl+Space 选择函数；Tab 缩进，F12 停止执行。</div></div><footer class="modal-footer">${button('取消','close-modal')}${button('应用到步骤','script-apply','primary', '',disabled())}</footer>`;
   if(m.kind==='confirm') modal.innerHTML=header('确认操作')+`<div class="modal-body"><p>${esc(m.message)}</p><p class="modal-message" style="margin-top:10px">${esc(m.detail)}</p></div><footer class="modal-footer">${button('取消','confirm-no')}${button('继续','confirm-yes','primary')}</footer>`;
   if(m.kind==='environment') modal.innerHTML=header('运行环境')+`<div class="modal-body"><div class="env-row"><span>测试服务权限</span><strong>${S.admin?'管理员':'普通权限'}</strong></div><div class="env-row"><span>已发现目标窗口</span><strong>${S.windows.length} 个</strong></div><div class="env-row"><span>停止快捷键</span><strong>F12</strong></div><p class="modal-message" style="margin-top:20px">软件默认请求管理员权限。若当前仍显示普通权限，请保存并关闭工作台，重新启动并确认 Windows 权限提示。</p></div><footer class="modal-footer">${button('知道了','close-modal','primary')}</footer>`;
   if(m.kind==='selector') {
     const t=m.draft, image=t.kind==='image';
-    modal.innerHTML=header(m.index===null?'新增控件':'编辑控件')+`<div class="modal-body">${field('控件名称',input(t.name,'data-dfield="name"'))}${field('分类',`<select id="control-category-choice"><option value="">未分类</option>${options(S.controls.categories.map(category=>[category.id,category.name]),m.categoryId||'')}</select>`)}<p class="field-help">保存到通用控件库，所有引用此控件的用例都会使用新配置。</p><div class="segmented"><button data-act="target-mode" data-mode="coordinate" class="${t.kind==='coordinate'?'active':''}">${icon('coordinate')} 坐标定位</button><button data-act="target-mode" data-mode="image" class="${image?'active':''}">${icon('image')} 图片定位</button><button data-act="target-mode" data-mode="android_ui" class="${t.kind==='android_ui'?'active':''}">${icon('android')} 安卓 UI</button></div>
+    modal.innerHTML=header(m.index===null?'新增控件':'编辑控件')+`<div class="modal-body">${field('控件名称',input(t.name,'data-dfield="name"'))}${m.workbench?workbenchVerificationFields(m):''}${field('分类',`<select id="control-category-choice"><option value="">未分类</option>${options(S.controls.categories.map(category=>[category.id,category.name]),m.categoryId||'')}</select>`)}<p class="field-help">保存到通用控件库，所有引用此控件的用例都会使用新配置。</p><div class="segmented"><button data-act="target-mode" data-mode="coordinate" class="${t.kind==='coordinate'?'active':''}">${icon('coordinate')} 坐标定位</button><button data-act="target-mode" data-mode="image" class="${image?'active':''}">${icon('image')} 图片定位</button><button data-act="target-mode" data-mode="android_ui" class="${t.kind==='android_ui'?'active':''}">${icon('android')} 安卓 UI</button></div>
     ${t.kind==='android_ui'?androidUiFields(t):image?recognitionFields(t):`<div class="field-grid">${field('X 坐标',input(t.x??.5,'data-dfield="x"','number','step="0.001"'))}${field('Y 坐标',input(t.y??.5,'data-dfield="y"','number','step="0.001"'))}</div><label class="check-line"><input type="checkbox" data-dfield="normalized" ${t.normalized!==false?'checked':''}>使用比例坐标 · 0 到 1</label><div class="field-help" style="margin:10px 0 17px">以目标应用客户区左上角为原点，不包含标题栏。</div>${button('从目标应用截图取点','pick-target','quiet wide','coordinate')}`}
     <details class="details"><summary>点击偏移</summary><div class="field-grid">${field('X 偏移 · 像素',input(t.offset_x||0,'data-dfield="offset_x"','number'))}${field('Y 偏移 · 像素',input(t.offset_y||0,'data-dfield="offset_y"','number'))}</div></details></div><footer class="modal-footer">${button('取消','close-modal')}${button('保存控件','save-target','primary')}</footer>`;
   }
@@ -403,26 +412,26 @@ async function thumbnail(image,refresh=false){
 }
 async function captureTarget(){
   if(!hasTarget()){toast('先连接目标窗口');return;}
-  const previous=clone(S.modal);delete S.modal.addVariant;
+  const sourceModal=S.modal,previous={...S.modal,draft:clone(S.modal.draft)};delete S.modal.addVariant;
   toast('正在截取目标应用画面…');
   try{
     const shot=await api('capture',targetArgs());
+    if(S.modal!==sourceModal)return;
     showModal({kind:'picker',shot,returnModal:previous,selection:null});
-  }catch(error){showModal(previous);throw error;}
+  }catch(error){if(S.modal!==sourceModal)return;showModal(previous);throw error;}
 }
 function pickPoint(event){const rectangle=document.querySelector('#image-stage').getBoundingClientRect();const shot=S.modal.shot;return [Math.max(0,Math.min(shot.width-1,Math.round((event.clientX-rectangle.left)/rectangle.width*shot.width))),Math.max(0,Math.min(shot.height-1,Math.round((event.clientY-rectangle.top)/rectangle.height*shot.height)))];}
 function drawPick(point){const m=S.modal,shot=m.shot,image=m.returnModal.draft.kind==='image';m.selection=image?[Math.min(pickStart[0],point[0]),Math.min(pickStart[1],point[1]),Math.max(pickStart[0],point[0]),Math.max(pickStart[1],point[1])]:point;document.querySelector('#selection-overlay').innerHTML=image?`<div class="pick-rect" style="left:${m.selection[0]/shot.width*100}%;top:${m.selection[1]/shot.height*100}%;width:${(m.selection[2]-m.selection[0])/shot.width*100}%;height:${(m.selection[3]-m.selection[1])/shot.height*100}%"></div>`:`<i class="pick-point" style="left:${point[0]/shot.width*100}%;top:${point[1]/shot.height*100}%"></i>`;document.querySelector('#pick-hint').textContent=image?`区域 ${m.selection.join(', ')}`:`坐标 ${point.join(', ')}`;}
-async function acceptPick(){const m=S.modal;if(!m.selection){toast('请先选取位置或区域');return;}const previous=m.returnModal;const t=previous.draft;if(t.kind==='image'){const image=(await api('save_template',{capture_id:m.shot.id,box:m.selection})).image;if(previous.addVariant){(t.templates||=[]).push({image,mask:''});delete previous.addVariant;}else{t.image=image;t.mask='';}await thumbnail(image);}else{t.x=t.normalized!==false?Number((m.selection[0]/(m.shot.width-1)).toFixed(6)):m.selection[0];t.y=t.normalized!==false?Number((m.selection[1]/(m.shot.height-1)).toFixed(6)):m.selection[1];}showModal(previous);}
+async function acceptPick(){const m=S.modal;if(!m.selection){toast('请先选取位置或区域');return;}const previous=m.returnModal;const t=previous.draft;if(t.kind==='image'){const image=(await api('save_template',{capture_id:m.shot.id,box:m.selection})).image;if(previous.addVariant){(t.templates||=[]).push({image,mask:''});delete previous.addVariant;}else{t.image=image;t.mask='';}await thumbnail(image);}else{t.x=t.normalized!==false?Number((m.selection[0]/(m.shot.width-1)).toFixed(6)):m.selection[0];t.y=t.normalized!==false?Number((m.selection[1]/(m.shot.height-1)).toFixed(6)):m.selection[1];}if(S.modal===m)showModal(previous);}
 async function saveTarget(){return saveSharedControl();}
 
-function setProject(data){S.gameCasePath='';setLibrary(data.library);S.project=data.project;setControls(data.controls);S.path=data.path;S.baseDir=data.base_dir||S.baseDir;S.recent=data.recent||S.recent;S.selected=0;S.pythonSelection=null;S.dirty=false;S.stepStatus={};S.thumbnails={};api('dirty',{value:false,caseName:S.project.name}).catch(()=>{});render();}
-async function save(asNew=false){if(lock())return;const data=await api('save_project',{project:S.project,as_new:asNew});if(data){setProject(data);toast('用例已保存','success');}}
-async function run({stayOnGame=false}={}){
+function setProject(data){workbenchReset();S.gameCasePath='';setLibrary(data.library);S.project=data.project;setControls(data.controls);S.path=data.path;S.baseDir=data.base_dir||S.baseDir;S.recent=data.recent||S.recent;S.selected=0;S.pythonSelection=null;S.dirty=false;S.stepStatus={};S.thumbnails={};api('dirty',{value:false,caseName:S.project.name}).catch(()=>{});render();}
+async function save(asNew=false){if(lock())return;const data=await api('save_project',{project:S.project,as_new:asNew});if(data){clearWorkbenchDraft();setProject(data);toast('用例已保存','success');}}
+async function run({stayOnGame=false,stayOnWorkbench=S.view==='cases',project=S.project,iterations=S.iterations}={}){
   if(lock())return;if(!hasTarget())throw new Error('请先连接目标窗口');
-  const iterations=S.iterations;
   if(!Number.isInteger(iterations)||iterations<1||iterations>1000)throw new Error('循环次数需在 1 ~ 1000 之间');
-  S.busy='running';S.logs=[];S.lastResult=null;S.stepStatus={};if(S.android.connection)S.view='android';else if(!stayOnGame)S.view='runs';render();
-  try{await api('run',{project:S.project,...targetArgs(),iterations});log('开始执行 '+S.project.name);}catch(error){S.busy='';render();throw error;}
+  S.busy='running';S.logs=[];S.lastResult=null;S.stepStatus={};if(S.android.connection)S.view='android';else if(!stayOnGame&&!stayOnWorkbench)S.view='runs';if(project===S.project){S.wb.range=null;}S.wb.failure=null;S.wb.failureImage=null;S.wb.runOpen=true;render();
+  try{await api('run',{project,...targetArgs(),iterations});log('开始执行 '+S.project.name);}catch(error){S.busy='';render();throw error;}
 }
 async function replayRecording(){
   if(lock())return;
@@ -447,7 +456,7 @@ async function startRecord(){
   if(S.recordPending){S.view='record';render();toast('请先将上一段录制加入用例，或丢弃后重新录制');return;}
   if(lock())return;if(!hasTarget())throw new Error('请先连接目标窗口');
   S.recordReplayRun=null;S.recordReplaying=false;
-  S.recordStart=0;S.recordCount=0;S.recordEvents=[];S.recordStarting=true;S.busy='recording';S.view='record';
+  S.recordStart=0;S.recordCount=0;S.recordEvents=[];S.recordStarting=true;S.busy='recording';S.view=S.wb.recordContext?'cases':'record';
   if(S.android.connection)S.view='android';
   if(S.view==='game')updateGameControls();else render();
   try{await api('record_start',targetArgs());}catch(error){S.busy='';throw error;}finally{S.recordStarting=false;if(S.view==='game')updateGameControls();else render();}
@@ -471,6 +480,8 @@ async function acceptRecording(asNew){
 }
 
 async function handleAction(action,node){
+  if(action.startsWith('setup-'))return stepSetupAction(action,node);
+  if(action.startsWith('wb-'))return workbenchAction(action,node);
   if(action==='view-android'||action.startsWith('android-'))return androidAction(action,node);
   if(action==='close-modal'||action==='confirm-no'){closeModal();return;}
   if(action.startsWith('mode-')){await caseModeAction(action,node);return;}
@@ -487,7 +498,7 @@ async function handleAction(action,node){
   if(action==='case-folder')return api('case_folder');
   if(action==='case-open'){
     if(lock()||!await canReplace())return;
-    const data=await api('open_case',{path:node.dataset.path});setProject(data);S.view='cases';render();return;
+    const data=await api('open_case',{path:node.dataset.path});clearWorkbenchDraft();setProject(data);S.view='cases';render();return;
   }
   if(action==='history-delete')return deleteHistory(node.dataset.kind);
   if(action==='audit-refresh')return refreshAudit();
@@ -529,7 +540,7 @@ async function handleAction(action,node){
   if(action==='new'||action==='open'||action==='recent'){
     if(lock()||!await canReplace())return;
     const data=await api(action==='new'?'new_project':action==='recent'?'open_recent':'open_project',action==='recent'?{index}:{});
-    if(data){setProject(data);S.view='cases';render();}return;
+    if(data){clearWorkbenchDraft();setProject(data);S.view='cases';render();}return;
   }
   if(action==='refresh')return refreshGameWindows();
   if(action==='game-connect')return reconnectGame();
@@ -552,7 +563,7 @@ async function handleAction(action,node){
   if(action==='import-mask'||action==='clear-mask'){const index=Number(node.dataset.variant),t=S.modal.draft,owner=index<0?t:t.templates[index];if(action==='clear-mask')owner.mask='';else{const result=await api('import_template');if(result)owner.mask=result.image;}renderModal();return;}
   if(action==='cancel-pick'){showModal(S.modal.returnModal);return;}
   if(action==='accept-pick')return acceptPick();
-  if(action==='save-target')return saveTarget();
+  if(action==='save-target')return S.modal?.stepSetup?saveStepSetupImage():S.modal?.workbench?workbenchSaveVerification():saveTarget();
   if(action==='import-image'){const result=await api('import_template');if(result){S.modal.draft.image=result.image;S.modal.draft.mask='';await thumbnail(result.image);renderModal();}return;}
   if(action==='run')return run();
   if(action==='game-run')return runGameCase();
@@ -604,12 +615,16 @@ document.addEventListener('change',event=>{
   if(node.id==='game-case'){if(!S.busy)S.gameCasePath=node.value;return;}
   if(node.id==='connection'){connectGame(node.value).catch(error=>toast(error.message,'error'));return;}
   if(node.dataset.sfield==='action'){
-    const step=S.project.steps[S.selected];step.action=node.value;step.name=A[node.value];step.params=clone(DEFAULTS[node.value]||{});
+    const step=S.project.steps[S.selected],oldParams=step.params||{};step.action=node.value;step.name=A[node.value];step.params=clone(DEFAULTS[node.value]||{});
+    if(STEP_POSITION_ACTIONS.has(step.action)&&oldParams.position){step.params.position=oldParams.position;step.target='';}
+    if(step.action==='drag'&&oldParams.end_position){step.params.end_position=oldParams.end_position;step.end_target='';}
     if(step.action==='python')step.timeout=30;
-    if(UI_ACTIONS.has(step.action)&&!controlSelectors().some(t=>t.name===step.target&&t.kind==='android_ui'))step.target=controlSelectors().find(t=>t.kind==='android_ui')?.name||'';
-    if(IMAGES.has(step.action)&&!controlSelectors().some(t=>t.name===step.target&&t.kind==='image'))step.target=controlSelectors().find(t=>t.kind==='image')?.name||'';
+    if(UI_ACTIONS.has(step.action)&&!controlSelectors().some(t=>t.name===step.target&&t.kind==='android_ui'))step.target='';
+    if(IMAGES.has(step.action)&&!controlSelectors().some(t=>t.name===step.target&&t.kind==='image'))step.target='';
     if(TARGETS.has(step.action)&&step.target)useControl(step.target);
+    S.wb.preview=null;
     dirty();render();
+    if(TARGETS.has(step.action)&&!step.target&&!step.params.position)openControlPicker('target').catch(error=>toast(error.message,'error'));
   }
 });
 document.addEventListener('dragstart',event=>{const row=event.target.closest('[data-step]');if(row&&!S.busy&&!S.mcpOperation){dragIndex=Number(row.dataset.step);event.dataTransfer.effectAllowed='move';}});
@@ -655,20 +670,21 @@ window.studio.onEvent(event=>{
   if(event.kind==='step'){if(!['recording','exploration'].includes(S.runState?.source))S.stepStatus[event.index]=event.status;log(`${event.status==='running'?'执行':'完成'}步骤 ${event.index+1} · ${event.name}${event.error?' · '+event.error:''}`,event.status==='failed'?'error':event.status==='passed'?'success':'');}
   if(event.kind==='notice')toast(event.message,event.level==='error'?'error':'');
   if(['log','match','notice'].includes(event.kind))log(event.message,event.kind==='log'?'error':'');
-  if(event.kind==='finished'){S.busy='';if(S.recordReplaying){S.recordReplaying=false;S.view=S.android.connection?'android':'record';api('workbench_show').catch(()=>{});}S.lastResult={...event.result,id:(event.directory||'').split(/[\\/]/).at(-1)};log(`执行结束 · ${LABELS[event.result.status]}`,event.result.status==='failed'?'error':'success');if(event.directory)reports().catch(()=>{});}
+  if(event.kind==='finished'){S.busy='';if(S.recordReplaying){S.recordReplaying=false;S.view=S.android.connection?'android':'record';api('workbench_show').catch(()=>{});}S.lastResult={...event.result,id:(event.directory||'').split(/[\\/]/).at(-1)};log(`执行结束 · ${LABELS[event.result.status]}`,event.result.status==='failed'?'error':'success');if(event.directory)reports().catch(()=>{});workbenchOnFinished(event).catch(error=>toast(error.message,'error'));}
   if(event.kind==='service_error')windowDiscovery.stop();
   if(['run_error','service_error'].includes(event.kind)){S.recordStarting=false;S.busy='';if(S.recordReplaying){S.recordReplaying=false;S.view=S.android.connection?'android':'record';api('workbench_show').catch(()=>{});}log(event.message,'error');toast(event.message,'error');}
   if(event.kind==='record_started'){S.recordStarting=false;S.busy='recording';S.recordStart=Date.now();S.recordCount=0;S.recordEvents=[];}
   if(event.kind==='record_event'&&S.view==='android'){const status=document.querySelector('.android-record-status');if(status)status.textContent=`正在录制预览中的操作 · ${event.count} 个操作 · 仅录制通过本工作台发出的操作`;}
-  if(event.kind==='record_event'){S.recordCount=event.count;S.recordEvents.push(event.event);if(S.recordEvents.length>50)S.recordEvents.shift();if(S.view==='record'&&document.querySelector('#live-events'))document.querySelector('#live-events').innerHTML=liveEvents();const status=document.querySelector('.game-status span');if(status)status.textContent=`正在录制 · ${S.recordCount} 个事件`;return;}
+  if(event.kind==='record_event'){S.recordCount=event.count;S.recordEvents.push(event.event);workbenchRecordingStatus();if(S.recordEvents.length>50)S.recordEvents.shift();if(S.view==='record'&&document.querySelector('#live-events'))document.querySelector('#live-events').innerHTML=liveEvents();const status=document.querySelector('.game-status span');if(status)status.textContent=`正在录制 · ${S.recordCount} 个事件`;return;}
+  if(event.kind==='record_stopped'&&S.wb.recordContext){S.busy='';S.recordStarting=false;workbenchAcceptRecording(event).catch(error=>toast(error.message,'error'));return;}
   if(event.kind==='record_stopped'){S.busy='';S.recordReplaying=false;S.recordReplayRun=null;S.recordPending=event;S.view='record';}
   if(event.kind==='record_error'){S.recordStarting=false;S.busy='';toast(event.message,'error');}
   if(S.view==='game'&&['step','finished','log','match','notice','run_error','service_error','record_started','record_error'].includes(event.kind)){updateGameControls();return;}
   render();
 });
-setInterval(()=>{RunPanel.tick(document.querySelector('#android-run-results'),S.runState);RunPanel.tick(document.querySelector('#game-run-results'),S.runState);RunPanel.tick(document.querySelector('#record-replay-results'),S.recordReplayRun);const clock=document.querySelector('#record-clock');if(clock&&S.busy==='recording')clock.textContent=elapsed();},500);
+setInterval(()=>{RunPanel.tick(document.querySelector('#wb-run-results'),S.runState);RunPanel.tick(document.querySelector('#android-run-results'),S.runState);RunPanel.tick(document.querySelector('#game-run-results'),S.runState);RunPanel.tick(document.querySelector('#record-replay-results'),S.recordReplayRun);const clock=document.querySelector('#record-clock');if(clock&&S.busy==='recording')clock.textContent=elapsed();},500);
 async function bootstrap(){
-  try{const data=await api('bootstrap');if(data.settings){applySettingsConfig(data.settings);S.settingsDraft=clone(data.settings.values);}S.windows=data.windows;S.admin=data.admin;const candidate=data.windows.find(w=>w.handle===data.preferredHandle);S.handle=null;setProject(data);await reports();if(data.autoConnect&&candidate){try{await connectGame(candidate.handle);}catch(error){toast(error.message,'error');}}window.__studioReady=true;windowDiscovery.start();}
+  try{const data=await api('bootstrap');if(data.settings){applySettingsConfig(data.settings);S.settingsDraft=clone(data.settings.values);}S.windows=data.windows;S.admin=data.admin;const candidate=data.windows.find(w=>w.handle===data.preferredHandle);S.handle=null;setProject(data);await reports();if(data.autoConnect&&candidate){try{await connectGame(candidate.handle);}catch(error){toast(error.message,'error');}}S.wb.draftReady=true;if(S.wb.recovery&&!S.path){S.view='cases';render();}window.__studioReady=true;windowDiscovery.start();}
   catch(error){window.__studioErrors.push(error.message);root.innerHTML=`<div class="loading"><div class="empty"><strong>测试服务未能启动</strong><p>${esc(error.message)}</p><p>请确认 Python 和依赖已安装，再重新打开工作台。</p></div></div>`;toast(error.message,'error');}
 }
 bootstrap();
@@ -699,7 +715,7 @@ window.addEventListener('beforeunload',()=>windowDiscovery.stop());
 async function handleShortcutAction(action){
   if(!window.__studioReady||modal.open)return;
   if(action==='run')return run();
-  if(action==='record')return startRecord();
+  if(action==='record')return S.view==='cases'?workbenchStartRecord():startRecord();
   if(action==='pick')return chooseTargetWindow();
   if(action==='screenshot'){
     if(lock())return;if(!hasTarget())throw new Error('请先连接目标窗口');

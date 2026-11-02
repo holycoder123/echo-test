@@ -1,5 +1,9 @@
 # 开发与验证
 
+本步位置回归：`tests/test_step_positions.py` 验证坐标边界、运行与 Python 转换一致性、录制保存／加载不新增共享条目，以及旧坐标整理的文件保护、Python 与跨用例引用保护。`workbench-beta-smoke.json` 同时覆盖位置编辑、重新取点、预览隔离、手动共享、拖动终点、改用图片和历史位置整理；界面测试拦截目标输入，不替代游戏实机验证。
+
+1.2.1-beta 新增 `electron/tests/workbench-model.test.cjs`，检查局部运行范围、嵌套循环边界、禁用状态、原用例不变性及恢复点解析；`tests/test_report_images.py` 检查报告图片引用、目录边界和重定向拒绝。`npm run test:ui` 额外执行 `workbench-smoke.cjs`，结果为 `artifacts/smoke/workbench-beta-smoke.json`，预览为 `workbench-beta-preview.png`；所有目标输入和采集均使用隔离夹具。
+
 以下命令在项目根目录运行。Node 测试保存在 `electron/tests`，Python 测试保存在 `tests`。
 
 Python 编辑器使用 `npm run build:editor` 构建本地 Monaco、中文语言包与 worker；`npm start`、`npm run test:ui` 和打包流程会自动调用。`electron/tests/python-language-service.test.cjs` 使用真实 Pyright/Ruff 验证补全、悬浮、参数提示、定义/引用、错误行号映射、future import 和格式化；`electron/tests/smoke/python-ide-smoke.cjs` 验证真实 Monaco 的补全撤销、查找、格式化撤销、问题定位、切页状态保留、控件插入、脚本弹窗和只读锁，不执行目标窗口输入。

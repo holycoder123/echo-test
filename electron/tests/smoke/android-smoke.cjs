@@ -94,7 +94,7 @@ async function verify(window){
       await handleAction('preview-target',{dataset:{i:String(S.controls.entries.findIndex(entry=>entry.id==='a'.repeat(32)))}});
       result.nativePreview=S.modal.kind==='preview'&&modal.textContent.includes('匹配 1 个节点');closeModal();
       S.view='android';render();addStep('wait_ui');
-      await openControlPicker('target');
+      await stepSetupAction('setup-shared');
       result.nativeAssertionPicker=S.modal.androidOnly&&modal.querySelectorAll('.control-picker-card').length===1&&modal.textContent.includes('安卓原生登录测试');
       closeModal();S.view='android';render();
       await handleAction('record-start',{dataset:{}});

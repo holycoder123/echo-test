@@ -739,15 +739,15 @@ app.whenReady().then(async () => {
         knownCases.add(secondFixturePath);
         const interaction = await window.webContents.executeJavaScript(`(async () => {
           await handleAction('view-cases',{dataset:{}});
-          const localCasesVisible=document.querySelectorAll('.library-list [data-act="case-open"]').length===S.library.length&&S.library.length>0;
+          const localCasesVisible=document.querySelectorAll('.wb-projects [data-act="case-open"]').length===S.library.length&&S.library.length>0;
           const caseDirectory=S.caseDirectory;
           const savedCase=S.library.find(item=>!item.error);
           await handleAction('case-open',{dataset:{path:savedCase.path}});
           const localCaseOpened=S.path===savedCase.path;
           S.caseSearch=savedCase.name;render();
-          const caseSearch=document.querySelectorAll('.library-list [data-act="case-open"]').length>0;
+          const caseSearch=document.querySelectorAll('.wb-projects [data-act="case-open"]').length>0;
           S.caseSearch='';render();
-          addStep('long_press');
+          addStep('long_press');await stepSetupAction('setup-coordinate');saveStepPosition();
           const added = S.project.steps.at(-1)?.action === 'long_press' || S.project.steps[S.selected].action === 'long_press';
           S.view = 'targets'; render();
           await editTarget();
@@ -765,6 +765,8 @@ app.whenReady().then(async () => {
         })()`);
         fs.writeFileSync(artifactFile('smoke', 'electron-interaction.json'), JSON.stringify(interaction));
           await require('./tests/smoke/desktop-workspace-smoke.cjs').verify(window,()=>BrowserWindow.getAllWindows().length);
+          await require('./tests/smoke/workbench-smoke.cjs').verify(window);
+          if(process.env.ECHO_TEST_WORKBENCH_SMOKE==='1')return;
           await require('./tests/smoke/connection-smoke.cjs').verify(window);
           await require('./tests/smoke/window-search-smoke.cjs').verify(window);
           await require('./tests/smoke/window-discovery-smoke.cjs').verify(window);

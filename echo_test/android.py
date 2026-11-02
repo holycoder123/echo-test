@@ -14,7 +14,7 @@ from uuid import uuid4
 
 from PIL import Image
 
-from .models import Project, Selector, Step
+from .models import Project, Step
 
 
 class AndroidStopped(RuntimeError):
@@ -355,20 +355,18 @@ class AndroidRecorder:
         if self.size and self.size != size:
             raise ValueError("录制过程中屏幕方向发生变化，请结束本段录制后重新开始")
         self.size = size
-        def target(point):
-            name = f'安卓录制位置 {len(self.project.selectors)+1:02d}'
-            self.project.selectors.append(Selector(name, x=point[0]/max(1,size[0]-1), y=point[1]/max(1,size[1]-1)))
-            return name
+        def position(point):
+            return {'x': point[0]/max(1,size[0]-1), 'y': point[1]/max(1,size[1]-1), 'normalized': True}
         step = Step(name={'tap':'点击屏幕','long_press':'长按屏幕','swipe':'滑动屏幕','key':'安卓按键','text':'输入文本'}[action], delay=0)
         if self.project.steps:
             self.project.steps[-1].delay = round(min(600, max(0, started-self.start_time-self.last_end)), 3)
         if action in {'tap', 'long_press', 'swipe'}:
-            step.target = target(params['point'])
             step.action = {'tap':'click','long_press':'long_press','swipe':'drag'}[action]
             if action != 'tap':
                 step.params = {'duration': params.get('duration', 1)}
+            step.params['position'] = position(params['point'])
             if action == 'swipe':
-                step.end_target = target(params['end'])
+                step.params['end_position'] = position(params['end'])
         else:
             step.action = action
             step.params = {'keys': params['keys']} if action == 'key' else {'text': params['text']}

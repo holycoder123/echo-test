@@ -50,6 +50,28 @@ class ReportLibrary:
                 continue
         return records
 
+    def image(self, identifier, filename):
+        """Read only a screenshot referenced by a completed report."""
+        self._check_root()
+        directory = self._report(identifier)
+        if not isinstance(filename, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,160}\.png', filename):
+            raise ValueError('无效的报告图片名称')
+        result = directory / 'result.json'
+        if not result.is_file() or self._redirected(result) or result.stat().st_size > 10 * 1024 * 1024:
+            raise ValueError('报告尚未生成或不可读取')
+        data = json.loads(result.read_text(encoding='utf-8'))
+        allowed = {row.get(key) for row in data.get('steps', []) for key in ('screenshot', 'recognition_screenshot')}
+        image = directory / filename
+        if filename not in allowed or self._redirected(image) or not image.is_file() or image.stat().st_size > 10 * 1024 * 1024:
+            raise ValueError('报告图片不存在或不可读取')
+        from PIL import Image
+        with Image.open(image) as source:
+            if source.width * source.height > 16 * 1024 * 1024:
+                raise ValueError('报告图片尺寸过大')
+            converted = source.convert('RGB')
+            converted.thumbnail((1600, 1200))
+            return converted.copy()
+
     def delete(self, identifiers):
         if not isinstance(identifiers, list) or not 1 <= len(identifiers) <= 1000:
             raise ValueError('请选择 1 ~ 1000 份报告')

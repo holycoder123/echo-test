@@ -31,6 +31,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Refreshing portable payload failed' }
 & $python -X utf8 (Join-Path $PSScriptRoot 'prepare-installer.py')
 if ($LASTEXITCODE -ne 0) { throw 'Installer payload preparation failed' }
 $version = (Get-Content -LiteralPath (Join-Path $projectRoot 'package.json') -Raw | ConvertFrom-Json).version
+$numericVersion = (($version -split '[-+]')[0]) + '.0'
 $output = Join-Path $projectRoot "dist\latest\echo-test-$version-setup-x64.exe"
 # NSIS cannot read some paths beyond MAX_PATH. Keep the source and payload
 # addresses short even when the checkout lives inside a deeply nested folder.
@@ -41,7 +42,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Could not create a temporary short build path'
 try {
     $shortRoot = $drive+'\.'
     $payload = Join-Path $shortRoot '.runtime\installer-build\payload\echo-test'
-    & $Compiler '/V3' '/INPUTCHARSET' 'UTF8' "/DPRODUCT_VERSION=$version" "/DPROJECT_ROOT=$shortRoot" "/DPAYLOAD_ROOT=$payload" "/DOUTPUT_EXE=$output" (Join-Path $shortRoot 'scripts\installer.nsi')
+    & $Compiler '/V3' '/INPUTCHARSET' 'UTF8' "/DPRODUCT_VERSION=$version" "/DPRODUCT_VERSION_NUMERIC=$numericVersion" "/DPROJECT_ROOT=$shortRoot" "/DPAYLOAD_ROOT=$payload" "/DOUTPUT_EXE=$output" (Join-Path $shortRoot 'scripts\installer.nsi')
     if ($LASTEXITCODE -ne 0) { throw "NSIS compilation failed: $LASTEXITCODE" }
 } finally {
     & subst $drive /D

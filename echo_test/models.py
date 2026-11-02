@@ -157,9 +157,17 @@ class Step:
         number(self.delay, "步骤后等待", 0, 600)
         if type(self.repeat) is not int or not 1 <= self.repeat <= 1000:
             raise ValueError("重复次数必须为 1 ~ 1000 的整数")
-        if self.action in TARGET_ACTIONS and self.target not in selectors:
+        from .positions import POSITION_ACTIONS, validate_position
+        for key, field in [('target', 'position'), ('end_target', 'end_position')]:
+            if field in self.params:
+                if self.action not in POSITION_ACTIONS or (field == 'end_position' and self.action != 'drag'):
+                    raise ValueError('此操作不支持步骤位置')
+                if getattr(self, key):
+                    raise ValueError('步骤位置和共享控件不能同时作为目标')
+                validate_position(self.params[field])
+        if self.action in TARGET_ACTIONS and self.target not in selectors and 'position' not in self.params:
             raise ValueError(f"步骤 {self.name} 的目标控件不存在")
-        if self.action == "drag" and self.end_target not in selectors:
+        if self.action == "drag" and self.end_target not in selectors and 'end_position' not in self.params:
             raise ValueError("拖动终点控件不存在")
         if self.action in IMAGE_ACTIONS and selectors[self.target].kind != "image":
             raise ValueError("图片等待 / 断言需要截图识别控件")

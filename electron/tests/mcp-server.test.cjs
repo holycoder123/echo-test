@@ -10,6 +10,16 @@ const {startMcpServer,projectSchema,selectorSchema,MAX_BODY_BYTES} = require('..
 
 const pixel = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jZuoAAAAASUVORK5CYII=';
 const simpleProject = () => ({name:'新手验证',selectors:[{name:'NPC',x:.3,y:.4}],steps:[{name:'接待员',action:'click',target:'NPC'}]});
+test('step positions validate without shared controls and reject conflicting or malformed targets',()=>{
+  const plan={name:'录制',selectors:[],steps:[{action:'drag',params:{position:{x:.2,y:.3},end_position:{x:120,y:220,normalized:false}}}]};
+  const parsed=projectSchema.parse(plan);assert.equal(parsed.steps[0].target,'');assert.equal(parsed.selectors.length,0);
+  for(const patch of [{x:1.2,y:.3},{x:Infinity,y:.3},{x:true,y:.3},{x:.2,y:.3,offset_x:.1},{x:.2,y:.3,unknown:1}]){
+    assert.equal(projectSchema.safeParse({...plan,steps:[{action:'click',params:{position:patch}}]}).success,false);
+  }
+  assert.equal(projectSchema.safeParse({...plan,steps:[{action:'click',target:'NPC',params:{position:{x:.2,y:.3}}}]}).success,false);
+  assert.equal(projectSchema.safeParse({...plan,steps:[{action:'key',params:{position:{x:.2,y:.3}}}]}).success,false);
+  assert.equal(projectSchema.safeParse({...plan,steps:[{action:'click',params:plan.steps[0].params}]}).success,false);
+});
 async function fixture(t, options={}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(),'echo-test-mcp-test-'));
   const calls = [], logs = [];

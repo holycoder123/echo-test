@@ -38,7 +38,8 @@ async function verify(main){
       const choosing=chooseTargetWindow();
       const picking=S.windowPicking&&!!document.querySelector('[data-act="target-pick-cancel"]');
       window.__targetPickResolve({selected:window.__targetWindows[0],connection:{...window.__targetWindows[0],width:1024,height:700},cancelled:false});await choosing;
-      const confirmed=S.connection.handle===94101&&!S.windowPicking&&document.querySelector('.target-current').textContent.includes('GameClient.exe');
+      const confirmed=S.connection.handle===94101&&!S.windowPicking&&S.view==='cases'&&!!document.querySelector('.wb-workspace');
+      S.view='select-window';render();
       const cancelled=chooseTargetWindow();await handleAction('target-pick-cancel',{dataset:{}});await cancelled;
       const cancelPreservesTarget=!S.windowPicking&&S.connection.handle===94101;
       await handleAction('target-mode',{dataset:{mode:'search'}});
@@ -54,7 +55,7 @@ async function verify(main){
       await handleAction('target-connect',{dataset:{handle:'94102'}});
       const call=window.__targetCalls.filter(item=>item.method==='game_connect').at(-1);
       const rowConnect=S.connection.handle===94102&&call.args.expected_pid===302;
-      await handleAction('window-search-clear',{dataset:{}});
+      S.view='select-window';render();await handleAction('window-search-clear',{dataset:{}});
       const cleared=S.windowSearch===''&&document.querySelectorAll('.target-window-table tbody tr').length===5;
       await handleAction('target-disconnect',{dataset:{}});
       return {filter,rowConnect,cleared,disconnect:S.connection===null&&S.handle===null,

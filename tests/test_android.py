@@ -269,9 +269,10 @@ class AndroidServiceTests(unittest.TestCase):
         self.service.call('android_record_control',args)
         self.assertEqual(len(self.commands),before)
         self.assertEqual(self.service.recorder.project.steps[0].action,'drag')
-        selector=self.service.recorder.project.selectors[0]
-        self.assertAlmostEqual(selector.x,100/575)
-        self.assertAlmostEqual(selector.y,200/1279)
+        position=self.service.recorder.project.steps[0].params["position"]
+        self.assertEqual(self.service.recorder.project.selectors, [])
+        self.assertAlmostEqual(position["x"],100/575)
+        self.assertAlmostEqual(position["y"],200/1279)
         with self.assertRaisesRegex(ValueError,'方向'):
             self.service.call('android_record_control',{**args,'size':[1280,576]})
         self.assertEqual(len(self.service.recorder.events),1)

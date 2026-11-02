@@ -34,7 +34,10 @@ AutoCloseWindow true
 ManifestDPIAware true
 Icon "${PROJECT_ROOT}\electron\assets\studio.ico"
 UninstallIcon "${PROJECT_ROOT}\electron\assets\studio.ico"
-VIProductVersion "${PRODUCT_VERSION}.0"
+!ifndef PRODUCT_VERSION_NUMERIC
+  !define PRODUCT_VERSION_NUMERIC "${PRODUCT_VERSION}.0"
+!endif
+VIProductVersion "${PRODUCT_VERSION_NUMERIC}"
 VIAddVersionKey "ProductName" "${APP_NAME}"
 VIAddVersionKey "FileDescription" "${APP_NAME}安装程序"
 VIAddVersionKey "FileVersion" "${PRODUCT_VERSION}"

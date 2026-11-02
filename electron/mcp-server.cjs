@@ -54,7 +54,10 @@ const selectorSchema = z.object({
 const actionNames = ['click','double_click','right_click','long_press','drag','scroll','wait_image','assert_image','assert_absent',
   'key','text','sleep','screenshot','key_down','key_up','python','loop','end_loop','set_variable','wait_ui','assert_ui','assert_ui_absent'];
 const pythonCode=z.string().max(256*1024).refine(value=>Buffer.byteLength(value,'utf8')<=256*1024,'Python source exceeds 256 KB');
+const positionActions=new Set(['click','double_click','right_click','long_press','drag','scroll']);
+const positionSchema=z.object({x:finite.min(0).max(100000),y:finite.min(0).max(100000),normalized:z.boolean().default(true),offset_x:z.int().min(-100000).max(100000).default(0),offset_y:z.int().min(-100000).max(100000).default(0)}).strict().superRefine((p,ctx)=>{if(p.normalized&&(p.x>1||p.y>1))ctx.addIssue({code:'custom',message:'Normalized position must be in 0..1'});});
 const paramsSchema = z.object({
+  position:positionSchema.optional(),end_position:positionSchema.optional(),
   duration: finite.min(.01).max(600).optional(), interval: finite.min(.01).max(600).optional(),
   amount: z.int().min(-100).max(100).refine(value => value !== 0).optional(),
   axis: z.enum(['vertical','horizontal']).optional(), keys: keys.optional(), text: z.string().max(4000).optional(),
@@ -71,6 +74,7 @@ const stepSchema = z.object({
   timeout: finite.min(.1).max(600).default(5), delay: finite.min(0).max(600).default(.5),
   repeat: z.int().min(1).max(1000).default(1), params: paramsSchema.default({}),
 }).strict().superRefine((value, ctx) => {
+  for(const [key,field] of [['target','position'],['end_target','end_position']])if(value.params[field]&&(!positionActions.has(value.action)||(field==='end_position'&&value.action!=='drag')||value[key]))ctx.addIssue({code:'custom',path:['params',field],message:'Step position requires a mouse action and no competing selector'});
   if (value.params.path && value.action !== 'drag') ctx.addIssue({code:'custom',path:['params','path'],message:'Only drag supports a path'});
   if(value.action==='python'&&value.enabled&&!value.params.code?.trim())ctx.addIssue({code:'custom',path:['params','code'],message:'Python script must not be blank'});
 });
@@ -115,9 +119,9 @@ const projectSchema = z.object({name:label.default('目标应用测试用例'), 
   }
   for (const [index, step] of value.steps.entries()) {
     if (!step.enabled||value.mode==='python') continue;
-    if (targetActions.has(step.action) && !selectors.has(step.target)) ctx.addIssue({code:'custom',path:['steps',index,'target'],message:'Target selector does not exist'});
+    if (targetActions.has(step.action) && !selectors.has(step.target) && !step.params.position) ctx.addIssue({code:'custom',path:['steps',index,'target'],message:'Target selector does not exist'});
     if (['wait_ui','assert_ui','assert_ui_absent'].includes(step.action) && selectors.get(step.target)?.kind !== 'android_ui') ctx.addIssue({code:'custom',path:['steps',index,'target'],message:'Android UI action needs an Android UI selector'});
-    if (step.action === 'drag' && !selectors.has(step.end_target)) ctx.addIssue({code:'custom',path:['steps',index,'end_target'],message:'Drag end selector does not exist'});
+    if (step.action === 'drag' && !selectors.has(step.end_target) && !step.params.end_position) ctx.addIssue({code:'custom',path:['steps',index,'end_target'],message:'Drag end selector does not exist'});
     if (imageActions.has(step.action) && selectors.get(step.target)?.kind !== 'image') ctx.addIssue({code:'custom',path:['steps',index,'target'],message:'Image action needs an image selector'});
   }
 });

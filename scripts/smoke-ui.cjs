@@ -32,6 +32,7 @@ try {
     assert.equal(interaction[name], true, `${name} failed`);
   }
   assert.equal(read('desktop-workspace-smoke.json').passed,true);
+  assert.equal(read('workbench-beta-smoke.json').passed,true);
   assert.equal(read('game-run-smoke.json').passed, true);
   assert.equal(read('exploration-smoke.json').passed, true);
   const connectionFile = path.join(ROOT, 'artifacts', 'smoke', 'connection-smoke.json');

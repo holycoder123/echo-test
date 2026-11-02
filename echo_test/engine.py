@@ -91,7 +91,7 @@ class Runner:
             return None
         point = None
         if action in {"click", "double_click", "right_click", "long_press", "scroll", "drag", "wait_image", "assert_image", "wait_ui", "assert_ui"}:
-            point = self.resolve(step.target, step.timeout)
+            point = self.resolve_step_position(step)
         if action == "click":
             self.backend.click(point)
         elif action == "double_click":
@@ -103,9 +103,9 @@ class Runner:
         elif action == "scroll":
             self.backend.scroll(point, params.get("amount", -3), params.get("axis", "vertical"))
         elif action == "drag":
-            end = self.resolve(step.end_target, step.timeout)
+            end = self.resolve_step_position(step, 'end_target')
             # Re-resolve the start after waiting for the end image.
-            point = self.resolve(step.target, step.timeout)
+            point = self.resolve_step_position(step)
             extra = {}
             if params.get("path"):
                 width, height = self.backend.size()
@@ -134,6 +134,15 @@ class Runner:
                 return destination.name
             return None
         return None
+
+    def resolve_step_position(self, step, key='target'):
+        field = 'position' if key == 'target' else 'end_position'
+        if field in step.params:
+            from .positions import validate_position
+            from .models import Selector
+            value = validate_position(step.params[field])
+            return coordinate(Selector('步骤位置', **value), self.backend.size())
+        return self.resolve(getattr(step, key), step.timeout)
 
     def run(self, iterations=1):
         if type(iterations) is not int or not 1 <= iterations <= 1000:

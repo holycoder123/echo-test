@@ -529,6 +529,9 @@ class Service:
             return self.project_response(Project("未命名用例"))
         if method == 'control_list':
             return self.controls.list(args.get('query', ''), args.get('category_id'))
+        if method == 'record_positions_localize':
+            self.idle()
+            return self.controls.localize_recording_positions(Project.from_dict(args['project']), self.case_path)
         if method in {'control_save', 'control_delete', 'control_import', 'control_category_save', 'control_category_delete'}:
             self.idle()
             if method == 'control_save':
@@ -691,6 +694,8 @@ class Service:
             return self.finish_recording()
         if method == "reports":
             return ReportLibrary(ROOT).list()
+        if method == 'report_image':
+            return {'image': png(ReportLibrary(ROOT).image(args.get('id'), args.get('file')))}
         if method == "reports_cleanup_preview":
             self.idle()
             return ReportLibrary(ROOT).cleanup_preview(args.get('days'))

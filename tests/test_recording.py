@@ -12,9 +12,9 @@ def mouse(event, t, x=.3, y=.4, button="left", **extra):
 
 
 class RecordingTests(unittest.TestCase):
-    def test_two_clicks_become_double_click_with_one_selector(self):
+    def test_two_clicks_become_double_click_with_step_position(self):
         project = convert_events([mouse("down", 0), mouse("up", .05), mouse("down", .15), mouse("up", .20)])
-        self.assertEqual(len(project.selectors), 1)
+        self.assertEqual(len(project.selectors), 0)
         self.assertEqual(len(project.steps), 1)
         self.assertEqual(project.steps[0].action, "double_click")
         self.assertAlmostEqual(project.steps[0].params["interval"], .1)
@@ -29,7 +29,7 @@ class RecordingTests(unittest.TestCase):
         project = convert_events([mouse("down", 0), mouse("move", .2, .4, .5), mouse("move", .4, .5, .6), mouse("up", .6, .6, .7)])
         step = project.steps[0]
         self.assertEqual(step.action, "drag")
-        self.assertEqual(len(project.selectors), 2)
+        self.assertEqual(len(project.selectors), 0)
         self.assertEqual(step.params["path"][0], [.3, .4])
         self.assertEqual(step.params["path"][-1], [.6, .7])
 

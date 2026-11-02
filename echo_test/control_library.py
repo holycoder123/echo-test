@@ -158,12 +158,50 @@ class ControlLibrary:
                              '安卓 UI android_ui' if selector['kind'] == 'android_ui' else '坐标 coordinate' if selector['kind'] == 'coordinate' else '图片 image OCR 模板 template'])
             if not all(word in text.casefold() for word in query.strip().casefold().split()):
                 continue
-            entries.append(deepcopy(entry))
+            item = deepcopy(entry)
+            from .positions import legacy_recording_entry
+            item['legacy_recording'] = legacy_recording_entry(entry)
+            entries.append(item)
         for category in categories:
             category['count'] = sum(entry['category_id'] == category['id'] for entry in self.data['entries'])
         return {'entries': entries, 'categories': categories, 'total': len(self.data['entries']),
                 'uncategorized': sum(not entry['category_id'] for entry in self.data['entries']),
                 'directory': str(self.directory), 'warnings': deepcopy(self.warnings)}
+
+    def localize_recording_positions(self, project, current_path=None):
+        """Return an editable conversion; retain every library entry and saved file."""
+        from .models import load_project
+        from .positions import inline_coordinates, legacy_recording_entry
+        original = Project.from_dict(project.to_dict())
+        if original.mode == 'python' or any(step.action == 'python' for step in original.steps):
+            return {'project': original.to_dict(), 'converted': 0, 'reason': '用例含 Python，保留原共享引用'}
+        eligible = {row['id']: row for row in self.data['entries'] if legacy_recording_entry(row)}
+        protected = set()
+        current = Path(current_path).resolve() if current_path else None
+        paths = {*CaseLibrary(self.root).candidates(), *(self.source_path(p) for p in self.data.get('imports', {}))}
+        for path in paths:
+            path = path.resolve()
+            if path == current or not path.is_file():
+                continue
+            try:
+                other = load_project(path)
+                names = ({s.name for s in other.selectors} if any(s.action == 'python' for s in other.steps)
+                         else referenced_selector_names(other))
+                imports = self.data.get('imports', {}).get(self.source_key(path), {})
+                protected.update(s.library_id or imports.get(s.name) for s in other.selectors if s.name in names)
+            except (OSError, ValueError, TypeError, KeyError, AttributeError):
+                return {'project': original.to_dict(), 'converted': 0, 'reason': '存在无法检查的已保存用例，保留共享引用'}
+        selectors = []
+        for selector in original.selectors:
+            identifier = selector.library_id
+            if identifier in eligible and identifier not in protected:
+                # Use the current shared definition, including any edited coordinates.
+                live = Selector(**deepcopy(eligible[identifier]['selector']))
+                live.name = selector.name
+                selectors.append(live)
+        converted, count = inline_coordinates(original, selectors)
+        return {'project': converted.to_dict(), 'converted': count,
+                'reason': '仅转换当前编辑内容；历史记录和已保存文件保持不变' if count else '没有可安全转换的位置；跨用例引用继续保留'}
 
     def import_project(self, project, source_dir, source_path=None, category_id=''):
         """Migrate definitions once; persisted IDs subsequently resolve to the shared control."""
@@ -323,7 +361,7 @@ class ControlLibrary:
             self.asset_path(image)
         identifier = identifier or uuid4().hex
         selector.library_id = identifier
-        entry = {'id': identifier, 'category_id': category_id, 'origin_name': existing.get('origin_name', existing['selector']['name']) if existing else selector.name, 'selector': asdict(selector)}
+        entry = {'id': identifier, 'category_id': category_id, 'source': 'manual', 'origin_name': existing.get('origin_name', existing['selector']['name']) if existing else selector.name, 'selector': asdict(selector)}
         if existing:
             old_name = existing['selector']['name']
             for row in data['entries']:

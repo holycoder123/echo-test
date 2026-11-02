@@ -13,7 +13,7 @@ function categoryName(id){return S.controls.categories.find(category=>category.i
 function setControls(data,markDirty=false){
   if(!data)return;
   S.controls=data;
-  if(S.targetCategory!=='all'&&S.targetCategory!==''&&!data.categories.some(category=>category.id===S.targetCategory))S.targetCategory='all';
+  if(!['all','','recording-history'].includes(S.targetCategory)&&!data.categories.some(category=>category.id===S.targetCategory))S.targetCategory='all';
   const changed=syncProjectControls();
   if(markDirty&&changed)dirty();
 }
@@ -56,9 +56,10 @@ function matchesControl(entry,search){
   const target=entry.selector,text=[target.name,categoryName(entry.category_id),target.text||'',...Object.values(target.ui||{}),controlKind(target),target.kind,target.recognition||''].join(' ').toLocaleLowerCase();
   return search.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean).every(word=>text.includes(word));
 }
+function controlCategoryMatches(entry,category){return category==='recording-history'?!!entry.legacy_recording:!entry.legacy_recording&&(category==='all'||entry.category_id===category);}
 function controlChoice(step,key){
   const name=step[key]||'';
-  return `<button type="button" class="control-choice" data-act="choose-control" data-field="${key}" aria-haspopup="dialog" ${disabled()}><span>${esc(name||'从控件库选择')}</span>${icon('targets')}</button>`;
+  return `${stepPositionChoice(step,key)}<button type="button" class="control-choice" data-act="choose-control" data-field="${key}" aria-haspopup="dialog" ${disabled()}><span>${esc(name|| (step.params?.[positionField(key)]?'改用共享控件':'从控件库选择'))}</span>${icon('targets')}</button>`;
 }
 function controlImageSlot(image,alt){
   const source=S.thumbnails[image],failed=thumbnailFailures.has(image);
@@ -72,17 +73,21 @@ function updateControlImages(image,failed=false){
     else if(failed)hint.querySelector('small').textContent='图片无法读取';
   }
 }
-async function openControlPicker(key){
+async function openControlPicker(key,setup=null,forceImage=false){
   if(lock())return;
   if(!['target','end_target'].includes(key))return;
-  const project=S.project,step=project.steps[S.selected];
+  const project=S.project,step=setup?.step||project.steps[S.selected];
+  if(setup)checkStepSetup(setup);
   if(!step||(key==='target'&&!TARGETS.has(step.action))||(key==='end_target'&&step.action!=='drag'))return;
+  const previousModal=S.modal,request={};if(setup)setup.request=request;
   const data=await api('control_list');
-  if(lock()||S.project!==project||S.project.steps[S.selected]!==step)return;
+  if(setup&&(S.modal!==previousModal||setup.request!==request))return;
+  if(lock()||S.project!==project||(!setup&&S.project.steps[S.selected]!==step))return;
+  if(setup)checkStepSetup(setup);
   setControls(data,true);
-  const imageOnly=key==='target'&&IMAGES.has(step.action),androidOnly=key==='target'&&UI_ACTIONS.has(step.action),eligible=S.controls.entries.filter(entry=>(!imageOnly||entry.selector.kind==='image')&&(!androidOnly||entry.selector.kind==='android_ui'));
+  const imageOnly=forceImage||key==='target'&&IMAGES.has(step.action),androidOnly=key==='target'&&UI_ACTIONS.has(step.action),eligible=S.controls.entries.filter(entry=>(!imageOnly||entry.selector.kind==='image')&&(!androidOnly||entry.selector.kind==='android_ui'));
   const selected=eligible.find(entry=>entry.selector.name===step[key]);
-  const m={kind:'control-picker',project,step,key,imageOnly,androidOnly,category:'all',search:'',selectedId:selected?.id||'',clear:false};
+  const m={kind:'control-picker',project,step,key,setup,imageOnly,androidOnly,category:selected?.legacy_recording?'recording-history':'all',search:'',selectedId:setup?'':selected?.id||'',clear:false};
   showModal(m);modal.querySelector('#control-picker-search').focus();
   // Load saved templates without requiring a connected application. Keep search focus and scroll intact.
   const images=[...new Set(eligible.flatMap(entry=>controlImages(entry.selector)))];
@@ -91,7 +96,7 @@ async function openControlPicker(key){
   await Promise.all(Array.from({length:Math.min(4,images.length)},worker));
 }
 function controlPickerResults(m){
-  const entries=S.controls.entries.filter(entry=>((!m.imageOnly||entry.selector.kind==='image')&&(!m.androidOnly||entry.selector.kind==='android_ui'))&&(m.category==='all'||m.category===entry.category_id)&&matchesControl(entry,m.search));
+  const entries=S.controls.entries.filter(entry=>((!m.imageOnly||entry.selector.kind==='image')&&(!m.androidOnly||entry.selector.kind==='android_ui'))&&controlCategoryMatches(entry,m.category)&&matchesControl(entry,m.search));
   return `<div class="control-result-count">${entries.length} 个${m.search?'匹配':''}控件${m.imageOnly?' · 仅图片 / OCR 控件':''}</div>${entries.length?`<div class="control-picker-grid">${entries.map(entry=>{
     const target=entry.selector,image=controlImage(target),selected=m.selectedId===entry.id;
     const preview=image?controlImageSlot(image,target.name):`<div class="control-text-preview">${icon(target.kind==='coordinate'?'coordinate':'image')}<span>${esc(target.kind==='coordinate'?target.normalized!==false?`X ${(target.x*100).toFixed(1)}% · Y ${(target.y*100).toFixed(1)}%`:`X ${target.x} · Y ${target.y}`:target.kind==='android_ui'?androidUiSummary(target):target.text||'未设置识别文字')}</span></div>`;
@@ -115,8 +120,8 @@ function renderControlPickerResults(){
 }
 function controlPickerModal(m){
   const eligible=S.controls.entries.filter(entry=>(!m.imageOnly||entry.selector.kind==='image')&&(!m.androidOnly||entry.selector.kind==='android_ui'));
-  const categories=[{id:'all',name:'全部控件'},{id:'',name:'未分类'},...S.controls.categories];
-  return header(m.key==='end_target'?'选择拖动终点控件':'选择目标控件')+`<div class="control-picker-tools"><div class="search"><input id="control-picker-search" placeholder="搜索名称、分类或识别文字" aria-label="搜索可选控件" value="${esc(m.search)}">${icon('search')}</div><span>选中控件后，确认选择</span></div><div class="control-picker-layout"><aside class="control-categories" aria-label="可选控件分类">${categories.map(category=>`<button type="button" class="control-category ${m.category===category.id?'active':''}" data-act="picker-category" data-category="${esc(category.id)}" aria-pressed="${m.category===category.id}"><span>${esc(category.name)}</span><small>${eligible.filter(entry=>category.id==='all'||entry.category_id===category.id).length}</small></button>`).join('')}</aside><div id="control-picker-results">${controlPickerResults(m)}</div><aside id="control-picker-detail" aria-label="选中控件预览">${controlPickerDetail(m)}</aside></div><footer class="modal-footer"><button class="btn ghost control-picker-clear" data-act="picker-clear" ${disabled()}>清空目标</button>${button('取消','close-modal')}${button('确认选择','picker-accept','primary','',disabled()||(!m.selectedId&&!m.clear?'disabled':''))}</footer>`;
+  const categories=[{id:'all',name:'全部控件'},{id:'',name:'未分类'},...S.controls.categories,...(eligible.some(e=>e.legacy_recording)?[{id:'recording-history',name:'历史录制位置'}]:[])];
+  return header(m.key==='end_target'?'选择拖动终点控件':'选择目标控件')+`<div class="control-picker-tools"><div class="search"><input id="control-picker-search" placeholder="搜索名称、分类或识别文字" aria-label="搜索可选控件" value="${esc(m.search)}">${icon('search')}</div><span>${m.step.action==='drag'&&m.step.params?.path?'更换拖动目标后将按起终点直线拖动':'选中控件后，确认选择'}</span></div><div class="control-picker-layout"><aside class="control-categories" aria-label="可选控件分类">${categories.map(category=>`<button type="button" class="control-category ${m.category===category.id?'active':''}" data-act="picker-category" data-category="${esc(category.id)}" aria-pressed="${m.category===category.id}"><span>${esc(category.name)}</span><small>${eligible.filter(entry=>controlCategoryMatches(entry,category.id)).length}</small></button>`).join('')}</aside><div id="control-picker-results">${controlPickerResults(m)}</div><aside id="control-picker-detail" aria-label="选中控件预览">${controlPickerDetail(m)}</aside></div><footer class="modal-footer">${m.setup?button('返回定位方式','setup-back','ghost')+(m.imageOnly?button('新建图片定位','setup-capture','ghost','screenshot',disabled()):''):'<button class="btn ghost control-picker-clear" data-act="picker-clear" '+disabled()+'>清空目标</button>'}${button('取消','close-modal')}${button('确认选择','picker-accept','primary','',disabled()||(!m.selectedId&&!m.clear?'disabled':''))}</footer>`;
 }
 async function refreshControls(){
   setControls(await api('control_list'),true);render();
@@ -127,16 +132,17 @@ async function refreshControls(){
   void Promise.all(Array.from({length:Math.min(4,images.length)},worker));
 }
 function controlView(){
+  const history=S.controls.entries.filter(entry=>entry.legacy_recording),shared=S.controls.entries.filter(entry=>!entry.legacy_recording);
   const words=S.targetSearch.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
   const cards=S.controls.entries.map((entry,index)=>({...entry,index})).filter(entry=>{
     const t=entry.selector,text=[t.name,categoryName(entry.category_id),t.text||'',t.kind==='image'?t.recognition==='ocr'?'图片 image OCR 文字':'图片 image 模板 template':'坐标 coordinate'].join(' ').toLocaleLowerCase();
-    return (S.targetCategory==='all'||entry.category_id===S.targetCategory)&&words.every(word=>text.includes(word));
+    return (S.targetCategory==='recording-history'?entry.legacy_recording:!entry.legacy_recording&&(S.targetCategory==='all'||entry.category_id===S.targetCategory))&&words.every(word=>text.includes(word));
   });
   const usedIds=new Set(projectControlIds());
   const categoryButton=(id,name,count)=>`<button class="control-category ${S.targetCategory===id?'active':''}" data-act="control-filter" data-category="${esc(id)}" aria-pressed="${S.targetCategory===id}"><span>${esc(name)}</span><small>${count}</small></button>`;
   return `<div class="page-heading control-heading"><div class="heading-actions"><div class="search"><input placeholder="搜索名称、分类或识别文字" id="target-search" value="${esc(S.targetSearch)}" aria-label="搜索通用控件">${icon('search')}</div>${button('刷新','control-refresh','ghost','refresh')}${button('新增控件','new-target','primary','plus',disabled())}</div></div>
-  <div class="control-layout"><aside class="control-categories" aria-label="控件分类"><div class="control-category-heading"><strong>分类</strong>${button('管理','control-categories','ghost','',disabled())}</div>${categoryButton('all','全部控件',S.controls.entries.length)}${categoryButton('','未分类',S.controls.uncategorized||0)}${S.controls.categories.map(category=>categoryButton(category.id,category.name,category.count||0)).join('')}${button('新建分类','new-category','ghost','plus',disabled())}</aside>
-  <div class="control-results"><div class="control-result-count">${esc(S.targetCategory==='all'?'全部控件':categoryName(S.targetCategory))} · ${cards.length} 个${S.targetSearch?'匹配结果':''}</div>${S.controls.warnings?.length?`<p class="control-import-note">${S.controls.warnings.length} 个旧文件未能迁入，请检查用例文件和模板是否完整。</p>`:''}
+  <div class="control-layout"><aside class="control-categories" aria-label="控件分类"><div class="control-category-heading"><strong>分类</strong>${button('管理','control-categories','ghost','',disabled())}</div>${categoryButton('all','全部控件',shared.length)}${categoryButton('','未分类',shared.filter(entry=>!entry.category_id).length)}${S.controls.categories.map(category=>categoryButton(category.id,category.name,category.count||0)).join('')}${button('新建分类','new-category','ghost','plus',disabled())}${history.length?categoryButton('recording-history','历史录制位置',history.length):''}</aside>
+  <div class="control-results"><div class="control-result-count">${esc(S.targetCategory==='all'?'全部控件':S.targetCategory==='recording-history'?'历史录制位置':categoryName(S.targetCategory))} · ${cards.length} 个${S.targetSearch?'匹配结果':''}</div><p class="control-import-note">${S.targetCategory==='recording-history'?'旧版录制坐标保留在这里供历史用例引用。可将当前用例独占的位置整理为本步位置；共享定义继续保留。':'录制位置保存在步骤内；这里管理供多个步骤或用例复用的控件。'}${history.length&&S.project.mode!=='python'?button('整理当前用例录制位置','wb-position-localize','ghost','',disabled()):''}</p>${S.controls.warnings?.length?`<p class="control-import-note">${S.controls.warnings.length} 个旧文件未能迁入，请检查用例文件和模板是否完整。</p>`:''}
   ${cards.length?`<div class="target-grid">${cards.map(entry=>{
     const target=entry.selector,index=entry.index,used=usedIds.has(entry.id);
     return `<article class="target-card" data-control-id="${entry.id}">${target.kind==='image'?`<div class="target-thumb">${controlImageSlot(controlImage(target),target.name)}</div>`:''}<div class="target-body"><div class="top">${icon(target.kind)}<strong>${esc(target.name)}</strong><span class="type-pill">${controlKind(target)}</span></div><div class="control-tags"><span>${esc(categoryName(entry.category_id))}</span>${used?'<span class="control-used">当前用例已引用</span>':''}</div><div class="target-values">${target.kind==='android_ui'?esc(androidUiSummary(target)):target.kind==='image'?`${target.recognition==='ocr'?'OCR 文字':'模板匹配'} · 阈值 ${target.threshold??.86}<br>${esc(target.recognition==='ocr'?target.text:target.image||target.templates?.[0]?.image||'')}${target.templates?.length?`<br>附加模板 ${target.templates.length} 张`:''}${target.anchor?`<br>锚点 ${esc(target.anchor)}`:''}`:target.normalized!==false?`X ${(target.x*100).toFixed(1)}% · Y ${(target.y*100).toFixed(1)}%<br>随客户区尺寸变化`:`X ${target.x} · Y ${target.y}<br>客户区像素坐标`}</div></div><footer>${button('编辑','edit-target','','',`data-i="${index}" ${disabled()}`)}${button('预览定位','preview-target','ghost','',`data-i="${index}" ${disabled()}`)}<button class="icon-button last" data-act="delete-target" data-i="${index}" title="删除通用控件" ${disabled()}>${icon('trash')}</button></footer></article>`;
@@ -146,7 +152,7 @@ async function editSharedControl(index=null){
   if(lock())return;
   const entry=index===null?null:S.controls.entries[index];
   if(index!==null&&!entry)throw new Error('控件已不存在，请刷新');
-  showModal({kind:'selector',index,id:entry?.id||null,categoryId:entry?.category_id??(S.targetCategory==='all'?'':S.targetCategory),draft:entry?clone(entry.selector):defaultSelector()});
+  showModal({kind:'selector',index,id:entry?.id||null,categoryId:entry?.category_id??(['all','recording-history'].includes(S.targetCategory)?'':S.targetCategory),draft:entry?clone(entry.selector):defaultSelector()});
   await Promise.all(controlImages(S.modal.draft).map(image=>thumbnail(image,true)));
 }
 async function saveSharedControl(){
@@ -176,10 +182,15 @@ async function sharedControlAction(action,node){
     if(action==='picker-clear'){m.selectedId='';m.clear=true;renderControlPickerResults();}
     if(action==='picker-accept'){
       if(lock())return true;
-      if(S.project!==m.project||!S.project.steps.includes(m.step))throw new Error('步骤已发生变化，请重新选择控件');
+      if(m.setup)checkStepSetup(m.setup);else if(S.project!==m.project||!S.project.steps.includes(m.step))throw new Error('步骤已发生变化，请重新选择控件');
       const entry=S.controls.entries.find(item=>item.id===m.selectedId);
       if(!m.clear&&(!entry||(m.imageOnly&&entry.selector.kind!=='image')||(m.androidOnly&&entry.selector.kind!=='android_ui')))throw new Error('请先选择控件');
-      m.step[m.key]=m.clear?'':useControl(entry.selector.name).name;
+      if(m.setup){if(m.clear)throw new Error('请明确选择新步骤的目标');m.step[m.key]=entry.selector.name;delete m.step.params[positionField(m.key)];finishStepSetup(m.setup);return true;}
+      const name=m.clear?'':useControl(entry.selector.name).name;
+      if(m.step.action==='drag'&&(m.step[m.key]!==name||m.step.params?.[positionField(m.key)]))delete m.step.params.path;
+      m.step[m.key]=name;
+      if(m.step.params)delete m.step.params[positionField(m.key)];
+      S.wb.preview=null;
       dirty();closeModal();render();
     }
     return true;

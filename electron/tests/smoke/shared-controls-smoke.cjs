@@ -29,12 +29,12 @@ async function verify(window){
       result.categoryFilter=document.querySelectorAll('.target-card').length===1&&document.querySelector('.control-category.active').getAttribute('aria-pressed')==='true';
       const bank=clone(S.controls),blank=label=>({project:{name:label,schema_version:1,selectors:[],steps:[]},path:null,controls:bank});
       setProject(blank('共享引用甲'));S.view='cases';addStep('click');
-      await handleAction('choose-control',{dataset:{field:'target'}});await handleAction('picker-select',{dataset:{id:entry.id}});await handleAction('picker-accept',{dataset:{}});
+      await stepSetupAction('setup-shared');await handleAction('picker-select',{dataset:{id:entry.id}});await handleAction('picker-accept',{dataset:{}});
       result.stepReferencesShared=S.project.steps[0].target===name&&S.project.selectors.some(item=>item.library_id===entry.id);
       const first=clone(S.project),count=S.controls.entries.length;
       setProject(blank('共享引用乙'));S.view='targets';S.targetCategory='all';render();
       result.caseSwitchKeepsLibrary=S.controls.entries.length===count&&!!document.querySelector('[data-control-id="'+entry.id+'"]')&&S.project.selectors.length===0;
-      S.view='cases';addStep('click');await handleAction('choose-control',{dataset:{field:'target'}});await handleAction('picker-select',{dataset:{id:entry.id}});await handleAction('picker-accept',{dataset:{}});
+      S.view='cases';addStep('click');await stepSetupAction('setup-shared');await handleAction('picker-select',{dataset:{id:entry.id}});await handleAction('picker-accept',{dataset:{}});
       await editTarget(S.controls.entries.findIndex(item=>item.id===entry.id));S.modal.draft.name=name+'_updated';S.modal.draft.x=.8;await saveTarget();
       result.currentReferenceUpdated=S.project.steps[0].target===name+'_updated'&&S.project.selectors.find(item=>item.library_id===entry.id).x===.8;
       S.project=first;setControls(S.controls);render();

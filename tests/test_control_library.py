@@ -222,6 +222,24 @@ class SharedControlServiceTests(unittest.TestCase):
             self.service.worker.join(1)
             self.assertEqual(runner.call_args.args[1].selectors[0].x,.8)
 
+    def test_recording_position_conversion_service_preserves_files_and_saves_inline(self):
+        old=Project(selectors=[Selector('录制位置 01')],steps=[Step(target='录制位置 01')])
+        path=self.root/'test_cases'/'old.echo.json'
+        self.service.case_path=path
+        imported=self.service.controls.import_project(old,self.root,path)
+        save_project(imported,path,self.root)
+        original=path.read_bytes();bank=self.service.controls.path.read_bytes()
+        response=self.service.call('record_positions_localize',{'project':imported.to_dict()})
+        self.assertEqual(response['converted'],1)
+        self.assertEqual(path.read_bytes(),original)
+        self.assertEqual(self.service.controls.path.read_bytes(),bank)
+        saved=self.service.call('save_project',{'path':str(path),'project':response['project']})
+        self.assertEqual(saved['project']['selectors'],[])
+        self.assertIn('position',load_project(path).steps[0].params)
+        self.service.running=True
+        with self.assertRaisesRegex(ValueError,'停止'):
+            self.service.call('record_positions_localize',{'project':response['project']})
+
     def test_mutations_are_blocked_while_running_but_search_is_available(self):
         self.service.call('control_save',{'selector':asdict(Selector('按钮'))})
         self.service.running=True

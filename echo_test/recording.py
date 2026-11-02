@@ -100,4 +100,5 @@ def convert_events(events, name="录制的测试用例"):
             merged.append((0, 0, Step(name="松开 " + key_name(vk), action="key_up", params={"keys": key_name(vk)}, delay=0)))
     project = Project(name=name, selectors=selectors, steps=[step for _, _, step in merged])
     project.validate()
-    return project
+    from .positions import inline_coordinates
+    return inline_coordinates(project)[0]

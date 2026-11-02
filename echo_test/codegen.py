@@ -14,7 +14,20 @@ def generate_python(project):
     lines = ['# 由低代码用例生成；此脚本可独立修改，原用例保持不变。',
              '# window、controls、variables、render、assign、run_script 由运行环境提供。', '']
 
-    def target(name):
+    if any('position' in s.params or 'end_position' in s.params for s in steps):
+        lines.extend([
+            'def _step_position(x, y, normalized=True, offset_x=0, offset_y=0):',
+            '    width, height = window.size()',
+            '    x = (round(x * (width - 1)) if normalized else round(x)) + offset_x',
+            '    y = (round(y * (height - 1)) if normalized else round(y)) + offset_y',
+            '    if not (0 <= x < width and 0 <= y < height):',
+            '        raise ValueError("步骤位置超出目标应用客户区")',
+            '    return (x, y)', '',
+        ])
+
+    def target(name, position=None):
+        if position is not None:
+            return '_step_position(' + ', '.join(f'{key}={value!r}' for key, value in position.items()) + ')'
         selector = selectors[name]
         return f'controls.by_id({selector.library_id!r})' if selector.library_id else f'controls[{name!r}]'
 
@@ -57,11 +70,11 @@ def generate_python(project):
                         extra = ", button='right'"
                     elif action == 'long_press':
                         extra = f', hold={params.get("duration", 1)!r}, button={params.get("button", "left")!r}'
-                    emit(f'window.click({target(step.target)}, {timeout}{extra})', inner)
+                    emit(f'window.click({target(step.target, params.get("position"))}, {timeout}{extra})', inner)
                 elif action == 'drag':
-                    emit(f'window.drag({target(step.target)}, {target(step.end_target)}, duration={params.get("duration", 1)!r}, {timeout}, path={params.get("path")!r}, button={params.get("button", "left")!r})', inner)
+                    emit(f'window.drag({target(step.target, params.get("position"))}, {target(step.end_target, params.get("end_position"))}, duration={params.get("duration", 1)!r}, {timeout}, path={params.get("path")!r}, button={params.get("button", "left")!r})', inner)
                 elif action == 'scroll':
-                    emit(f'window.scroll({target(step.target)}, amount={params.get("amount", -3)!r}, axis={params.get("axis", "vertical")!r}, {timeout})', inner)
+                    emit(f'window.scroll({target(step.target, params.get("position"))}, amount={params.get("amount", -3)!r}, axis={params.get("axis", "vertical")!r}, {timeout})', inner)
                 elif action in {'wait_image', 'assert_image', 'assert_absent'}:
                     method = 'assert_absent' if action == 'assert_absent' else 'assert_image'
                     emit(f'window.{method}({target(step.target)}, {timeout})', inner)
