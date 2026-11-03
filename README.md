@@ -19,7 +19,6 @@
   <a href="docs/user-guide.md">使用指南</a> ·
   <a href="docs/android.md">安卓接入</a> ·
   <a href="docs/mcp.md">MCP 接入</a> ·
-  <a href="docs/brand/README.md">品牌资源</a> ·
   <a href="#开源框架与致谢">开源致谢</a> ·
   <a href="https://github.com/holycoder123/echo-test/issues">反馈问题</a>
 </p>
