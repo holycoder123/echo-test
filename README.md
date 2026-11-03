@@ -20,6 +20,7 @@
   <a href="docs/android.md">安卓接入</a> ·
   <a href="docs/mcp.md">MCP 接入</a> ·
   <a href="docs/brand/README.md">品牌资源</a> ·
+  <a href="#开源框架与致谢">开源致谢</a> ·
   <a href="https://github.com/holycoder123/echo-test/issues">反馈问题</a>
 </p>
 
@@ -144,6 +145,36 @@ npm run test:ui     # 独立配置目录中的界面冒烟
 Electron 负责工作台界面，Python / OpenCV / OCR 负责识别与用例执行，Windows 目标使用 Win32，安卓目标使用 ADB / UI Automator 与 scrcpy 视频及控制通道。Python 编辑器使用 Monaco、Pyright 和 Ruff。运行环境位于项目内的 `runtime/`；测试与打包的完整要求见 [开发与验证](docs/testing.md)。
 
 本地构建的最新安装包、便携包及校验文件位于 `dist/latest/`，旧构建保留到 `dist/history/`。GitHub 发行包通过发布工作流独立构建并验证。
+
+## 开源框架与致谢
+
+EchoTest 的桌面工作台、图像识别、代码编辑和安卓接入建立在以下开源项目之上。感谢各项目作者、维护者与贡献者。
+
+| 项目 | 在 EchoTest 中的用途 | 主要许可证 |
+| --- | --- | --- |
+| [Electron](https://github.com/electron/electron) | 桌面应用框架与窗口管理 | MIT |
+| [Node.js](https://github.com/nodejs/node) | JavaScript 运行环境、桌面服务与工具调用 | MIT（主体） |
+| [Python / CPython](https://github.com/python/cpython) | 自动化执行、录制转换与脚本运行环境 | PSF License，另含历史许可 |
+| [Monaco Editor](https://github.com/microsoft/monaco-editor) | 本地 Python 代码编辑器 | MIT |
+| [Pyright](https://github.com/microsoft/pyright) | Python 补全、诊断与代码导航 | MIT |
+| [Ruff](https://github.com/astral-sh/ruff) | Python 代码格式化 | MIT |
+| [OpenCV](https://github.com/opencv/opencv) / [opencv-python](https://github.com/opencv/opencv-python) | 图像处理与模板匹配 | OpenCV：Apache-2.0；Python 打包脚本：MIT |
+| [NumPy](https://github.com/numpy/numpy) | 图像数组与数值计算 | BSD-3-Clause（主体） |
+| [Pillow](https://github.com/python-pillow/Pillow) | 截图、模板及图片资源处理 | MIT-CMU |
+| [RapidOCR](https://github.com/RapidAI/RapidOCR) | 中英文 OCR 识别流程 | Apache-2.0 |
+| [PaddleOCR / PP-OCR](https://github.com/PaddlePaddle/PaddleOCR) | 经 RapidOCR 使用的 OCR 模型来源 | Apache-2.0（项目）；模型以各自发布声明为准 |
+| [ONNX Runtime](https://github.com/microsoft/onnxruntime) | 本地 OCR 模型推理 | MIT |
+| [Protocol Buffers](https://github.com/protocolbuffers/protobuf) | 识别依赖中的结构化数据支持 | BSD-3-Clause |
+| [scrcpy](https://github.com/Genymobile/scrcpy) | 安卓设备视频服务与控制通道 | Apache-2.0 |
+| [ADB / Android Open Source Project](https://android.googlesource.com/platform/packages/modules/adb/) | 安卓设备连接、调试及命令执行 | ADB 源码：Apache-2.0；分发组件见随包 NOTICE |
+| [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) | MCP 服务与客户端协议接入 | MIT |
+| [Koffi](https://github.com/Koromix/koffi) | JavaScript 调用 Windows 原生接口 | MIT |
+| [Zod](https://github.com/colinhacks/zod) | 配置、参数与工具输入校验 | MIT |
+| [DOMPurify](https://github.com/cure53/DOMPurify) | 编辑器间接依赖中的 HTML 净化 | Apache-2.0 或 MPL-2.0 |
+
+构建工具还包括 [esbuild](https://github.com/evanw/esbuild)（MIT，编辑器资源打包）、[NSIS](https://nsis.sourceforge.io/)（[许可说明](https://nsis.sourceforge.io/License)：主体为 zlib/libpng，LZMA 压缩模块为 CPL-1.0）和 [TinyCC](https://bellard.org/tcc/)（LGPL-2.1，编译安装器原生界面辅助组件；编译器本身不进入发行包）。
+
+上述项目及其版权归各自作者和贡献者所有。本节列出主要组成及用途；具体版本见 [package.json](package.json)、[package-lock.json](package-lock.json)、[Python 依赖清单](requirements.txt) 和 [便携依赖锁定清单](requirements-portable.lock)。各组件、传递依赖及模型的许可与版权说明，以对应版本随附的 `LICENSE`、`COPYING`、`NOTICE`、`ThirdPartyNotices` 等文件及上游发布声明为准。
 
 ## 文档导航
 
