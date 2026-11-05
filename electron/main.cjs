@@ -51,6 +51,7 @@ let tray;
 let recordStart=0,recordCount=0,recordPending=false;
 let continuousRole='';
 let selectedGame=null,connectingGame=false;
+let floatingToolbar=null,floatingRequest=null;
 let selectedAndroid=null,androidOperating=false,androidConfigured=false;
 let androidRecordTail=Promise.resolve(),androidRecordSize=null,androidRecordCount=0,androidRecordError='',androidStopping=false;
 const androidStream=new (require('./android-stream.cjs').AndroidStream)({root:ROOT,onPacket:packet=>send({kind:'android_video',...packet}),onState:state=>send({kind:'android_video_state',...state}),onAction:action=>{
@@ -86,6 +87,7 @@ function publishConnection(){send({kind:'game_connection',connection:selectedGam
 function gameState(){return {connection:selectedGame,busy,recordStart,recordCount,recordPending,recordStarting,run:runState.snapshot(),caseName:currentCaseName,casePath:currentPath};}
 function publishRun(){send({kind:'run_state',run:runState.snapshot()});sendGameState();}
 function sendGameState(){
+  floatingToolbar?.update({...gameState(),mcpOperation:automation?.active||'',settingsChanging});
   if(automation)send({kind:'workbench_state',busy,recordStarting,mcpOperation:automation.active||''});
 }
 function nativeHandle(win){const bytes=win.getNativeWindowHandle();return bytes.length===8?Number(bytes.readBigUInt64LE()):bytes.readUInt32LE();}
@@ -237,6 +239,10 @@ function createBridge() {
 
 async function studioCall(event, method, args = {}) {
   const role=authorize(event,window,null,method,args);
+  if(method==='floating_result'){
+    if(floatingRequest&&args.id===floatingRequest.id){const request=floatingRequest;floatingRequest=null;clearTimeout(request.timer);floatingToolbar?.feedback(args.error||args.message||'已完成');args.error?request.reject(new Error(args.error)):request.resolve({ok:true});}
+    return {};
+  }
   const releaseControl=method==='android_control'&&args.event==='cancel';
   if(!releaseControl&&settingsChanging&&!['android_stream_stop','android_stream_ack','settings_get','dirty','stop','record_stop','renderer_error','game_state','audit_list'].includes(method))throw new Error('设置正在更新，请稍后重试');
   if(!releaseControl&&automation?.active&&!['android_stream_stop','android_stream_ack','dirty','stop','record_stop','window_pick_cancel','game_state','audit_list','control_list','renderer_error'].includes(method))throw new Error('MCP 正在操作工作台，请稍候');
@@ -250,6 +256,12 @@ async function stopCurrent(method='stop'){
   finally{androidStopping=false;}
 }
 async function dispatchStudioCall(role, method, args = {}) {
+  if(method==='floating_screenshot'){
+    if(!selectedGame||args.handle!==selectedGame.handle)throw new Error('请先绑定目标窗口');
+    if(busy&&busy!=='recording'||recordStarting||settingsChanging)throw new Error('当前不能截屏');
+    const capture=()=>bridge.call('floating_screenshot',{handle:selectedGame.handle,expected_pid:selectedGame.pid});
+    return busy==='recording'?capture():handoff.call(capture,true);
+  }
   if(method==='editor_control_refs')return bridge.call(method,args);
   if(method.startsWith('android_'))return androidCall(method,args);
   if(method==='editor_sync')return pythonLanguage.sync(args);
@@ -636,6 +648,19 @@ app.whenReady().then(async () => {
     title: 'EchoTest', titleBarStyle: 'hidden', titleBarOverlay: {color: '#f8f8f9', symbolColor: '#55585e', height: 42},
     webPreferences: {preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true,backgroundThrottling:false}
   });
+  floatingToolbar=new (require('./floating-toolbar.cjs').FloatingToolbar)({BrowserWindow,screen,ipcMain,onError:error=>auditError('floating.load',error),onAction:async action=>{
+    if(action==='workbench'){showWorkbench();return {};}
+    if(action==='stop')return stopCurrent('record_stop');
+    if(!selectedGame||closing)throw new Error('请先绑定目标窗口');
+    if(settingsChanging||automation?.active||busy&&busy!=='recording'||recordStarting)throw new Error('当前工作台正在处理操作');
+    if(floatingRequest)throw new Error('上一项悬浮窗操作尚未完成');
+    return new Promise((resolve,reject)=>{
+      const id=require('node:crypto').randomUUID();
+      const timer=setTimeout(()=>{if(floatingRequest?.id===id)floatingRequest=null;reject(new Error('工作台响应超时，请检查操作状态'));},30000);
+      floatingRequest={id,resolve,reject,timer};send({kind:'floating_action',id,action,handle:selectedGame.handle});
+    });
+  }});
+  window.once('closed',()=>{floatingToolbar?.update({connection:null});if(floatingRequest){clearTimeout(floatingRequest.timer);floatingRequest.reject(new Error('工作台已关闭'));floatingRequest=null;}});
   restoreWorkbenchBounds();
   for(const event of ['resize','move'])window.on(event,saveWorkbenchBounds);
   // Editor smoke tests use isolated settings without taking the user's global hotkeys.

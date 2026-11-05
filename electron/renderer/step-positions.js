@@ -31,7 +31,7 @@ function saveStepPosition(){
   if(changed&&ctx.step.action==='drag')delete ctx.step.params.path;
   ctx.step.params[positionField(ctx.key)]=p;ctx.step[ctx.key]='';
   if(ctx.pending)return finishStepSetup(ctx);
-  S.wb.preview=null;dirty();closeModal();render();toast('已更新本步位置','success');
+  S.wb.previewRequest=null;dirty();closeModal();render();toast('已更新本步位置','success');
 }
 function promoteStepPosition(key){
   if(lock())return;
@@ -47,7 +47,7 @@ async function savePositionPromotion(){
   checkPositionContext(m.ctx);setControls(data);
   const target=data.control?.selector||data.entries.find(e=>e.selector.name===name)?.selector;if(!target)throw new Error('共享控件未保存，请刷新后重试');
   useControl(target.name);m.ctx.step[m.ctx.key]=target.name;delete m.ctx.step.params[positionField(m.ctx.key)];
-  S.wb.preview=null;dirty();closeModal();render();toast('已保存为共享控件并引用','success');
+  S.wb.previewRequest=null;dirty();closeModal();render();toast('已保存为共享控件并引用','success');
 }
 async function localizeRecordingPositions(){
   if(lock())return;
@@ -57,7 +57,7 @@ async function localizeRecordingPositions(){
   if(!result.converted){toast(result.reason||'当前没有可转换的录制位置');return;}
   if(!await confirm(`将 ${result.converted} 处录制坐标改为本步位置？`,'仅修改当前草稿。共享库和已保存用例保留，Python 及其他用例引用的位置会跳过。保存用例后生效。'))return;
   if(S.project!==project||JSON.stringify(project)!==before)throw new Error('用例已变化，请重试整理');
-  S.project=result.project;S.selected=Math.max(0,Math.min(S.selected,S.project.steps.length-1));S.wb.preview=null;S.wb.selection=[];S.wb.failure=null;S.stepStatus={};dirty();render();toast(`已整理 ${result.converted} 处录制坐标，等待保存用例`,'success');
+  S.project=result.project;S.selected=Math.max(0,Math.min(S.selected,S.project.steps.length-1));S.wb.previewRequest=null;S.wb.selection=[];S.wb.failure=null;S.stepStatus={};dirty();render();toast(`已整理 ${result.converted} 处录制坐标，等待保存用例`,'success');
 }
 document.addEventListener('input',event=>{if(event.target.id==='position-control-name'&&S.modal?.kind==='position-promotion')S.modal.name=event.target.value;});
 document.addEventListener('change',event=>{if(event.target.id==='position-control-category'&&S.modal?.kind==='position-promotion')S.modal.categoryId=event.target.value;});
@@ -81,7 +81,7 @@ function finishStepSetup(ctx){
   }
   for(const key of ['target','end_target'])if(ctx.step[key])useControl(ctx.step[key]);
   if(S.project.selectors.some(t=>[ctx.step.target,ctx.step.end_target].includes(t.name)&&t.kind==='android_ui'))ctx.step.timeout=15;
-  S.project.steps.splice(ctx.index,0,ctx.step);S.selected=ctx.index;S.stepStatus={};S.wb.preview=null;S.wb.selection=[];
+  S.project.steps.splice(ctx.index,0,ctx.step);S.selected=ctx.index;S.stepStatus={};S.wb.previewRequest=null;S.wb.selection=[];
   dirty();closeModal();S.view='cases';render();
 }
 function stepSetupImageModal(m){

@@ -1,7 +1,7 @@
 'use strict';
 const WB_DRAFT_KEY='echo-test.workbench.draft.v1';
 function initializeWorkbench(){
-  S.wb={selection:[],recordContext:null,converting:false,undoRecording:null,preview:null,failure:null,draftReady:false,draftStatus:'',recovery:null,runOpen:true,range:null};
+  S.wb={stepOrder:'asc',selection:[],recordContext:null,converting:false,undoRecording:null,previewRequest:null,failure:null,draftReady:false,draftStatus:'',recovery:null,runOpen:true,range:null};
   try{S.wb.recovery=WorkbenchModel.parseDraft(localStorage.getItem(WB_DRAFT_KEY));}catch{S.wb.draftStatus='草稿存储不可用，请及时保存用例';}
 }
 function persistWorkbenchDraft(){
@@ -15,7 +15,7 @@ function persistWorkbenchDraft(){
   const node=document.querySelector('#wb-draft-status');if(node)node.textContent=S.wb.draftStatus;
 }
 function clearWorkbenchDraft(force=false){if(S.wb?.recovery&&!force)return;try{localStorage.removeItem(WB_DRAFT_KEY);}catch{}if(S.wb){S.wb.recovery=null;S.wb.draftStatus='';}}
-function workbenchReset(){if(!S.wb)return;S.wb.selection=[];S.wb.preview=null;S.wb.failure=null;S.wb.failureStep=null;S.wb.failureImage=null;S.wb.range=null;S.wb.undoRecording=null;}
+function workbenchReset(){if(!S.wb)return;S.wb.selection=[];S.wb.previewRequest=null;S.wb.failure=null;S.wb.failureStep=null;S.wb.failureImage=null;S.wb.range=null;S.wb.undoRecording=null;}
 function workbenchHint(){
   if(S.wb.converting)return `<div class="wb-hint"><span>正在整理录制并保存草稿，请稍候…</span></div>`;
   if(S.busy==='recording')return `<div class="wb-hint recording"><i class="status-dot red"></i><span id="wb-record-status">${S.recordStarting?'正在启动监听，请稍候…':'正在录制目标窗口 · '+S.recordCount+' 个事件'} · <kbd>F12</kbd> 停止</span>${button('停止录制','stop','record','stop')}</div>`;
@@ -30,10 +30,19 @@ function workbenchHint(){
 }
 function workbenchLibrary(){
   const q=S.caseSearch.toLocaleLowerCase(),items=S.library.filter(row=>(row.name+' '+row.location).toLocaleLowerCase().includes(q));
-  return `<aside class="wb-projects" aria-label="项目用例"><div class="wb-projects-title"><strong>本地用例</strong><button class="icon-button" data-act="case-refresh" title="刷新用例">${icon('refresh')}</button></div><input type="search" id="wb-case-search" value="${esc(S.caseSearch)}" placeholder="搜索用例" aria-label="搜索本地用例"><button class="wb-current">${icon('cases')}<span>${esc(S.project.name)}<small>${S.dirty?'未保存草稿':'当前编辑'}</small></span></button>${items.map(row=>`<button class="wb-case ${row.path===S.path?'active':''}" data-act="case-open" data-path="${esc(row.path)}" title="${esc(row.location)}" ${row.error||disabled()?'disabled':''}>${icon('cases')}<span>${esc(row.name)}<small>${row.steps} 个步骤</small></span></button>`).join('')||'<p class="field-help">保存的用例会显示在这里。</p>'}<div class="wb-project-actions">${button('新建用例','new','ghost','plus',disabled())}${button('打开本地用例','open','ghost','folder',disabled())}</div></aside>`;
+  return `<aside class="wb-projects" aria-label="项目用例"><div class="wb-projects-title"><strong>本地用例</strong><button class="icon-button" data-act="case-refresh" title="刷新用例">${icon('refresh')}</button></div><input type="search" id="wb-case-search" value="${esc(S.caseSearch)}" placeholder="搜索用例" aria-label="搜索本地用例">${items.map(row=>`<button class="wb-case ${row.path===S.path?'active':''}" data-act="case-open" data-path="${esc(row.path)}" title="${esc(row.location)}" ${row.error||disabled()?'disabled':''}>${icon('cases')}<span>${esc(row.name)}<small>${row.steps} 个步骤</small></span></button>`).join('')||'<p class="field-help">保存的用例会显示在这里。</p>'}<div class="wb-project-actions">${button('新建用例','new','ghost','plus',disabled())}${button('打开本地用例','open','ghost','folder',disabled())}</div></aside>`;
 }
 function caseView(){
   return `<div class="wb-workspace"><div class="wb-target"><i class="status-dot ${hasTarget()?'green':''}"></i><span>${esc(S.android.connection?.model||S.connection?.title||'尚未连接目标')}</span>${S.connection?`<small>${S.connection.width} × ${S.connection.height}</small>`:''}<small id="wb-draft-status" role="status">${esc(S.wb.draftStatus)}</small><span class="wb-beta">1.2.1-beta</span></div>${workbenchHint()}<div class="wb-layout">${workbenchLibrary()}<div class="wb-editor">${legacyCaseView()}${workbenchRunView()}</div></div></div>`;
+}
+function workbenchStepOrderTools(){
+  const descending=S.wb.stepOrder==='desc';
+  return `<div class="wb-step-order" role="group" aria-label="步骤显示顺序" title="按步骤序号排序，仅改变显示顺序，执行顺序不变"><button type="button" data-act="wb-step-order" data-order="asc" aria-pressed="${!descending}" class="${descending?'':'active'}">升序 ↑</button><button type="button" data-act="wb-step-order" data-order="desc" aria-pressed="${descending}" class="${descending?'active':''}">降序 ↓</button></div>`;
+}
+function workbenchStepRows(depths){
+  const rows=S.project.steps.map((step,index)=>stepRow(step,index,depths[index]));
+  if(S.wb.stepOrder==='desc')rows.reverse();
+  return rows.join('');
 }
 function workbenchStepTools(){
   if(S.project.mode==='python')return '';
@@ -41,8 +50,7 @@ function workbenchStepTools(){
 }
 function workbenchInspectorView(){
   const step=S.project.steps[S.selected],target=step&&S.project.selectors.find(t=>t.name===step.target);
-  const preview=S.wb.preview?.step===step?S.wb.preview:null;
-  return `${step?workbenchStepTools():''}${workbenchFailureView()}${target?`<section class="wb-target-detail"><div><strong>目标检查</strong>${button('预览定位','wb-preview','ghost','search',disabled())}</div><p>${esc(target.name)} · ${esc(controlKind(target))}</p>${target.kind==='image'?controlImageSlot(controlImage(target),target.name):''}<div class="wb-target-actions">${button('重新采集副本','wb-recapture','ghost','screenshot',disabled())}${button('高级设置','wb-edit-target','ghost','settings',disabled())}</div><small>重新采集仅替换本步引用；共享原控件保持不变。</small></section>`:''}${preview?`<section class="wb-preview"><strong>${preview.shot.matched===false?'未找到满足条件的目标':'定位预览'}</strong><div class="wb-shot"><img src="${esc(preview.shot.image)}" alt="当前目标定位截图">${previewOverlay(preview.shot)}</div><p>${esc(previewHint(preview.shot))}</p>${previewDetails(preview.shot)}<small>${esc(dateLabel(preview.at))} · ${preview.shot.width} × ${preview.shot.height} · 手动预览</small></section>`:''}${inspectorView()}`;
+  return `${step?workbenchStepTools():''}${workbenchFailureView()}${target?`<section class="wb-target-detail"><div><strong>目标检查</strong>${button('预览定位','wb-preview','ghost','search',disabled())}</div><p>${esc(target.name)} · ${esc(controlKind(target))}</p>${target.kind==='image'?controlImageSlot(controlImage(target),target.name):''}<div class="wb-target-actions">${button('重新采集副本','wb-recapture','ghost','screenshot',disabled())}${button('高级设置','wb-edit-target','ghost','settings',disabled())}</div><small>重新采集仅替换本步引用；共享原控件保持不变。</small></section>`:''}${inspectorView()}`;
 }
 function workbenchFailureView(){
   const failure=S.wb.failure;if(!failure||S.project.steps[S.selected]!==S.wb.failureStep)return '';
@@ -56,8 +64,13 @@ async function workbenchPreview(key='target'){
   if(lock())return;if(!hasTarget())throw new Error('请先连接目标窗口');
   const step=S.project.steps[S.selected],p=step?.params?.[positionField(key)],target=p?{...defaultSelector(),...p,name:key==='end_target'?'拖动终点位置':'本步位置'}:S.project.selectors.find(t=>t.name===step?.[key]);
   if(!target)throw new Error('请先选择带有目标控件的步骤');
-  const project=S.project,shot=await api('preview',{...targetArgs(),selector:target,selectors:S.project.selectors});
-  if(S.project!==project)return;S.wb.preview={step,target:target.name,shot,at:new Date().toISOString()};render();
+  const project=S.project,view=S.view,previousModal=S.modal,request={};
+  S.wb.previewRequest=request;
+  try{
+    const shot=await api('preview',{...targetArgs(),selector:target,selectors:project.selectors});
+    if(S.wb.previewRequest!==request||S.project!==project||S.project.steps[S.selected]!==step||S.view!==view||S.modal!==previousModal)return;
+    showModal({kind:'preview',shot,at:new Date().toISOString()});
+  }finally{if(S.wb.previewRequest===request)S.wb.previewRequest=null;}
 }
 async function workbenchStartRecord(after=false){
   if(lock())return;if(S.project.mode==='python'){toast('Python 用例可通过「录制」页创建独立低代码用例');S.view='record';render();return;}
@@ -111,7 +124,7 @@ async function workbenchSaveVerification(){
   useControl(saved.selector.name);
   if(ctx.repair){ctx.step.target=saved.selector.name;delete ctx.step.params.position;if(ctx.step.action==='drag')delete ctx.step.params.path;}
   else{const index=S.project.steps.length?Math.min(ctx.index+1,S.project.steps.length):0;S.project.steps.splice(index,0,{name:`${ctx.action==='assert_absent'?'验证消失':ctx.action==='wait_image'?'等待出现':'验证出现'} · ${saved.selector.name}`,action:ctx.action,target:saved.selector.name,enabled:true,timeout:5,delay:0,repeat:1,params:{}});S.selected=index;}
-  S.wb.preview=null;S.wb.selection=[];dirty();closeModal();S.view='cases';render();toast(ctx.repair?'已替换本步目标，可预览或重跑':'验证步骤已加入草稿','success');
+  S.wb.previewRequest=null;S.wb.selection=[];dirty();closeModal();S.view='cases';render();toast(ctx.repair?'已替换本步目标，可预览或重跑':'验证步骤已加入草稿','success');
 }
 async function workbenchRun(mode){
   if(lock())return;if(!hasTarget())throw new Error('请先连接目标窗口');
@@ -130,7 +143,7 @@ async function workbenchOnFinished(event){
   const failure=event.result.steps?.find(row=>row.status==='failed');
   S.wb.failure=failure||null;S.wb.failureStep=failure?S.project.steps[failure.index]:null;S.wb.failureImage=null;
   if(failure){
-    S.selected=failure.index;S.wb.preview=null;
+    S.selected=failure.index;S.wb.previewRequest=null;
     if(event.directory&&(failure.recognition_screenshot||failure.screenshot)){
       try{const image=await api('report_image',{id:event.directory.split(/[\\/]/).at(-1),file:failure.recognition_screenshot||failure.screenshot});if(S.wb.failure===failure)S.wb.failureImage=image.image;}catch(error){log('失败截图读取失败：'+error.message,'error');}
     }
@@ -138,6 +151,7 @@ async function workbenchOnFinished(event){
   if(S.view==='cases')render();
 }
 async function workbenchAction(action,node){
+  if(action==='wb-step-order'){S.wb.stepOrder=node.dataset.order==='desc'?'desc':'asc';render();return;}
   if(action==='wb-position-edit')return openStepPosition(node.dataset.field);
   if(action==='wb-position-save')return saveStepPosition();
   if(action==='wb-position-promote')return promoteStepPosition(node.dataset.field);
@@ -177,3 +191,32 @@ document.addEventListener('toggle',event=>{if(event.target.matches?.('.wb-run-dr
 window.addEventListener('beforeunload',persistWorkbenchDraft);
 
 function workbenchRecordingStatus(){const node=document.querySelector('#wb-record-status');if(node)node.textContent=`正在录制目标窗口 · ${S.recordCount} 个事件 · F12 停止`;}
+
+async function workbenchFloatingAction(event){
+  let message='',error='';
+  try{
+    if(!window.__studioReady)throw new Error('工作台尚未准备好');
+    if(S.connection?.handle!==event.handle)throw new Error('目标窗口已变化，请重新操作');
+    if(S.modal)throw new Error('请先完成工作台中的弹窗操作');
+    if(event.action==='record'){
+      if(S.project.mode==='python')throw new Error('请先切换到低代码用例再录制');
+      if(lock()||S.recordPending)throw new Error('请先停止当前操作或处理上一段录制');
+      await workbenchStartRecord(true);message='录制已开始 · F12 停止';
+    }else if(event.action==='screenshot'){
+      if(S.project.mode==='python')throw new Error('Python 用例请使用 window.screenshot()');
+      if(S.recordPending||S.wb.converting||S.mcpOperation||S.busy&&S.busy!=='recording')throw new Error('请先完成当前操作');
+      const project=S.project,step=project.steps[S.selected];
+      const result=await api('floating_screenshot',{handle:event.handle});
+      if(!result.recorded){
+        if(S.project!==project)throw new Error('截图已保存，用例已切换，未插入步骤');
+        const index=step?project.steps.indexOf(step)+1:project.steps.length;
+        if(step&&index===0)throw new Error('截图已保存，当前步骤已删除，未插入步骤');
+        project.steps.splice(index,0,{name:'截图',action:'screenshot',target:'',enabled:true,timeout:5,delay:0,repeat:1,params:{}});
+        S.selected=index;S.wb.selection=[];S.stepStatus={};dirty();render();
+      }
+      message=result.recorded?'截图已保存并加入录制序列':'截图已保存并加入当前步骤后';
+      log('截图已保存：'+result.path,'success');
+    }else throw new Error('不支持的悬浮窗操作');
+  }catch(failure){error=failure.message;toast(error,'error');}
+  try{await api('floating_result',{id:event.id,message,error});}catch(failure){toast(failure.message,'error');}
+}

@@ -19,7 +19,7 @@ function previewStatus(record,text){const node=record.wrapper?.querySelector('.i
 function clearPreviews(record){
   record.previewToken=(record.previewToken||0)+1;clearTimeout(record.previewTimer);
   if(record.editor&&record.previewZones?.length)record.editor.changeViewZones(accessor=>{for(const id of record.previewZones)accessor.removeZone(id);});
-  for(const item of record.previewInline||[])record.editor?.removeContentWidget(item.widget);
+  for(const item of record.previewInline||[])if(item.widget)record.editor?.removeContentWidget(item.widget);
   record.previewDecorations?.clear();record.previewInline=[];
   record.previewZones=[];record.previewDialog?.remove();record.previewDialog=null;
 }
@@ -28,14 +28,16 @@ function updateInlinePreviews(record){
   const editor=record.editor,positions=(editor.getSelections()||[]).map(selection=>selection.getPosition()),decorations=[];
   for(const item of record.previewInline){
     item.expanded=editor.hasTextFocus()&&positions.some(position=>position.lineNumber===item.range.startLineNumber&&position.column>=item.range.startColumn&&position.column<item.range.endColumn);
-    if(!item.expanded)decorations.push({range:item.range,options:{description:'control-image-argument',inlineClassName:'ide-control-source-hidden',inlineClassNameAffectsLetterSpacing:true,lineHeight:2.1,before:{content:'\u00a0',inlineClassName:'ide-control-image-slot',inlineClassNameAffectsLetterSpacing:true,cursorStops:monaco.editor.InjectedTextCursorStops.None},stickiness:monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges}});
-    editor.layoutContentWidget(item.widget);
+    if(!item.expanded)decorations.push({range:item.range,options:{description:'control-argument-preview',inlineClassName:'ide-control-source-hidden',inlineClassNameAffectsLetterSpacing:true,lineHeight:item.text?undefined:2.1,before:{content:item.text||'\u00a0',inlineClassName:item.text?'ide-control-coordinate':'ide-control-image-slot',inlineClassNameAffectsLetterSpacing:!item.text,cursorStops:monaco.editor.InjectedTextCursorStops.None},stickiness:monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges}});
+    if(item.widget)editor.layoutContentWidget(item.widget);
   }
   if(!record.previewDecorations)record.previewDecorations=editor.createDecorationsCollection();record.previewDecorations.set(decorations);
 }
-function inlinePreview(record,ref,row){
+function inlinePreview(record,ref,row,text=''){
   if(ref.endLine!==ref.line||!Number.isInteger(ref.column)||!Number.isInteger(ref.endColumn)||ref.column<1||ref.endColumn<=ref.column||ref.endColumn>record.model.getLineMaxColumn(ref.line))return false;
-  const item={range:new monaco.Range(ref.line,ref.column,ref.line,ref.endColumn),expanded:false};row.classList.add('ide-control-inline');row.title=row.textContent+'\n'+record.model.getValueInRange(item.range)+'\n光标移入参数可编辑源码';
+  const item={range:new monaco.Range(ref.line,ref.column,ref.line,ref.endColumn),expanded:false,text};
+  if(text){row.remove();record.previewInline.push(item);return true;}
+  row.classList.add('ide-control-inline');row.title=row.textContent+'\n'+record.model.getValueInRange(item.range)+'\n光标移入参数可编辑源码';
   item.widget={getId:()=>record.id+'-control-'+record.previewToken+'-'+record.previewInline.length,getDomNode:()=>row,suppressMouseDown:true,getPosition:()=>item.expanded?null:{position:{lineNumber:ref.line,column:ref.column},positionAffinity:monaco.editor.PositionAffinity.LeftOfInjectedText,preference:[monaco.editor.ContentWidgetPositionPreference.EXACT]}};
   // Capture the ID now: the array length changes as further occurrences are added.
   const id=item.widget.getId();item.widget.getId=()=>id;record.previewInline.push(item);record.editor.addContentWidget(item.widget);return true;
@@ -70,6 +72,14 @@ async function refreshPreviews(record){
         const matches=aliases.length?aliases.flatMap(selector=>selector.library_id?entries.filter(entry=>entry.id===selector.library_id):[{selector}]):entries.filter(entry=>ref.kind==='id'?entry.id===ref.value:entry.selector?.name===ref.value);
         if(matches.length!==1){label.textContent=(matches.length?'控件名称不唯一 · ':'控件不存在 · ')+String(ref.value);continue;}
         const selector=matches[0].selector||{},types={image:'图片',coordinate:'坐标',android_ui:'原生控件'};label.textContent=(selector.name||ref.value)+' · '+(types[selector.kind]||selector.kind||'控件');
+        if(selector.kind==='coordinate'){
+          const format=value=>selector.normalized!==false?`${Number((value*100).toFixed(2))}%`:String(value);
+          if(Number.isFinite(selector.x)&&Number.isFinite(selector.y)){
+            const offset=selector.offset_x||selector.offset_y?` + 偏移(${selector.offset_x||0}, ${selector.offset_y||0})`:'';
+            inlinePreview(record,ref,row,`坐标(${format(selector.x)}, ${format(selector.y)})${offset}`);
+          }
+          continue;
+        }
         if(selector.kind!=='image')continue;
         const image=selector.image||selector.templates?.[0]?.image,thumbnail=document.createElement('button');thumbnail.type='button';thumbnail.className='ide-control-thumbnail';thumbnail.textContent=image?'正在读取图片…':'未配置模板图片';row.prepend(thumbnail);thumbnail.disabled=true;
         thumbnail.setAttribute('aria-label',(selector.name||ref.value)+' · 查看控件图片');thumbnail.title=(selector.name||ref.value)+' · 点击查看大图';

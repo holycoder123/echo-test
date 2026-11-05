@@ -563,6 +563,27 @@ class Service:
             project = save_project(self.controls.prune_project(self.controls.resolve_project(parsed, self.base_dir)), path, self.base_dir)
             self.case_path, self.base_dir = path, path.parent
             return self.project_response(project, path)
+        if method == "floating_screenshot":
+            if self.running:
+                raise ValueError("请先停止执行再截屏")
+            with self.record_lock:
+                recorder = self.recorder
+                game = self.window(args['handle'])
+                self.verify_game_pid(game, args.get('expected_pid'))
+                if recorder and getattr(getattr(recorder, 'window', None), 'handle', None) != game.handle:
+                    raise ValueError("录制目标与截图窗口不一致")
+                backend = WindowsBackend(game)
+                if not recorder:
+                    backend.activate(require_input=False)
+                stamp = time.monotonic() - recorder.start_time if recorder else None
+                image = backend.capture()
+                directory = ROOT / 'recordings' / 'screenshots'
+                directory.mkdir(parents=True, exist_ok=True)
+                path = directory / ('screen_' + uuid4().hex + '.png')
+                image.save(path)
+                if recorder:
+                    recorder.queue.put({'kind':'screenshot', 'event':'screenshot', 't':stamp})
+                return {'path':str(path), 'recorded':bool(recorder)}
         if method == "capture":
             return self.capture(args.get("handle"), args.get('target'))
         if method == "automation_explore":

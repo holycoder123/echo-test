@@ -21,3 +21,5 @@ for(const method of ['android_stream_start','android_stream_stop','android_strea
 
 for(const method of ['settings_environment','settings_environment_pick'])MAIN_METHODS.add(method);
 MAIN_METHODS.add('editor_control_refs');
+
+for(const method of ['floating_screenshot','floating_result'])MAIN_METHODS.add(method);

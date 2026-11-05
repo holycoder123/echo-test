@@ -17,22 +17,24 @@ try {
         if ($component.id -notmatch '^[a-f0-9]{24}$') { throw 'Invalid environment component ID' }
         $valid = $false
         try {
-            $directory = [IO.Path]::GetFullPath((Join-Path $root $component.path)).TrimEnd('\') + '\'
+            $directory = [IO.Path]::GetFullPath([IO.Path]::Combine($root, $component.path)).TrimEnd('\') + '\'
             if (!$directory.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { throw 'Invalid component path' }
             $valid = $component.files.Count -gt 0 -and [IO.Directory]::Exists($directory)
-            foreach ($entry in $component.files) {
-                if (!$valid) { break }
-                $file = [IO.Path]::GetFullPath((Join-Path $directory $entry.path))
-                if (!$file.StartsWith($directory, [StringComparison]::OrdinalIgnoreCase)) { throw 'Invalid dependency path' }
-                $info = [IO.FileInfo]::new($file)
-                if (!$info.Exists -or $info.Length -ne $entry.size) { $valid = $false; break }
-                # Timestamps and version markers alone cannot detect damaged DLLs/models.
-                $stream = [IO.File]::OpenRead($file)
-                $sha = [Security.Cryptography.SHA256]::Create()
-                try { $hash = [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '').ToLowerInvariant() }
-                finally { $sha.Dispose(); $stream.Dispose() }
-                if ($hash -ne $entry.sha256) { $valid = $false; break }
-            }
+            $sha = [Security.Cryptography.SHA256]::Create()
+            try {
+                foreach ($entry in $component.files) {
+                    if (!$valid) { break }
+                    $file = [IO.Path]::GetFullPath([IO.Path]::Combine($directory, $entry.path))
+                    if (!$file.StartsWith($directory, [StringComparison]::OrdinalIgnoreCase)) { throw 'Invalid dependency path' }
+                    $info = [IO.FileInfo]::new($file)
+                    if (!$info.Exists -or $info.Length -ne $entry.size) { $valid = $false; break }
+                    # Timestamps and version markers alone cannot detect damaged DLLs/models.
+                    $stream = [IO.File]::OpenRead($file)
+                    try { $hash = [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '').ToLowerInvariant() }
+                    finally { $stream.Dispose() }
+                    if ($hash -ne $entry.sha256) { $valid = $false; break }
+                }
+            } finally { $sha.Dispose() }
         } catch { $valid = $false }
         if ($valid) { $reuse.Add($component.id + '=1'); $reused++ }
         else { $repaired++ }

@@ -130,13 +130,7 @@ Function SetupWelcome
   !insertmacro SetupLabel 38 61 660 40 "欢迎使用 EchoTest" 232428 $UiTitleFont
   !insertmacro SetupLabel 38 111 660 52 "将重复操作，交给自动化。$\r$\n安装桌面自动化测试工作台，开始录制、编排和运行你的测试。" 737680 $UiBodyFont
   !insertmacro SetupLabel 38 181 660 24 "操作录制     ·     低代码编排     ·     Python 脚本" 555C68 $UiBodyFont
-  !insertmacro SetupControl Label 38 222 660 101 "" $0
-  SetCtlColors $0 626671 FAFAFB
-  !insertmacro SetupLabel 55 235 625 20 "安装前，了解这两件事" 444954 $UiBodyFont
-  SetCtlColors $0 444954 FAFAFB
-  !insertmacro SetupLabel 55 261 625 51 "已包含 Node.js、Python 和 OCR 运行环境，无需另行配置。$\r$\n升级前请保存工作并关闭 EchoTest，已有用例和控件会保留。" 626671 $UiBodyFont
-  SetCtlColors $0 626671 FAFAFB
-  !insertmacro SetupLabel 38 344 660 22 "Windows 10 及以上 · 64 位" 737680 $UiBodyFont
+  !insertmacro SetupLabel 38 225 660 22 "Windows 10 及以上 · 64 位" 737680 $UiBodyFont
   GetDlgItem $0 $HWNDPARENT 1
   ${NSD_SetText} $0 "下一步"
   nsDialogs::Show
@@ -296,10 +290,10 @@ Function SetupFinish
   Call SetupCreatePage
   !insertmacro SetupLabel 38 30 660 18 "ALL SET" 737680 $UiBodyFont
   !insertmacro SetupLabel 38 68 660 40 "一切就绪，开始测试" 232428 $UiTitleFont
-  !insertmacro SetupLabel 38 126 660 53 "EchoTest ${PRODUCT_VERSION} 已准备就绪。$\r$\n从录制一个操作开始，构建你的第一个自动化用例。" 737680 $UiBodyFont
-  !insertmacro SetupLabel 38 213 660 20 "安装位置" 737680 $UiBodyFont
-  !insertmacro SetupLabel 38 240 660 40 "$INSTDIR" 444954 $UiBodyFont
-  !insertmacro SetupControl Checkbox 38 310 660 25 "完成后启动 EchoTest" $UiLaunch
+  !insertmacro SetupLabel 38 126 660 24 "EchoTest ${PRODUCT_VERSION} 已准备就绪。" 737680 $UiBodyFont
+  !insertmacro SetupLabel 38 181 660 20 "安装位置" 737680 $UiBodyFont
+  !insertmacro SetupLabel 38 208 660 40 "$INSTDIR" 444954 $UiBodyFont
+  !insertmacro SetupControl Checkbox 38 263 660 25 "完成后启动 EchoTest" $UiLaunch
   ${NSD_SetState} $UiLaunch $LaunchChoice
   ${If} $TestInstall == 1
     ${NSD_Uncheck} $UiLaunch

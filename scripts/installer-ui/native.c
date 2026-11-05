@@ -95,32 +95,17 @@ static void paint_chrome(Chrome *s, HDC target) {
     text(dc,s->dpi,s->small,MUTED,s->uninstall?L"卸载向导":L"安装向导",137,17,100,22,DT_VCENTER);
     line(dc,s->dpi,LINE,125,18,125,35);
     text(dc,s->dpi,s->small,MUTED,s->version,565,17,110,22,DT_RIGHT|DT_VCENTER);
-    text(dc,s->dpi,s->small,MUTED,L"EchoTest · 桌面自动化测试工作台",26,(client.bottom*96/(int)s->dpi)-50,370,26,DT_VCENTER);
     if(s->uninstall) {
         text(dc,s->dpi,s->normal,INK,s->step>=3?L"卸载完成":L"卸载 EchoTest",38,74,650,32,DT_VCENTER);
     } else {
-        static const WCHAR *labels[]={L"欢迎",L"安装选项",L"安装",L"完成"};
-        static const int centers[]={51,246,459,646};
-        static const int link_start[]={113,329,515}, link_end[]={207,420,607};
-        for(int i=0;i<3;i++)line(dc,s->dpi,RGB(222,223,227),link_start[i],91,link_end[i],91);
+        static const WCHAR *labels[]={L"欢迎",L"安装选项",L"正在安装",L"安装完成"};
+        int step=s->step>=0 && s->step<4?s->step:0;
+        WCHAR count[]={L'0'+step+1,L' ',L'/',L' ',L'0'+4,0};
+        text(dc,s->dpi,s->normal,INK,labels[step],38,67,540,32,DT_VCENTER);
+        text(dc,s->dpi,s->small,MUTED,count,595,67,103,32,DT_RIGHT|DT_VCENTER);
         for(int i=0;i<4;i++) {
-            COLORREF edge=i<s->step?RGB(204,228,219):(i==s->step?DARK:RGB(217,219,224));
-            HBRUSH brush=CreateSolidBrush(i<s->step?RGB(237,246,242):(i==s->step?DARK:WHITE));
-            HPEN pen=CreatePen(PS_SOLID,scale(s->dpi,1),edge);
-            HGDIOBJ oldbrush=SelectObject(dc,brush),oldpen=SelectObject(dc,pen);
-            Ellipse(dc,scale(s->dpi,centers[i]-11),scale(s->dpi,80),scale(s->dpi,centers[i]+12),scale(s->dpi,103));
-            SelectObject(dc,oldpen);SelectObject(dc,oldbrush);DeleteObject(pen);DeleteObject(brush);
-            if(i<s->step) {
-                HPEN tick=CreatePen(PS_SOLID,scale(s->dpi,1),GREEN);oldpen=SelectObject(dc,tick);
-                MoveToEx(dc,scale(s->dpi,centers[i]-4),scale(s->dpi,91),NULL);
-                LineTo(dc,scale(s->dpi,centers[i]-1),scale(s->dpi,95));
-                LineTo(dc,scale(s->dpi,centers[i]+5),scale(s->dpi,86));
-                SelectObject(dc,oldpen);DeleteObject(tick);
-            } else {
-                WCHAR number[2]={(WCHAR)(L'1'+i),0};
-                text(dc,s->dpi,s->number,i==s->step?WHITE:MUTED,number,centers[i]-11,80,23,23,DT_CENTER|DT_VCENTER);
-            }
-            text(dc,s->dpi,s->small,i==s->step?INK:MUTED,labels[i],centers[i]+21,79,82,25,DT_VCENTER);
+            int start=38+i*167;
+            line(dc,s->dpi,i<=step?GREEN:LINE,start,112,start+159,112);
         }
     }
     BitBlt(target,0,0,client.right,client.bottom,dc,0,0,SRCCOPY);

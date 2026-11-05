@@ -22,7 +22,8 @@ OutFile "${OUTPUT_EXE}"
 InstallDir "$LOCALAPPDATA\Programs\EchoTest"
 InstallDirRegKey HKCU "${APP_KEY}" "InstallLocation"
 !ifndef SETUP_COMPRESSION
-  !define SETUP_COMPRESSION "/SOLID lzma"
+  ; Favor extraction speed for the bundled runtimes.
+  !define SETUP_COMPRESSION "zlib"
 !endif
 SetCompressor ${SETUP_COMPRESSION}
 !if "${SETUP_COMPRESSION}" == "/SOLID lzma"
@@ -116,6 +117,10 @@ Section "工作台及离线运行环境（必需）" Core
     Abort
   ${EndIf}
   idle_checked:
+  ; A fresh install has no managed environment to reuse.
+  IfFileExists "$INSTDIR\runtime\*" check_environment
+  IfFileExists "$INSTDIR\node_modules\*" check_environment write_payload
+  check_environment:
   InitPluginsDir
   SetOutPath "$PLUGINSDIR"
   File /oname=installer-environment.ps1 "${PROJECT_ROOT}\scripts\installer-environment.ps1"
@@ -129,6 +134,7 @@ Section "工作台及离线运行环境（必需）" Core
     Delete "$PLUGINSDIR\environment-reuse.ini"
     DetailPrint "Environment detection unavailable; installing bundled dependencies."
   ${EndIf}
+  write_payload:
   !insertmacro SetupStage 1
   SetOutPath "$INSTDIR"
   SetOverwrite on
@@ -157,8 +163,14 @@ Section "工作台及离线运行环境（必需）" Core
   WriteINIStr "$INSTDIR\echo-test-install.ini" "Installer" "AppId" "EchoTest"
   WriteINIStr "$INSTDIR\echo-test-install.ini" "Installer" "TestInstall" "$TestInstall"
   ReadINIStr $0 "$PLUGINSDIR\environment-reuse.ini" "Summary" "Reused"
+  ${If} $0 == ""
+    StrCpy $0 "0"
+  ${EndIf}
   WriteINIStr "$INSTDIR\echo-test-install.ini" "Environment" "Reused" "$0"
   ReadINIStr $0 "$PLUGINSDIR\environment-reuse.ini" "Summary" "InstalledOrRepaired"
+  ${If} $0 == ""
+    StrCpy $0 "${ENVIRONMENT_COMPONENT_COUNT}"
+  ${EndIf}
   WriteINIStr "$INSTDIR\echo-test-install.ini" "Environment" "InstalledOrRepaired" "$0"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   WriteRegStr HKCU "$RegistryKey" "DisplayName" "${APP_NAME}"

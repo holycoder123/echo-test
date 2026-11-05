@@ -185,6 +185,7 @@ EchoTest 的桌面工作台、图像识别、代码编辑和安卓接入建立�
 | 安装、升级、卸载与离线分发 | [Windows 安装版](docs/installer.md) · [便携运行包](docs/portable.md) |
 | 接入支持 MCP 的客户端 | [MCP 接入](docs/mcp.md) |
 | Python 编辑器、双模式与脚本 API | [Python 用例与脚本](docs/python-scripts.md) |
+| Python 函数签名、参数、返回值与示例 | [Python 模式接口文档](docs/python-api.md) |
 | 代码结构、测试与发布变化 | [项目结构](docs/structure.md) · [开发与验证](docs/testing.md) · [1.2.0 发布说明](docs/releases/1.2.0.md) |
 | Logo、桌面图标与分享封面 | [品牌资源及使用规范](docs/brand/README.md) |
 

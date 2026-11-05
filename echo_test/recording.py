@@ -30,7 +30,9 @@ def convert_events(events, name="录制的测试用例"):
         selectors.append(selector)
         return selector.name
     for event in sorted(events, key=lambda item: item["t"]):
-        if event["kind"] == "key":
+        if event["kind"] == "screenshot":
+            actions.append((event["t"], event["t"], Step(name="截图", action="screenshot", delay=0)))
+        elif event["kind"] == "key":
             vk = event["vk"]
             if vk in {91, 92, 123}:
                 continue

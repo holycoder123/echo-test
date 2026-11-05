@@ -190,7 +190,7 @@ async function sharedControlAction(action,node){
       if(m.step.action==='drag'&&(m.step[m.key]!==name||m.step.params?.[positionField(m.key)]))delete m.step.params.path;
       m.step[m.key]=name;
       if(m.step.params)delete m.step.params[positionField(m.key)];
-      S.wb.preview=null;
+      S.wb.previewRequest=null;
       dirty();closeModal();render();
     }
     return true;

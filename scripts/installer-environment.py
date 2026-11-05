@@ -56,5 +56,6 @@ def prepare(payload, output):
     (output / 'environment-manifest.json').write_text(
         json.dumps({'schema_version': 1, 'components': components}, separators=(',', ':')),
         encoding='utf-8')
+    blocks.insert(0, f'!define ENVIRONMENT_COMPONENT_COUNT {len(components)}')
     (output / 'environment-files.nsh').write_text('\n'.join(blocks) + '\n', encoding='utf-8')
     return components

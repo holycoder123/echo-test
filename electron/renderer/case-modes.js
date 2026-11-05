@@ -37,16 +37,21 @@ function caseModeBar(){
 }
 function pythonControlPanel(){
   const query=(S.pythonControlSearch||'').trim().toLocaleLowerCase();
-  const entries=S.controls.entries.filter(entry=>[entry.selector.name,entry.selector.text||'',categoryName(entry.category_id)].join(' ').toLocaleLowerCase().includes(query));
-  return `<div class="inspector-head"><span>控件参数</span><small>${entries.length} 个</small></div><div class="search python-control-search"><input id="python-control-search" type="search" placeholder="搜索控件名称 / 分类" value="${esc(S.pythonControlSearch||'')}" aria-label="搜索 Python 控件" ${disabled()}></div><p class="field-help">选中控件可预览并插入引用。引用可作为 window 操作或自定义函数的参数。</p><div class="python-control-list">${entries.map(entry=>{
+  const entries=S.controls.entries.filter(entry=>[entry.selector.name,entry.selector.text||'',categoryName(entry.category_id)].join(' ').toLocaleLowerCase().includes(query))
+    .sort((a,b)=>Number(b.selector.kind==='image')-Number(a.selector.kind==='image'));
+  return `<div class="inspector-head"><span>控件参数</span><small>${entries.length} 个</small></div><div class="search python-control-search"><input id="python-control-search" type="search" placeholder="搜索控件名称 / 分类" value="${esc(S.pythonControlSearch||'')}" aria-label="搜索 Python 控件" ${disabled()}></div><p class="field-help">图片控件优先显示，缩略图自动加载。选中控件后可插入引用。引用可作为 window 操作或自定义函数的参数。</p><div class="python-control-list">${entries.map(entry=>{
     const target=entry.selector;
-    return `<button class="python-control-card ${S.pythonControlSelected===entry.id?'active':''}" data-act="mode-control" data-id="${esc(entry.id)}" ${disabled()}>${controlImage(target)?controlImageSlot(controlImage(target),target.name):icon(target.kind==='image'?'image':'coordinate')}<span><strong>${esc(target.name)}</strong><small>${esc(controlKind(target))} · ${esc(categoryName(entry.category_id))}</small></span></button>`;
+    const selected=S.pythonControlSelected===entry.id;
+    return `<div class="python-control-row"><button class="python-control-card ${selected?'active':''}" data-act="mode-control" data-id="${esc(entry.id)}" ${disabled()}>${controlImage(target)?controlImageSlot(controlImage(target),target.name):icon(target.kind==='image'?'image':'coordinate')}<span><strong>${esc(target.name)}</strong><small>${esc(controlKind(target))} · ${esc(categoryName(entry.category_id))}</small></span></button>${selected?button('插入','mode-insert-control','primary','plus',disabled()+' aria-label="插入控件引用"'):''}</div>`;
   }).join('')||'<div class="empty compact">没有匹配控件，可在通用控件库中添加。</div>'}</div>${pythonControlDetail()}`;
+}
+function loadPythonControlThumbnails(){
+  for(const slot of document.querySelectorAll('#python-controls [data-image-slot]'))void thumbnail(slot.dataset.imageSlot);
 }
 function pythonControlDetail(){
   const target=S.controls.entries.find(entry=>entry.id===S.pythonControlSelected)?.selector;
   if(!target)return '';
-  return `<div class="python-control-detail">${controlImage(target)?controlImageSlot(controlImage(target),target.name):''}<strong>${esc(target.name)}</strong><code>${esc(pythonControlReference(target))}</code>${button('插入控件引用','mode-insert-control','primary','plus',disabled())}<p class="field-help">在光标处插入；共享控件改名后仍按 ID 引用。</p></div>`;
+  return `<div class="python-control-detail">${controlImage(target)?controlImageSlot(controlImage(target),target.name):''}<strong>${esc(target.name)}</strong><code>${esc(pythonControlReference(target))}</code><p class="field-help">在光标处插入；共享控件改名后仍按 ID 引用。</p></div>`;
 }
 function pythonCaseView(){
   return `<div class="case-layout python-case-layout"><div class="python-case-main"><div class="section-toolbar"><span>${(S.project.code||'').split('\n').length} 行 Python</span><div class="right"><span>用例循环</span>${input(S.iterations,'id="iterations"','number','class="tiny-number" min="1" max="1000"')}${button('导入 .py','mode-import','ghost','upload',disabled())}</div></div><textarea id="case-python-code" class="python-editor case-python-code" spellcheck="false" aria-label="Python 用例代码" ${disabled()}>${esc(S.project.code||'')}</textarea><p class="field-help">Ctrl+Space 补全 · Ctrl+Alt+L 格式化 · Ctrl+B 查看定义 · Ctrl+F 查找 · Ctrl+H 替换 · F12 停止</p></div><aside class="inspector python-case-inspector">${field('用例执行超时 · 秒',input(S.project.script_timeout??600,'data-project-timeout','number','min="0.1" max="600" step="1"'))}<div id="python-controls">${pythonControlPanel()}</div></aside></div>`;
@@ -89,10 +94,12 @@ async function caseModeAction(action,node){
     await api('dirty',{value:S.dirty,caseName:S.project.name});render();return true;
   }
   if(action==='mode-control'){
-    S.pythonControlSelected=node.dataset.id;const panel=document.querySelector('#python-controls');
+    S.pythonControlSelected=node.dataset.id;
+    const panel=document.querySelector('#python-controls');
+    const scrollTop=panel.querySelector('.python-control-list').scrollTop;
     panel.innerHTML=pythonControlPanel();
-    const target=S.controls.entries.find(entry=>entry.id===node.dataset.id)?.selector;
-    if(target)await thumbnail(controlImage(target));return true;
+    panel.querySelector('.python-control-list').scrollTop=scrollTop;
+    loadPythonControlThumbnails();return true;
   }
   if(action==='mode-insert-control'){
     const target=S.controls.entries.find(entry=>entry.id===S.pythonControlSelected)?.selector;
@@ -113,6 +120,7 @@ function caseModeInput(event){
   if(node.id==='python-control-search'){
     if(disabled())return true;S.pythonControlSearch=node.value;
     const start=node.selectionStart;document.querySelector('#python-controls').innerHTML=pythonControlPanel();
+    loadPythonControlThumbnails();
     const next=document.querySelector('#python-control-search');next.focus();next.setSelectionRange(start,start);return true;
   }
   if(node.id==='case-python-code'||node.hasAttribute('data-project-timeout')){
